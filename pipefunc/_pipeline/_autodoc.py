@@ -95,6 +95,7 @@ def format_pipeline_docs(
     returns_table: bool = True,
     order: Literal["topological", "alphabetical"] = "topological",
     print_table: bool = True,
+    emojis: bool = True,
 ) -> tuple[Table, ...] | None:
     """Formats pipeline documentation into rich tables.
 
@@ -122,6 +123,8 @@ def format_pipeline_docs(
 
         * ``topological``: Display functions in topological order.
         * ``alphabetical``: Display functions in alphabetical order (using ``output_name``).
+    emojis
+        Whether to use emojis in the documentation.
 
     Returns
     -------
@@ -138,7 +141,7 @@ def format_pipeline_docs(
     tables: list[Table] = []
 
     if parameters_table:
-        table_params = _create_parameters_table(doc, box, skip_optional, skip_intermediate)
+        table_params = _create_parameters_table(doc, box, skip_optional, skip_intermediate, emojis)
         tables.append(table_params)
 
     if description_table:
@@ -202,8 +205,9 @@ def _output_name_text(output_name: OUTPUT_TYPE) -> Text:
 def _create_parameters_table(
     doc: PipelineDocumentation,
     box: Any,
-    skip_optional: bool,  # noqa: FBT001
-    skip_intermediate: bool,  # noqa: FBT001
+    skip_optional: bool,
+    skip_intermediate: bool,
+    emojis: bool,
 ) -> Table:
     """Creates the parameters table."""
     from rich.table import Table
@@ -235,6 +239,7 @@ def _create_parameters_table(
                 doc.defaults,
                 doc.p_annotations,
                 skip_optional,
+                emojis,
             ),
         )
     return table_params
@@ -245,7 +250,8 @@ def _create_parameter_row(
     param_descs: list[str],
     defaults: dict[str, Any],
     p_annotations: dict[str, Any],
-    skip_optional: bool,  # noqa: FBT001
+    skip_optional: bool,
+    emojis: bool,
 ) -> list[Text]:
     """Creates a row for the parameters table."""
     from rich.text import Text
@@ -255,7 +261,9 @@ def _create_parameter_row(
     default_str = f" [italic bold](default: {default})[/]" if param in defaults else ""
     annotation_str = f" [italic bold](type: {annotation})[/]" if param in p_annotations else ""
     param_text = Text.from_markup(f"{param}")
-    default_col = Text.from_markup("❌" if param in defaults else "✅")
+    yes = "✅" if emojis else "Yes"
+    no = "❌" if emojis else "No"
+    default_col = Text.from_markup(no if param in defaults else yes)
     if len(param_descs) == 1:
         param_desc_text = param_descs[0]
     else:

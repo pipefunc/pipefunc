@@ -493,7 +493,7 @@ class Electrostatics:
 
 
 @pytest.mark.parametrize("with_multiple_outputs", [False, True])
-def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  # noqa: FBT001
+def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:
     @pipefunc(output_name="geo")
     def make_geometry(x: float, y: float) -> Geometry:
         return Geometry(x, y)
@@ -1613,7 +1613,14 @@ async def test_map_async_with_progress(scheduling_strategy: Literal["generation"
         show_progress="ipywidgets",
         scheduling_strategy=scheduling_strategy,
         executor=ThreadPoolExecutor(),
+        start=False,
     )
+    with pytest.raises(RuntimeError, match="The task has not been started."):
+        async_map.task  # noqa: B018
+    async_map.start()
+    with pytest.warns(UserWarning, match="Task is already running"):
+        async_map.start()
+
     # Test that the progress tracker is working
     progress = async_map.progress
     assert isinstance(progress, IPyWidgetsProgressTracker)
@@ -1967,3 +1974,30 @@ def test_pipeline_map_single_output_load_all_outputs(tmp_path: Path) -> None:
     assert r["y"].output.tolist() == [2, 3, 4]
     outputs = load_all_outputs(run_folder=tmp_path)
     assert outputs["y"].tolist() == [2, 3, 4]
+
+
+def test_error_snapshot_in_parallel_map():
+    @pipefunc(output_name="c", renames={"a": "b"})
+    def f(a):
+        if a < 0:
+            msg = "a cannot be negative"
+            raise ValueError(msg)
+        return a * 2
+
+    pipeline = Pipeline([f])
+    for parallel in [True, False]:
+        with pytest.raises(ValueError, match="a cannot be negative"):
+            pipeline.map(
+                {"b": -1},
+                parallel=parallel,
+                executor=ThreadPoolExecutor() if parallel else None,
+                storage="dict",
+            )
+        with pytest.raises(ValueError, match="a cannot be negative"):
+            pipeline.error_snapshot.reproduce()
+
+    pipeline["c"].error_snapshot = None
+    with pytest.raises(ValueError, match="a cannot be negative"):
+        pipeline.run("c", kwargs={"b": -1})
+    with pytest.raises(ValueError, match="a cannot be negative"):
+        pipeline.error_snapshot.reproduce()

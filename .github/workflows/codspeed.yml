@@ -16,7 +16,7 @@ jobs:
     env:
       python-version: "3.13"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -38,9 +38,10 @@ jobs:
           pip install -e ".[test,all]"
 
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@v3
+        uses: CodSpeedHQ/action@v4
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
+          mode: instrumentation
           run: |
             micromamba run -n pipefunc \
               pytest tests/test_benchmark.py --codspeed --timeout 120

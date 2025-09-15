@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from pipefunc._utils import infer_shape
+
 from ._load import load_outputs, maybe_load_data
 from ._mapspec import MapSpec, mapspec_axes, trace_dependencies
 from ._run_info import RunInfo
@@ -106,7 +108,6 @@ def _xarray(
     load_intermediate: bool = True,
 ) -> xr.DataArray:
     """Load and represent the data as an `xarray.DataArray`."""
-    data = data_loader(output_name)
     all_dependencies = trace_dependencies(mapspecs)
     target_dependencies = all_dependencies.get(output_name, {})
     axes_mapping = mapspec_axes(mapspecs)
@@ -119,13 +120,13 @@ def _xarray(
         if name in inputs:
             array = inputs[name]
             array = maybe_load_data(array)
-            if not isinstance(array, np.ndarray):
-                array = _to_array(array, (len(array),))
         elif load_intermediate:
             array = data_loader(name)
         else:
             continue
 
+        array = _maybe_to_array(array)
+        array = _reshape_if_needed(array, name, axes_mapping)
         if axes == axes_mapping[name]:
             coord_mapping[axes][name].append(array)
 
@@ -144,17 +145,38 @@ def _xarray(
                 for i in np.ndindex(shape):
                     array[i] = tuple(arr[i] for arr in arrays)
             else:
-                array = pd.MultiIndex.from_arrays(arrays, names=names)  # type: ignore[arg-type]
+                array = _create_multiindex(arrays, names=names)
         coords[name] = (axes, array)
+
+    data = data_loader(output_name)
+    data = _maybe_to_array(data)
+    data = _reshape_if_needed(data, output_name, axes_mapping)
 
     return xr.DataArray(data, coords=coords, dims=axes_mapping[output_name], name=output_name)
 
 
-def _to_array(x: list[Any], shape: tuple[int, ...]) -> np.ndarray:
+def _maybe_to_array(x: Any) -> np.ndarray | Any:
     """Convert an iterable to an array."""
+    if isinstance(x, np.ndarray):
+        return x
+    shape = infer_shape(x)
+    if shape == ():
+        return x
     arr = np.empty(shape, dtype=object)
     arr[:] = x
     return arr
+
+
+def _reshape_if_needed(array: Any, name: str, axes_mapping: dict[str, tuple[str, ...]]) -> Any:
+    """Reshape N-D array to match mapspec dimensionality using object arrays."""
+    dims = axes_mapping.get(name)
+    if not isinstance(array, np.ndarray) or not dims or array.ndim <= len(dims):
+        return array
+    expected_shape = array.shape[: len(dims)]
+    new_array = np.empty(expected_shape, dtype=object)
+    for index in np.ndindex(expected_shape):
+        new_array[index] = array[index]
+    return new_array
 
 
 def _xarray_dataset(
@@ -219,3 +241,28 @@ def xarray_dataset_to_dataframe(ds: xr.Dataset) -> pd.DataFrame:
         if isinstance(df[col].iloc[0], DimensionlessArray):
             df[col] = df[col].apply(lambda x: x.arr)
     return _split_tuple_columns(df)
+
+
+def _create_multiindex(
+    arrays: list[Any],
+    *,
+    names: list[str],
+) -> pd.MultiIndex:
+    """Create a pandas MultiIndex, with a fallback for unhashable types.
+
+    Attempts to use `pandas.MultiIndex.from_arrays`, which is fast but requires
+    hashable elements. If that fails with a `TypeError`, it falls back to assuming
+    that items within each array are unique.
+    """
+    try:
+        return pd.MultiIndex.from_arrays(arrays, names=names)
+    except TypeError:
+        # This path assumes that items within each array are unique.
+        codes = [range(len(arr)) for arr in arrays]
+        levels = [pd.Index(arr) for arr in arrays]
+        return pd.MultiIndex(
+            levels=levels,
+            codes=codes,
+            names=names,
+            verify_integrity=False,
+        )

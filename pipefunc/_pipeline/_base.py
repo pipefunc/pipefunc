@@ -15,6 +15,7 @@ from __future__ import annotations
 import functools
 import inspect
 import os
+import re
 import time
 import warnings
 from dataclasses import dataclass, field
@@ -22,19 +23,19 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import networkx as nx
 
-from pipefunc._pipefunc import ErrorSnapshot, NestedPipeFunc, PipeFunc, _maybe_mapspec
+from pipefunc._pipefunc import NestedPipeFunc, PipeFunc, _maybe_mapspec
+from pipefunc._pipefunc_utils import handle_pipefunc_error
 from pipefunc._profile import print_profiling_stats
 from pipefunc._utils import (
     assert_complete_kwargs,
     at_least_tuple,
     clear_cached_properties,
-    handle_error,
     is_installed,
     is_running_in_ipynb,
     requires,
 )
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache
-from pipefunc.exceptions import UnusedParametersError
+from pipefunc.exceptions import ErrorSnapshot, UnusedParametersError
 from pipefunc.lazy import _LazyFunction, task_graph
 from pipefunc.map._mapspec import (
     MapSpec,
@@ -98,6 +99,10 @@ class Pipeline:
     debug
         Flag indicating whether debug information should be printed.
         If ``None``, the value of each PipeFunc's debug attribute is used.
+    print_error
+        Flag indicating whether errors raised during the function execution should
+        be printed.
+        If ``None``, the value of each PipeFunc's print_error attribute is used.
     profile
         Flag indicating whether profiling information should be collected.
         If ``None``, the value of each PipeFunc's profile attribute is used.
@@ -130,6 +135,12 @@ class Pipeline:
         the resources are not set. Either a dict or a `pipefunc.resources.Resources`
         instance can be provided. If provided, the resources in the `PipeFunc`
         instances are updated with the default resources.
+    name
+        A name for the pipeline. If provided, it will be used to generate e.g., docs
+        and MCP server descriptions.
+    description
+        A description of the pipeline. If provided, it will be used to generate e.g., docs
+        and MCP server descriptions.
 
     Notes
     -----
@@ -169,20 +180,26 @@ class Pipeline:
         *,
         lazy: bool = False,
         debug: bool | None = None,
+        print_error: bool | None = None,
         profile: bool | None = None,
         cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = None,
         cache_kwargs: dict[str, Any] | None = None,
         validate_type_annotations: bool = True,
         scope: str | None = None,
         default_resources: dict[str, Any] | Resources | None = None,
+        name: str | None = None,
+        description: str | None = None,
     ) -> None:
         """Pipeline class for managing and executing a sequence of functions."""
         self.functions: list[PipeFunc] = []
         self.lazy = lazy
         self._debug = debug
+        self._print_error = print_error
         self._profile = profile
         self._default_resources: Resources | None = Resources.maybe_from_dict(default_resources)  # type: ignore[assignment]
         self.validate_type_annotations = validate_type_annotations
+        self.name = name
+        self.description = description
         for f in functions:
             if isinstance(f, tuple):
                 f, mapspec = f  # noqa: PLW2901
@@ -274,6 +291,19 @@ class Pipeline:
             for f in self.functions:
                 f.debug = value
 
+    @property
+    def print_error(self) -> bool | None:
+        """Flag indicating whether errors raised during the function execution should be printed."""
+        return self._print_error
+
+    @print_error.setter
+    def print_error(self, value: bool | None) -> None:
+        """Set the print_error flag for the pipeline and all functions."""
+        self._print_error = value
+        if value is not None:
+            for f in self.functions:
+                f.print_error = value
+
     def add(self, f: PipeFunc | Callable, mapspec: str | MapSpec | None = None) -> PipeFunc:
         """Add a function to the pipeline.
 
@@ -317,6 +347,9 @@ class Pipeline:
 
         if self.debug is not None:
             f.debug = self.debug
+
+        if self.print_error is not None:
+            f.print_error = self.print_error
 
         self._clear_internal_cache()  # reset cache
         self.validate()
@@ -541,7 +574,7 @@ class Pipeline:
         func: PipeFunc,
         flat_scope_kwargs: dict[str, Any],
         all_results: dict[OUTPUT_TYPE, Any],
-        full_output: bool,  # noqa: FBT001
+        full_output: bool,
         used_parameters: set[str | None],
     ) -> dict[str, Any]:
         # Used in _run
@@ -694,6 +727,7 @@ class Pipeline:
 
         """
         self._validate_run_output_name(kwargs, output_name)
+        self._validate_scoped_parameters(kwargs)
         flat_scope_kwargs = self._flatten_scopes(kwargs)
 
         all_results: dict[OUTPUT_TYPE, Any] = flat_scope_kwargs.copy()  # type: ignore[assignment]
@@ -739,7 +773,7 @@ class Pipeline:
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
-        show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
+        show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> ResultDict:
@@ -831,6 +865,7 @@ class Pipeline:
               Shown only if in a Jupyter notebook and `ipywidgets` is installed.
             - ``"rich"``: Force `rich` progress bar (text-based).
               Shown only if `rich` is installed.
+            - ``"headless"``: No progress bar, but the progress is still tracked internally.
             - ``None`` (default): Shows `ipywidgets` progress bar *only if*
               running in a Jupyter notebook and `ipywidgets` is installed.
               Otherwise, no progress bar is shown.
@@ -900,9 +935,11 @@ class Pipeline:
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
-        show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
+        show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
+        display_widgets: bool = True,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
+        start: bool = True,
     ) -> AsyncMap:
         """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -990,9 +1027,13 @@ class Pipeline:
               Shown only if in a Jupyter notebook and `ipywidgets` is installed.
             - ``"rich"``: Force `rich` progress bar (text-based).
               Shown only if `rich` is installed.
+            - ``"headless"``: No progress bar, but the progress is still tracked internally.
             - ``None`` (default): Shows `ipywidgets` progress bar *only if*
               running in a Jupyter notebook and `ipywidgets` is installed.
               Otherwise, no progress bar is shown.
+        display_widgets
+            Whether to call ``IPython.display.display(...)`` on widgets.
+            Ignored if **outside** of a Jupyter notebook.
         return_results
             Whether to return the results of the pipeline. If ``False``, the pipeline is run
             without keeping the results in memory. Instead the results are only kept in the set
@@ -1008,6 +1049,9 @@ class Pipeline:
               without waiting for entire generations to complete. Can improve performance
               by maximizing parallel execution, especially for complex dependency graphs
               with varied execution times.
+        start
+            Whether to start the pipeline immediately. If ``False``, the pipeline is not started until the
+            `start()` method on the `AsyncMap` instance is called.
 
         See Also
         --------
@@ -1043,7 +1087,9 @@ class Pipeline:
             fixed_indices=fixed_indices,
             auto_subpipeline=auto_subpipeline,
             show_progress=show_progress,
+            display_widgets=display_widgets,
             return_results=return_results,
+            start=start,
         )
 
     def arg_combinations(self, output_name: OUTPUT_TYPE) -> set[tuple[str, ...]]:
@@ -1126,6 +1172,10 @@ class Pipeline:
             if arg not in func._bound and arg not in self.output_to_func
         }
 
+    @functools.cached_property
+    def scopes(self) -> set[str]:
+        return {scope for func in self.functions for scope in func.parameter_scopes}
+
     def _func_defaults(self, func: PipeFunc) -> dict[str, Any]:
         """Retrieve defaults for a function, including those set by other functions."""
         if r := self._internal_cache.func_defaults.get(func.output_name):
@@ -1141,7 +1191,12 @@ class Pipeline:
         self._internal_cache.func_defaults[func.output_name] = defaults
         return defaults
 
-    def update_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
+    def update_defaults(
+        self,
+        defaults: dict[str, Any | dict[str, Any]],
+        *,
+        overwrite: bool = False,
+    ) -> None:
         """Update defaults to the provided keyword arguments.
 
         Automatically traverses the pipeline graph to find all functions that
@@ -1160,6 +1215,9 @@ class Pipeline:
             defaults will be added to the existing defaults.
 
         """
+        self._validate_scoped_parameters(defaults)
+
+        defaults = self._flatten_scopes(defaults)
         unused = set(defaults.keys())
         for f in self.functions:
             update = {k: v for k, v in defaults.items() if k in f.parameters if k not in f.bound}
@@ -1212,6 +1270,32 @@ class Pipeline:
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. These are not settable renames."
             raise ValueError(msg)
+        self.validate()
+
+    def update_mapspec_axes(self, renames: dict[str, str]) -> None:
+        """Update the axes in the `MapSpec`s for the pipeline.
+
+        Parameters
+        ----------
+        renames
+            A dictionary mapping old axis names to new axis names.
+
+        """
+        current_axes = {axis for axes in self.mapspec_axes.values() for axis in axes}
+        if renames.keys() - current_axes:
+            unknown = set(renames.keys()) - current_axes
+            msg = f"Unknown axes to rename: {unknown}. Available axes: {current_axes}"
+            raise ValueError(msg)
+
+        for f in self.functions:
+            if f.mapspec is None:
+                continue
+            mapspec_str = str(f.mapspec)
+            for old, new in renames.items():
+                mapspec_str = re.sub(rf"\b{old}\b", new, mapspec_str)
+            f.mapspec = MapSpec.from_string(mapspec_str)
+
+        self._clear_internal_cache()
         self.validate()
 
     def update_scope(
@@ -1300,6 +1384,22 @@ class Pipeline:
             raise ValueError(msg)
         self._clear_internal_cache()
         self.validate()
+
+    def _validate_scoped_parameters(self, kwargs: dict[str, Any]) -> None:
+        """Validate that scoped parameters are not defined in both flattened and nested formats."""
+        if overlap := kwargs.keys() & self._flatten_scopes(
+            {
+                scope: scoped_kwargs
+                for scope, scoped_kwargs in kwargs.items()
+                if scope in self.scopes
+            },
+        ):
+            overlap_str = ", ".join(sorted(overlap))
+            msg = (
+                f"Conflicting definitions for `{overlap_str}`:"
+                " found both flattened ('scope.param') and nested ({'scope': {'param': ...}}) formats."
+            )
+            raise ValueError(msg)
 
     def _flatten_scopes(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         flat_scope_kwargs = kwargs
@@ -1679,7 +1779,7 @@ class Pipeline:
     def visualize_graphviz_widget(
         self,
         *,
-        orient: Literal["TB", "LR", "BT", "RL"] = "LR",
+        orient: Literal["TB", "LR", "BT", "RL"] = "TB",
         graphviz_kwargs: dict[str, Any] | None = None,
     ) -> ipywidgets.VBox:
         """Create an interactive visualization of the pipeline as a directed graph.
@@ -1874,10 +1974,13 @@ class Pipeline:
             "lazy": self.lazy,
             "debug": self._debug,
             "profile": self._profile,
+            "print_error": self._print_error,
             "cache_type": self._cache_type,
             "cache_kwargs": self._cache_kwargs,
             "default_resources": self._default_resources,
             "validate_type_annotations": self.validate_type_annotations,
+            "name": self.name,
+            "description": self.description,
         }
         assert_complete_kwargs(kwargs, Pipeline.__init__, skip={"self", "scope"})
         kwargs.update(update)
@@ -2138,12 +2241,14 @@ class Pipeline:
             pipeline.drop(f=f)
 
         if inputs is not None:
-            new_root_args = set(pipeline.topological_generations.root_args)
-            if not new_root_args.issubset(inputs):
+            # subtract inputs with default values as they are not required
+            root_args = set(pipeline.topological_generations.root_args)
+            new_required_root_args = root_args - pipeline.defaults.keys()
+            if not new_required_root_args.issubset(inputs):
                 outputs = {f.output_name for f in pipeline.functions}
                 msg = (
                     f"Cannot construct a partial pipeline with `{outputs=}`"
-                    f" and `{inputs=}`, it would require `{new_root_args}`."
+                    f" and `{inputs=}`, it would require `{new_required_root_args}`."
                 )
                 raise ValueError(msg)
 
@@ -2196,6 +2301,8 @@ class Pipeline:
 
             * ``topological``: Display functions in topological order.
             * ``alphabetical``: Display functions in alphabetical order (using ``output_name``).
+        emojis
+            Whether to use emojis in the documentation.
 
         See Also
         --------
@@ -2468,7 +2575,7 @@ def _update_all_results(
     r: Any,
     output_name: OUTPUT_TYPE,
     all_results: dict[OUTPUT_TYPE, Any],
-    lazy: bool,  # noqa: FBT001
+    lazy: bool,
 ) -> None:
     if isinstance(func.output_name, tuple):
         assert func.output_picker is not None
@@ -2486,14 +2593,14 @@ def _update_all_results(
         all_results[func.output_name] = r
 
 
-def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:  # noqa: FBT001
+def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:
     if lazy:
         return _LazyFunction(func, kwargs=func_args)
     try:
         return func(**func_args)
     except Exception as e:
-        handle_error(e, func, func_args)
-        # handle_error raises but mypy doesn't know that
+        handle_pipefunc_error(e, func, func_args)
+        # handle_pipefunc_error raises but mypy doesn't know that
         raise  # pragma: no cover
 
 

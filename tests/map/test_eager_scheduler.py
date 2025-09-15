@@ -17,8 +17,8 @@ from pipefunc.typing import Array
 @pytest.mark.parametrize("parallel", [True, False])
 def test_dynamic_scheduler_worker_count(
     tmp_path: Path,
-    parallel: bool,  # noqa: FBT001
-    eager: bool,  # noqa: FBT001
+    parallel: bool,
+    eager: bool,
 ):
     """Test that multiple workers are active simultaneously."""
     max_concurrent_workers = 0
@@ -571,7 +571,7 @@ def test_eager_scheduler_error_handling(tmp_path: Path):
 # Test with persist_memory
 @pytest.mark.parametrize("persist_memory", [True, False])
 def test_eager_scheduler_with_persist_memory(
-    persist_memory: bool,  # noqa: FBT001
+    persist_memory: bool,
 ):
     """Test that the eager scheduler respects the persist_memory parameter."""
     pipeline = Pipeline([task_a, task_b])

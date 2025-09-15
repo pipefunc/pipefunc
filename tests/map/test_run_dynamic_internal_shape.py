@@ -53,8 +53,8 @@ def _pipeline(dim: Literal["?"] | None) -> Pipeline:
 def test_dynamic_internal_shape(
     tmp_path: Path,
     dim: Literal["?"] | None,
-    return_results: bool,  # noqa: FBT001
-    use_run_folder: bool,  # noqa: FBT001
+    return_results: bool,
+    use_run_folder: bool,
 ) -> None:
     pipeline = _pipeline(dim)
     assert pipeline.mapspecs_as_strings == ["... -> x[i]", "x[i] -> y[i]"]
@@ -84,7 +84,7 @@ def test_dynamic_internal_shape(
 async def test_dynamic_internal_shape_async(
     tmp_path: Path,
     dim: Literal["?"] | None,
-    return_results: bool,  # noqa: FBT001
+    return_results: bool,
 ) -> None:
     pipeline = _pipeline(dim)
     assert pipeline.mapspecs_as_strings == ["... -> x[i]", "x[i] -> y[i]"]
@@ -135,7 +135,7 @@ def test_exception(tmp_path: Path) -> None:
 @pytest.mark.parametrize("return_results", [True, False])
 def test_2d_internal_shape_non_dynamic(
     tmp_path: Path,
-    return_results: bool,  # noqa: FBT001
+    return_results: bool,
 ) -> None:
     @pipefunc(output_name="n", mapspec="a[j] -> n[j]")
     def f(a) -> int:
@@ -175,7 +175,7 @@ def test_2d_internal_shape_non_dynamic(
 def test_2d_internal_shape(
     tmp_path: Path,
     dim: Literal["?"] | None,
-    return_results: bool,  # noqa: FBT001
+    return_results: bool,
     scheduling_strategy: Literal["generation", "eager"],
 ) -> None:
     counters = {"f": 0, "g": 0, "h": 0}
@@ -224,7 +224,7 @@ def test_2d_internal_shape(
         {"a": [0, 0]},
         run_folder=tmp_path,
         cleanup=False,
-        show_progress="ipywidgets",
+        show_progress="headless",
         return_results=return_results,
         scheduling_strategy=scheduling_strategy,
         parallel=False,
@@ -263,7 +263,7 @@ def test_internal_shape_2nd_step(tmp_path: Path, dim: Literal["?"] | None) -> No
 def test_internal_shape_2nd_step2(
     tmp_path: Path,
     dim: Literal["?"] | None,
-    return_results: bool,  # noqa: FBT001
+    return_results: bool,
 ) -> None:
     @pipefunc(output_name="x", internal_shape=dim)
     def g() -> list[int]:
@@ -291,7 +291,7 @@ def test_internal_shape_2nd_step2(
 def test_first_returns_2d(
     internal_shape: tuple | None,
     tmp_path: Path,
-    return_results: bool,  # noqa: FBT001
+    return_results: bool,
 ) -> None:
     @pipefunc(output_name="x", internal_shape=internal_shape)
     def g() -> npt.NDArray[np.int_]:
@@ -325,7 +325,7 @@ def test_first_returns_2d(
 def test_first_returns_2d_but_1d_internal(
     dim: Literal["?"] | None,
     tmp_path: Path,
-    return_results: bool,  # noqa: FBT001
+    return_results: bool,
 ) -> None:
     @pipefunc(output_name="x", internal_shape=dim)
     def g() -> npt.NDArray[np.int_]:
@@ -362,7 +362,7 @@ def test_dimension_mismatch_bug_with_autogen_axes(
     tmp_path: Path,
     dim: int | Literal["?"],
     order: str,
-    return_results: bool,  # noqa: FBT001
+    return_results: bool,
 ) -> None:
     # Fixes issue in https://github.com/pipefunc/pipefunc/pull/465
     # and afterwards https://github.com/pipefunc/pipefunc/pull/466
@@ -431,7 +431,7 @@ def test_dynamic_internal_shape_with_irregular_output(tmp_path: Path) -> None:
 def test_dynamic_internal_shape_with_size_1(
     tmp_path: Path,
     storage: str,
-    return_results: bool,  # noqa: FBT001
+    return_results: bool,
 ) -> None:
     @pipefunc(output_name="x", mapspec="n[k] -> x[i, k]")
     def fa(n: int, m: int = 0) -> list[int]:
@@ -455,8 +455,8 @@ def test_dynamic_internal_shape_with_size_1(
 @pytest.mark.parametrize("manually_set_internal_shape", [True, False])
 def test_dynamic_internal_shape_with_multiple_dynamic_axes(
     tmp_path: Path,
-    manually_set_internal_shape: bool,  # noqa: FBT001
-    return_results: bool,  # noqa: FBT001
+    manually_set_internal_shape: bool,
+    return_results: bool,
 ) -> None:
     @pipefunc(output_name="x", mapspec="... -> x[i]")
     def fa(n: int) -> list[int]:
@@ -509,7 +509,7 @@ def test_dynamic_internal_shape_with_multiple_dynamic_axes(
 @pytest.mark.parametrize("return_results", [False])
 def test_simple_2d(
     tmp_path: Path,
-    return_results: bool,  # noqa: FBT001
+    return_results: bool,
 ) -> None:
     @pipefunc(output_name="y", mapspec="x[:, k] -> y[i, k]")
     def fa(x: np.ndarray[Any, np.dtype[np.int64]]) -> np.ndarray[Any, np.dtype[np.int64]]:
@@ -562,8 +562,8 @@ def test_simple_2d(
 @pytest.mark.parametrize("storage", ["file_array", "dict"])
 def test_multiple_outputs_with_dynamic_shape_and_individual_outputs_are_nd_arrays(
     tmp_path: Path,
-    return_results: bool,  # noqa: FBT001
-    parallel: bool,  # noqa: FBT001
+    return_results: bool,
+    parallel: bool,
     storage: str,
 ) -> None:
     @pipefunc(("y1", "y2", "y3"), mapspec="... -> y1[i], y2[i], y3[i]")
@@ -617,8 +617,8 @@ def test_multiple_outputs_with_dynamic_shape_and_individual_outputs_are_nd_array
 def test_inhomogeneous_array(
     tmp_path: Path,
     storage_id: str,
-    return_results: bool,  # noqa: FBT001
-    asarray: bool,  # noqa: FBT001
+    return_results: bool,
+    asarray: bool,
 ) -> None:
     internal_shape = (2,)
 

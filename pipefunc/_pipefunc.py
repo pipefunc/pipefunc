@@ -12,16 +12,12 @@ import contextlib
 import dataclasses
 import datetime
 import functools
-import getpass
 import inspect
 import os
-import platform
-import traceback
 import warnings
 import weakref
 from collections import defaultdict
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, get_args, get_origin
 
 import cloudpickle
@@ -32,11 +28,11 @@ from pipefunc._utils import (
     at_least_tuple,
     clear_cached_properties,
     format_function_call,
-    get_local_ip,
     is_classmethod,
     is_pydantic_base_model,
     requires,
 )
+from pipefunc.exceptions import ErrorSnapshot
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, is_irregular, mapspec_axes
 from pipefunc.map._run import _EVALUATED_RESOURCES
@@ -44,8 +40,6 @@ from pipefunc.resources import Resources
 from pipefunc.typing import NoAnnotation, safe_get_type_hints
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     import pydantic
 
     from pipefunc import Pipeline
@@ -91,6 +85,9 @@ class PipeFunc(Generic[T]):
         Profiling is only available for sequential execution.
     debug
         Flag indicating whether debug information should be printed.
+    print_error
+        Flag indicating whether errors raised during the function execution should
+        be printed.
     cache
         Flag indicating whether the wrapped function should be cached.
     mapspec
@@ -209,6 +206,7 @@ class PipeFunc(Generic[T]):
         bound: dict[str, Any] | None = None,
         profile: bool = False,
         debug: bool = False,
+        print_error: bool = True,
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
         internal_shape: int | Literal["?"] | ShapeTuple | None = None,
@@ -229,6 +227,7 @@ class PipeFunc(Generic[T]):
         self.__name__ = _get_name(func)
         self._output_name: OUTPUT_TYPE = output_name
         self.debug = debug
+        self.print_error = print_error
         self.cache = cache
         self.mapspec = _maybe_mapspec(mapspec)
         self.internal_shape: int | Literal["?"] | ShapeTuple | None = internal_shape
@@ -636,6 +635,7 @@ class PipeFunc(Generic[T]):
             "defaults": self._defaults,
             "bound": self._bound,
             "profile": self._profile,
+            "print_error": self.print_error,
             "debug": self.debug,
             "cache": self.cache,
             "mapspec": self.mapspec,
@@ -657,6 +657,9 @@ class PipeFunc(Generic[T]):
         # This is a cached property because it is slow and otherwise called multiple times.
         # We assume that once it is set, it does not change during the lifetime of the object.
         return any(p.lazy for p in self._pipelines)
+
+    def _rename_to_native(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        return {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call the wrapped function with the given arguments.
@@ -684,7 +687,7 @@ class PipeFunc(Generic[T]):
                 kwargs[p] = v
             args = ()
         kwargs = self.defaults | kwargs | self._bound
-        kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
+        kwargs = self._rename_to_native(kwargs)
 
         with self._maybe_profiler():
             if self._evaluate_lazy:
@@ -699,11 +702,13 @@ class PipeFunc(Generic[T]):
             try:
                 result = self.func(*args, **kwargs)
             except Exception as e:
-                print(
-                    f"An error occurred while calling the function `{self.__name__}`"
-                    f" with the arguments `{args=}` and `{kwargs=}`.",
-                )
-                self.error_snapshot = ErrorSnapshot(self.func, e, args, kwargs)
+                if self.print_error:
+                    print(
+                        f"An error occurred while calling the function `{self.__name__}`"
+                        f" with the arguments `{args=}` and `{kwargs=}`.",
+                    )
+                renamed_kwargs = self._rename_to_native(kwargs)
+                self.error_snapshot = ErrorSnapshot(self.func, e, args, renamed_kwargs)
                 raise
 
         if self.debug:
@@ -829,6 +834,12 @@ class PipeFunc(Generic[T]):
             return {self.output_name: hint}
         if get_origin(hint) is tuple:
             return dict(zip(self.output_name, get_args(hint)))
+        if _is_named_tuple(hint):
+            field_hints = safe_get_type_hints(hint, include_extras=True)
+            return {
+                name: field_hints.get(original_name, NoAnnotation)
+                for name, original_name in zip(self.output_name, hint._fields)
+            }
         return dict.fromkeys(self.output_name, NoAnnotation)
 
     @functools.cached_property
@@ -974,6 +985,7 @@ def pipefunc(
     bound: dict[str, Any] | None = None,
     profile: bool = False,
     debug: bool = False,
+    print_error: bool = True,
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
     internal_shape: int | Literal["?"] | ShapeTuple | None = None,
@@ -1018,6 +1030,9 @@ def pipefunc(
         Flag indicating whether the decorated function should be profiled.
     debug
         Flag indicating whether debug information should be printed.
+    print_error
+        Flag indicating whether errors raised during the function execution should
+        be printed.
     cache
         Flag indicating whether the decorated function should be cached.
     mapspec
@@ -1144,6 +1159,7 @@ def pipefunc(
             bound=bound,
             profile=profile,
             debug=debug,
+            print_error=print_error,
             cache=cache,
             mapspec=mapspec,
             internal_shape=internal_shape,
@@ -1268,6 +1284,7 @@ class NestedPipeFunc(PipeFunc):
         self.variant: dict[str | None, str] = _ensure_variant(variant)
         self._output_picker = None
         self._profile = False
+        self.print_error = True
         self._renames: dict[str, str] = renames or {}
         self._bound: dict[str, Any] = bound or {}
         self._defaults: dict[str, Any] = {
@@ -1427,80 +1444,6 @@ class _NestedFuncWrapper:
         return tuple(result_dict[name] for name in self.output_name)
 
 
-def _timestamp() -> str:
-    return datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
-
-
-@dataclass
-class ErrorSnapshot:
-    """A snapshot that represents an error in a function call."""
-
-    function: Callable[..., Any]
-    exception: Exception
-    args: tuple[Any, ...]
-    kwargs: dict[str, Any]
-    traceback: str = field(init=False)
-    timestamp: str = field(default_factory=_timestamp)
-    user: str = field(default_factory=getpass.getuser)
-    machine: str = field(default_factory=platform.node)
-    ip_address: str = field(default_factory=get_local_ip)
-    current_directory: str = field(default_factory=os.getcwd)
-
-    def __post_init__(self) -> None:
-        tb = traceback.format_exception(
-            type(self.exception),
-            self.exception,
-            self.exception.__traceback__,
-        )
-        self.traceback = "".join(tb)
-
-    def __str__(self) -> str:
-        args_repr = ", ".join(repr(a) for a in self.args)
-        kwargs_repr = ", ".join(f"{k}={v!r}" for k, v in self.kwargs.items())
-        func_name = f"{self.function.__module__}.{self.function.__qualname__}"
-
-        return (
-            "ErrorSnapshot:\n"
-            "--------------\n"
-            f"- 🛠 Function: {func_name}\n"
-            f"- 🚨 Exception type: {type(self.exception).__name__}\n"
-            f"- 💥 Exception message: {self.exception}\n"
-            f"- 📋 Args: ({args_repr})\n"
-            f"- 🗂 Kwargs: {{{kwargs_repr}}}\n"
-            f"- 🕒 Timestamp: {self.timestamp}\n"
-            f"- 👤 User: {self.user}\n"
-            f"- 💻 Machine: {self.machine}\n"
-            f"- 📡 IP Address: {self.ip_address}\n"
-            f"- 📂 Current Directory: {self.current_directory}\n"
-            "\n"
-            "🔁 Reproduce the error by calling `error_snapshot.reproduce()`.\n"
-            "📄 Or see the full stored traceback using `error_snapshot.traceback`.\n"
-            "🔍 Inspect `error_snapshot.args` and `error_snapshot.kwargs`.\n"
-            "💾 Or save the error to a file using `error_snapshot.save_to_file(filename)`"
-            " and load it using `ErrorSnapshot.load_from_file(filename)`."
-        )
-
-    def reproduce(self) -> Any | None:
-        """Attempt to recreate the error by calling the function with stored arguments."""
-        return self.function(*self.args, **self.kwargs)
-
-    def save_to_file(self, filename: str | Path) -> None:
-        """Save the error snapshot to a file using cloudpickle."""
-        with open(filename, "wb") as f:  # noqa: PTH123
-            cloudpickle.dump(self, f)
-
-    @classmethod
-    def load_from_file(cls, filename: str | Path) -> ErrorSnapshot:
-        """Load an error snapshot from a file using cloudpickle."""
-        with open(filename, "rb") as f:  # noqa: PTH123
-            return cloudpickle.load(f)
-
-    def _ipython_display_(self) -> None:  # pragma: no cover
-        from IPython.display import HTML, display
-
-        display(HTML(f"<pre>{self}</pre>"))
-
-
 def _validate_identifier(name: str, value: Any) -> None:
     if "." in value:
         scope, value = value.split(".", 1)
@@ -1568,6 +1511,11 @@ def _validate_combinable_mapspecs(mapspecs: list[MapSpec | None]) -> None:
         if m.output_indices != first.output_indices:
             msg = f"Cannot combine MapSpecs with different output mappings. Mapspec: `{m}`"
             raise ValueError(msg)
+
+
+def _is_named_tuple(hint: Any) -> bool:
+    """Check if a type hint is a NamedTuple."""
+    return inspect.isclass(hint) and issubclass(hint, tuple) and hasattr(hint, "_fields")
 
 
 def _default_output_picker(output: Any, name: str, output_name: OUTPUT_TYPE) -> Any:

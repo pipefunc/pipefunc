@@ -30,6 +30,7 @@ dependencies = ["cloudpickle", "networkx", "numpy"]
 adaptive = ["adaptive", "adaptive-scheduler>=2.14.0"]
 autodoc = ["griffe", "rich"]
 cli = ["griffe", "rich", "pydantic", "rich-argparse"]
+mcp = ["fastmcp<2.10.0", "rich", "griffe"]
 pandas = ["pandas"]
 # Prevent old holoviews resulting in broken env
 plotting = ["bokeh", "graphviz", "holoviews>=1.14.0", "matplotlib"]
@@ -43,6 +44,7 @@ test = [
     "coverage",
     "pytest-asyncio",
     "pytest-codspeed",
+    "cffi<2.0.0",  # Avoid cffi 2.0.0 which has no 3.13t wheel yet
     "pytest-cov",
     "pytest-timeout",
     "pytest-xdist",
@@ -57,6 +59,7 @@ docs = [
     "sphinx-autodoc-typehints",
     "sphinx-book-theme",
     "sphinx-copybutton",
+    "sphinx-llms-txt",
     "sphinx-notfound-page",
     "sphinx-togglebutton",
     "sphinx",
@@ -69,12 +72,13 @@ docs = [
     "pipefunc[all]",
 ]
 all = [
-    "pipefunc[adaptive,autodoc,cli,pandas,plotting,profiling,pydantic,rich,widgets,xarray,zarr]",
+    "pipefunc[adaptive,autodoc,cli,pandas,mcp,plotting,profiling,pydantic,rich,widgets,xarray,zarr]",
 ]
 dev = [ # all + dev deps
     "black[jupyter]",
     "mypy",
     "pre-commit",
+    "pre-commit-uv",
     "ruff",
     "versioningit",
     "pipefunc[all,test,docs]",
@@ -177,6 +181,8 @@ ignore = [
     "E501",    # Line too long
     "D107",    # Missing docstring in `__init__`
     "B905",    # `zip()` without an explicit `strict=` parameter
+    "PLC0415", # `import` should be at the top-level of a file
+    "FBT001",  # Boolean-typed positional argument in function definition
 ]
 
 [tool.ruff.lint.per-file-ignores]

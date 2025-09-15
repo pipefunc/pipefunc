@@ -9,11 +9,14 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import cloudpickle
 import numpy as np
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, first, load
 from pipefunc._version import __version__
+from pipefunc.helpers import FileArray, FileValue
 
+from ._adaptive_scheduler_slurm_executor import is_slurm_executor
 from ._mapspec import MapSpec, is_irregular
 from ._result import DirectValue
 from ._shapes import (
@@ -26,6 +29,8 @@ from ._shapes import (
 from ._storage_array._base import StorageBase, get_storage_class
 
 if TYPE_CHECKING:
+    from concurrent.futures import Executor
+
     from pipefunc import Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
 
@@ -71,6 +76,7 @@ class RunInfo:
         inputs: dict[str, Any],
         internal_shapes: UserShapeDict | None = None,
         *,
+        executor: dict[OUTPUT_TYPE, Executor] | None = None,
         storage: str | dict[OUTPUT_TYPE, str] | None,
         cleanup: bool = True,
     ) -> RunInfo:
@@ -82,6 +88,7 @@ class RunInfo:
             else:
                 _compare_to_previous_run_info(pipeline, run_folder, inputs, internal_shapes)
         _check_inputs(pipeline, inputs)
+        _maybe_inputs_to_disk_for_slurm(pipeline, inputs, run_folder, executor)
         shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
         resolved_shapes = shapes.copy()
         return cls(
@@ -249,6 +256,46 @@ class RunInfo:
             self.dump()
 
 
+# Max size for inputs in bytes (100 kB)
+_MAX_SIZE_BYTES_INPUT = 100 * 1024
+
+
+def _maybe_inputs_to_disk_for_slurm(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    run_folder: Path | None,
+    executor: dict[OUTPUT_TYPE, Executor] | None,
+) -> None:
+    """If `run_folder` is set, dump inputs to disk if large serialization required.
+
+    Only relevant if the input is used in a SlurmExecutor.
+
+    This automatically applies the fix described in
+    https://github.com/pipefunc/pipefunc/blob/fbab121d/docs/source/concepts/slurm.md?plain=1#L263-L366
+    """
+    if run_folder is None:
+        return
+    for input_name, value in inputs.items():
+        if not _input_used_in_slurm_executor(pipeline, input_name, executor):
+            continue
+        dumped = cloudpickle.dumps(value)
+        if len(dumped) < _MAX_SIZE_BYTES_INPUT:
+            continue
+        warnings.warn(
+            f"Input `{input_name}` is too large ({len(dumped) / 1024} kB), "
+            "dumping to disk instead of serializing.",
+            stacklevel=2,
+        )
+        input_path = _input_path(input_name, run_folder)
+        path = input_path.with_suffix("")
+        new_value: FileArray | FileValue
+        if input_name in pipeline.mapspec_names:
+            new_value = FileArray.from_data(value, path)
+        else:
+            new_value = FileValue.from_data(value, path)
+        inputs[input_name] = new_value
+
+
 def _update_shape_in_store(
     shape: ShapeTuple,
     mask: tuple[bool, ...],
@@ -393,7 +440,7 @@ def _init_arrays(
     mask: tuple[bool, ...],
     storage_class: type[StorageBase],
     run_folder: Path | None,
-    irregular: bool,  # noqa: FBT001
+    irregular: bool,
 ) -> list[StorageBase]:
     external_shape = external_shape_from_mask(shape, mask)
     internal_shape = internal_shape_from_mask(shape, mask)
@@ -407,3 +454,21 @@ def _maybe_array_path(output_name: str, run_folder: Path | None) -> Path | None:
         return None
     assert isinstance(output_name, str)
     return run_folder / "outputs" / output_name
+
+
+def _input_used_in_slurm_executor(
+    pipeline: Pipeline,
+    input_name: str,
+    executor: dict[OUTPUT_TYPE, Executor] | None,
+) -> bool:
+    if executor is None:
+        return False
+    from ._run import _executor_for_func
+
+    dependents = pipeline.func_dependents(input_name)
+    for output_name in dependents:
+        func = pipeline[output_name]
+        ex = _executor_for_func(func, executor)
+        if is_slurm_executor(ex) and func.resources_scope == "element":
+            return True
+    return False

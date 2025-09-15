@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from pipefunc._pipefunc import PipeFunc
 from pipefunc.map._run import (
+    _finalize_run_map,
     _KwargsTask,
     _maybe_executor,
-    _maybe_persist_memory,
     _process_task,
     _submit_func,
     prepare_run,
@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 
     from pipefunc import Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
+    from pipefunc._widgets.progress_headless import HeadlessProgressTracker
     from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
     from pipefunc._widgets.progress_rich import RichProgressTracker
     from pipefunc.cache import _CacheBase
@@ -50,7 +51,7 @@ def run_map_eager(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-    show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
+    show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
 ) -> ResultDict:
     """Eagerly schedule pipeline functions as soon as their dependencies are met.
@@ -147,6 +148,7 @@ def run_map_eager(
           Shown only if in a Jupyter notebook and `ipywidgets` is installed.
         - ``"rich"``: Force `rich` progress bar (text-based).
           Shown only if `rich` is installed.
+        - ``"headless"``: No progress bar, but the progress is still tracked internally.
         - ``None`` (default): Shows `ipywidgets` progress bar *only if*
           running in a Jupyter notebook and `ipywidgets` is installed.
           Otherwise, no progress bar is shown.
@@ -174,9 +176,6 @@ def run_map_eager(
         in_async=False,
     )
 
-    if prep.progress is not None:
-        prep.progress.display()
-
     dependency_info = _build_dependency_graph(prep.pipeline)
 
     with _maybe_executor(prep.executor, prep.parallel) as ex:
@@ -192,10 +191,7 @@ def run_map_eager(
             return_results=return_results,
             cache=prep.pipeline.cache,
         )
-    if prep.progress is not None:  # final update
-        prep.progress.update_progress(force=True)
-    _maybe_persist_memory(prep.store, persist_memory)
-    return prep.outputs
+    return _finalize_run_map(prep, persist_memory)
 
 
 def _build_dependency_graph(pipeline: Pipeline) -> _DependencyInfo:
@@ -267,8 +263,8 @@ class _FunctionTracker:
         fixed_indices: dict[str, int | slice] | None,
         executor: dict[OUTPUT_TYPE, Executor] | None,
         chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-        progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
-        return_results: bool,  # noqa: FBT001
+        progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
+        return_results: bool,
         cache: _CacheBase | None,
         multi_run_manager: MultiRunManager | None = None,
     ) -> None:
@@ -396,7 +392,7 @@ def _eager_scheduler_loop(
     outputs: ResultDict,
     fixed_indices: dict[str, int | slice] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None,
 ) -> None:
@@ -444,7 +440,7 @@ def _process_completed_futures(
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None,
 ) -> None:
@@ -487,7 +483,7 @@ def _update_dependencies_and_submit(
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None,
     multi_run_manager: MultiRunManager | None = None,

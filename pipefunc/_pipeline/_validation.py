@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING
 
 import networkx as nx
 
 from pipefunc._pipefunc import PipeFunc
-from pipefunc._utils import at_least_tuple
+from pipefunc._utils import at_least_tuple, is_equal
 from pipefunc.typing import (
     Array,
     NoAnnotation,
@@ -30,7 +31,22 @@ def validate_consistent_defaults(
                 continue
             if arg not in arg_defaults:
                 arg_defaults[arg] = default_value
-            elif default_value != arg_defaults[arg]:
+            else:
+                try:
+                    if is_equal(default_value, arg_defaults[arg], on_error="raise"):
+                        continue
+                except Exception as e:  # noqa: BLE001
+                    msg = (
+                        f"Could not compare default values for argument '{arg}' due to: {e!r}."
+                        " This might result in inconsistent default values if different values are"
+                        " provided for this argument in different functions."
+                        " pipefunc cannot guarantee this consistency. This may lead to unexpected"
+                        " behavior, as one of the default values will be chosen arbitrarily during"
+                        " execution."
+                    )
+                    warnings.warn(msg, UserWarning, stacklevel=2)
+                    continue
+
                 msg = (
                     f"Inconsistent default values for argument '{arg}' in"
                     " functions. Please make sure the shared input arguments have"

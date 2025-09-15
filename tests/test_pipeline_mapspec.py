@@ -411,7 +411,7 @@ def test_replace_none_in_axes() -> None:
 
 
 @pytest.mark.parametrize("show_progress", [True, False])
-def test_zero_sizes_list_with_progress_bar(show_progress: bool) -> None:  # noqa: FBT001
+def test_zero_sizes_list_with_progress_bar(show_progress: bool) -> None:
     if show_progress and not has_ipywidgets:
         pytest.skip("ipywidgets not installed")
 
@@ -539,3 +539,68 @@ def test_add_nd_mapspec_axis_fan_out() -> None:
     results = pipeline.map({"a": np.array([[1]]), "b": [1, 2]})
     assert results["e"].output.tolist() == [[[[2]], [[3]]], [[[2]], [[3]]], [[[2]], [[3]]]]
     assert results["e"].output.shape == (3, 2, 1, 1)
+
+
+@pytest.fixture
+def pipeline_complex() -> Pipeline:
+    """A complex pipeline for testing."""
+
+    def f1(a, b, c, d):
+        return a + b + c + d
+
+    def f2(a, b, e):
+        return a + b + e
+
+    def f3(a, b, f1):
+        return a + b + f1
+
+    def f4(f1, f3):
+        return f1 + f3
+
+    def f5(f1, f4):
+        return f1 + f4
+
+    def f6(b, f5):
+        return b + f5
+
+    def f7(a, f2, f6):
+        return a + f2 + f6
+
+    return Pipeline([f1, f2, f3, f4, f5, f6, f7])  # type: ignore[list-item]
+
+
+def test_update_mapspec_axes(pipeline_complex: Pipeline) -> None:
+    pipeline = pipeline_complex.copy()
+    pipeline.add_mapspec_axis("a", axis="i")
+    pipeline.add_mapspec_axis("b", axis="j")
+    assert pipeline.mapspec_axes["f1"] == ("i", "j")
+    pipeline.update_mapspec_axes({"i": "ii", "j": "jj"})
+    assert pipeline.mapspec_axes["f1"] == ("ii", "jj")
+    assert "a[ii], b[jj] -> f1[ii, jj]" in pipeline.mapspecs_as_strings
+
+
+def test_update_mapspec_axes_unknown_axis(pipeline_complex: Pipeline) -> None:
+    pipeline = pipeline_complex.copy()
+    pipeline.add_mapspec_axis("a", axis="i")
+    with pytest.raises(ValueError, match="Unknown axes to rename"):
+        pipeline.update_mapspec_axes({"z": "zz"})
+
+
+def test_update_mapspec_axes_no_mapspec() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    with pytest.raises(ValueError, match="Unknown axes to rename"):
+        pipeline.update_mapspec_axes({"i": "ii"})
+
+
+def test_update_mapspec_skip_mapspecless_function(pipeline_complex: Pipeline) -> None:
+    pipeline = pipeline_complex.copy()
+    pipeline.add_mapspec_axis("e", axis="i")
+    # Skip mapspecless function f1
+    pipeline.update_mapspec_axes({"i": "ii"})
+
+    assert pipeline.mapspec_axes["f2"] == ("ii",)
+    assert pipeline.mapspecs_as_strings == ["e[ii] -> f2[ii]", "f2[ii] -> f7[ii]"]

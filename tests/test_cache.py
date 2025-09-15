@@ -263,7 +263,7 @@ def test_file_cache_clear_with_lru_cache(cache_dir):
 
 
 @pytest.mark.parametrize("shared", [True, False])
-def test_file_cache_put_and_get_none(cache_dir, shared: bool):  # noqa: FBT001
+def test_file_cache_put_and_get_none(cache_dir, shared: bool):
     cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True, lru_shared=shared)
     cache.put("key1", None)
     assert cache.get("key1") is None
@@ -320,7 +320,7 @@ def test_disk_cache_clear(cache_dir):
 
 
 @pytest.mark.parametrize("shared", [True, False])
-def test_disk_cache_clear_with_lru_cache(cache_dir: Path, shared: bool):  # noqa: FBT001
+def test_disk_cache_clear_with_lru_cache(cache_dir: Path, shared: bool):
     cache = DiskCache(
         cache_dir=str(cache_dir),
         with_lru_cache=True,
@@ -413,7 +413,7 @@ def test_disk_cache_permissions(cache_dir: Path, permissions: int | None) -> Non
 
 
 @pytest.mark.parametrize("shared", [True, False])
-def test_pickling_and_deepcopy_hybrid(shared: bool) -> None:  # noqa: FBT001
+def test_pickling_and_deepcopy_hybrid(shared: bool) -> None:
     # Create and populate cache
     cache = HybridCache(max_size=5, shared=shared)
     cache.put("key1", "value1", 0.1)
@@ -445,7 +445,7 @@ def test_pickling_and_deepcopy_hybrid(shared: bool) -> None:  # noqa: FBT001
 
 
 @pytest.mark.parametrize("shared", [True, False])
-def test_pickling_and_deepcopy_lru(shared: bool) -> None:  # noqa: FBT001
+def test_pickling_and_deepcopy_lru(shared: bool) -> None:
     # Create and populate cache
     cache = LRUCache(max_size=5, shared=shared)
     cache.put("key1", "value1")
@@ -507,7 +507,7 @@ def test_pickling_and_deepcopy_simple() -> None:
 
 @pytest.mark.parametrize("shared", [True, False])
 @pytest.mark.parametrize("with_lru", [True, False])
-def test_pickling_and_deepcopy_disk(shared: bool, with_lru: bool) -> None:  # noqa: FBT001
+def test_pickling_and_deepcopy_disk(shared: bool, with_lru: bool) -> None:
     # Create a temporary directory for the cache
     with tempfile.TemporaryDirectory() as temp_dir:
         cache_dir = Path(temp_dir) / "cache"

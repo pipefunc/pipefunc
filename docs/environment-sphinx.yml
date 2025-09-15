@@ -20,6 +20,8 @@ dependencies:
   # optional-dependencies: cli
   - pydantic
   - rich-argparse
+  # optional-dependencies: mcp
+  - fastmcp<2.10.0
   # optional-dependencies: pandas
   - pandas
   # optional-dependencies: plotting
@@ -29,8 +31,6 @@ dependencies:
   - matplotlib
   # optional-dependencies: profiling
   - psutil
-  # optional-dependencies: pydantic
-  # optional-dependencies: rich
   # optional-dependencies: widgets
   - graphviz-anywidget>=0.7.0
   - ipywidgets
@@ -47,6 +47,7 @@ dependencies:
   - sphinx-autodoc-typehints
   - sphinx-book-theme
   - sphinx-copybutton
+  - sphinx-llms-txt
   - sphinx-notfound-page
   - sphinx-togglebutton
   - sphinx

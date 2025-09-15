@@ -241,10 +241,36 @@ def test_getattr_for_pipeline_attributes() -> None:
     def f(a, b):
         return a + b
 
+    @pipefunc(output_name="c", variant={"op1": "mul"})
+    def f2(a, b):
+        return a * b
+
+    @pipefunc(output_name="c", variant="variant")
+    def h(a, b):
+        return a + b
+
+    @pipefunc(output_name="c", variant="variant2")
+    def i(a, b):
+        return a + b
+
     pipeline = VariantPipeline([f])
     with pytest.raises(
         AttributeError,
         match="This is a `VariantPipeline`, not a `Pipeline`",
+    ):
+        _ = pipeline.map  # type: ignore[attr-defined]
+
+    pipeline = VariantPipeline([h, i])
+    with pytest.raises(
+        AttributeError,
+        match="This is a `VariantPipeline`, not a `Pipeline`. The variants",
+    ):
+        _ = pipeline.map  # type: ignore[attr-defined]
+
+    pipeline = VariantPipeline([f, f2])
+    with pytest.raises(
+        AttributeError,
+        match="This is a `VariantPipeline`, not a `Pipeline`. The variant group",
     ):
         _ = pipeline.map  # type: ignore[attr-defined]
 

@@ -315,3 +315,64 @@ def test_2d_mapspec_with_nested_array() -> None:
     assert df.y.iloc[1].tolist() == [[3, 4], [5, 6]]
     assert df.y.iloc[2].tolist() == [[4, 5], [6, 7]]
     assert df.y.iloc[3].tolist() == [[5, 6], [7, 8]]
+
+
+def test_1d_mapspec_returns_2d_array() -> None:
+    @pipefunc(output_name="y", mapspec="... -> y[i]")
+    def f() -> npt.NDArray[np.float64]:
+        return np.ones((10, 3))
+
+    @pipefunc(output_name="z", mapspec="y[i] -> z[i]")
+    def g(y) -> int:
+        return sum(y)
+
+    pipeline = Pipeline([f, g])
+    results = pipeline.map(inputs={})
+    ds = results.to_xarray()
+    assert "y" in ds.coords
+    assert "z" in ds.data_vars
+
+
+def test_1d_mapspec_returns_2d_list_of_lists() -> None:
+    @pipefunc(output_name="y", mapspec="... -> y[i]")
+    def f() -> list[list[float]]:
+        return [[1, 2, 3] for _ in range(10)]
+
+    @pipefunc(output_name="z", mapspec="y[i] -> z[i]")
+    def g(y) -> int:
+        return sum(y)
+
+    pipeline = Pipeline([f, g])
+    results = pipeline.map(inputs={})
+    ds = results.to_xarray()
+    assert "y" in ds.coords
+    assert "z" in ds.data_vars
+
+
+def test_unhashable_types() -> None:
+    class Unhashable:
+        def __init__(self, value):
+            self.value = value
+
+        def __hash__(self):
+            msg = "Unhashable"
+            raise TypeError(msg)
+
+    @pipefunc(output_name="z", mapspec="x[i], y[i] -> z[i]")
+    def f(x: Unhashable, y: int) -> int:
+        return y
+
+    pipeline = Pipeline([f])
+    xs = [Unhashable(1), Unhashable(2), Unhashable(3)]
+    results = pipeline.map(
+        inputs={"x": xs, "y": [1, 2, 3]},
+        parallel=False,
+        storage="dict",
+    )
+    ds = results.to_xarray()
+    assert "x:y" in ds.coords
+    assert "z" in ds.data_vars
+    df = results.to_dataframe()
+    assert df.x.tolist() == xs
+    assert df.y.tolist() == [1, 2, 3]
+    assert df.z.tolist() == [1, 2, 3]

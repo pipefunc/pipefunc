@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, pipefunc
-from pipefunc._pipefunc import ErrorSnapshot
+from pipefunc.exceptions import ErrorSnapshot
 from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
@@ -734,3 +734,17 @@ def test_wrapping_pipefunc_with_scope_in_pipefunc() -> None:
     assert parameter.default is inspect.Parameter.empty
     assert parameter.name == "x.input2"
     assert parameter.annotation is int
+
+
+def test_renamed_inputs_error_snapshot():
+    @pipefunc(output_name="c", renames={"a": "b"})
+    def f(a):
+        if a < 0:
+            msg = "a cannot be negative"
+            raise ValueError(msg)
+        return a * 2
+
+    with pytest.raises(ValueError, match="a cannot be negative"):
+        f(b=-1)  # This will raise an error
+    with pytest.raises(ValueError, match="a cannot be negative"):
+        f.error_snapshot.reproduce()

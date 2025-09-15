@@ -5,7 +5,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeVar
 
 from pipefunc._pipeline._pydantic import maybe_pydantic_model_to_dict
-from pipefunc._utils import at_least_tuple
+from pipefunc._utils import at_least_tuple, is_running_in_ipynb
 
 from ._adaptive_scheduler_slurm_executor import validate_slurm_executor
 from ._mapspec import validate_consistent_axes
@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
+    from pipefunc._widgets.progress_headless import HeadlessProgressTracker
     from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
     from pipefunc._widgets.progress_rich import RichProgressTracker
     from pipefunc.map._types import UserShapeDict
@@ -37,7 +38,7 @@ class Prepared(NamedTuple):
     parallel: bool
     executor: dict[OUTPUT_TYPE, Executor] | None
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None
-    progress: IPyWidgetsProgressTracker | RichProgressTracker | None
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None
 
 
 def prepare_run(
@@ -54,13 +55,14 @@ def prepare_run(
     cleanup: bool,
     fixed_indices: dict[str, int | slice] | None,
     auto_subpipeline: bool,
-    show_progress: bool | Literal["rich", "ipywidgets"] | None,
+    show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None,
     in_async: bool,
 ) -> Prepared:
     if not parallel and executor:
         msg = "Cannot use an executor without `parallel=True`."
         raise ValueError(msg)
     inputs = maybe_pydantic_model_to_dict(inputs)
+    pipeline._validate_scoped_parameters(inputs)
     inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
@@ -75,6 +77,7 @@ def prepare_run(
         pipeline,
         inputs,
         internal_shapes,
+        executor=executor,
         storage=_expand_output_name_in_storage(pipeline, storage),
         cleanup=cleanup,
     )
@@ -87,6 +90,9 @@ def prepare_run(
     if parallel and any(func.profile for func in pipeline.functions):
         msg = "`profile=True` is not supported with `parallel=True` using process-based executors."
         warnings.warn(msg, UserWarning, stacklevel=2)
+    if not in_async and progress is not None and is_running_in_ipynb():  # pragma: no cover
+        # If in_async, the progress is displayed in the `_finalize_run_map_async` function
+        progress.display()
     return Prepared(pipeline, run_info, store, outputs, parallel, executor, chunksizes, progress)
 
 
@@ -149,7 +155,7 @@ def _cannot_be_parallelized(pipeline: Pipeline) -> bool:
 
 
 def _check_parallel(
-    parallel: bool,  # noqa: FBT001
+    parallel: bool,
     store: dict[str, StoreType],
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
 ) -> None:

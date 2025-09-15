@@ -1,3 +1,5 @@
+"""General utility functions, should not import anything from pipefunc."""
+
 from __future__ import annotations
 
 import contextlib
@@ -102,27 +104,73 @@ def prod(iterable: Iterable[int]) -> int:
     return functools.reduce(operator.mul, iterable, 1)
 
 
-def _is_equal(a: Any, b: Any) -> bool | None:  # noqa: PLR0911
-    if type(a) is not type(b):
-        return False
-    if isinstance(a, dict):
-        return equal_dicts(a, b)
-    if isinstance(a, np.ndarray):
-        return np.array_equal(a, b, equal_nan=True)
-    if isinstance(a, set):
-        return a == b
-    if isinstance(a, float | np.floating):
-        return math.isclose(a, b, rel_tol=1e-9, abs_tol=0.0)
-    if isinstance(a, str):
-        return a == b
-    if isinstance(a, list | tuple):
-        if len(a) != len(b):  # type: ignore[arg-type]
+def is_equal(  # noqa: PLR0911, PLR0912
+    a: Any,
+    b: Any,
+    *,
+    on_error: Literal["return_none", "raise"] = "return_none",
+) -> bool | None:
+    """Check if two objects are equal.
+
+    Comparisons are done using the `==` operator, but special cases are handled.
+
+    Parameters
+    ----------
+    a
+        The first object to compare.
+    b
+        The second object to compare.
+    on_error
+        If "return_none", return `None` if an error occurs during comparison.
+        If "raise", raise the error.
+
+    Returns
+    -------
+        `True` if the objects are equal, `False` otherwise.
+        If an error occurs during comparison, returns `None` if `on_error` is
+        "return_none" or raises the error if `on_error` is "raise".
+
+    """
+    try:
+        if type(a) is not type(b):
             return False
-        return all(_is_equal(x, y) for x, y in zip(a, b))
-    return a == b
+        if isinstance(a, dict):
+            return equal_dicts(a, b, on_error=on_error)
+        if isinstance(a, np.ndarray):
+            return np.array_equal(a, b, equal_nan=True)
+        if isinstance(a, set):
+            return a == b
+        if isinstance(a, float | np.floating):
+            return math.isclose(a, b, rel_tol=1e-9, abs_tol=0.0)
+        if isinstance(a, str):
+            return a == b
+        if isinstance(a, list | tuple):
+            if len(a) != len(b):  # type: ignore[arg-type]
+                return False
+            results = [is_equal(x, y, on_error=on_error) for x, y in zip(a, b)]
+            if None in results:
+                return None
+            return all(results)
+        if is_installed("pandas"):
+            import pandas as pd
+
+            if isinstance(a, pd.DataFrame):
+                return a.equals(b)
+        # Cast to bool to prevent issues with custom equality methods
+        return bool(a == b)
+    except Exception:
+        if on_error == "raise":
+            raise
+        return None
 
 
-def equal_dicts(d1: dict[str, Any], d2: dict[str, Any], *, verbose: bool = False) -> bool | None:
+def equal_dicts(
+    d1: dict[str, Any],
+    d2: dict[str, Any],
+    *,
+    verbose: bool = False,
+    on_error: Literal["return_none", "raise"] = "return_none",
+) -> bool | None:
     """Check if two dictionaries are equal.
 
     Returns True if the dictionaries are equal, False if they are not equal,
@@ -141,15 +189,13 @@ def equal_dicts(d1: dict[str, Any], d2: dict[str, Any], *, verbose: bool = False
     errors = []
     for k, v1 in d1.items():
         v2 = d2[k]
-        try:
-            equal = _is_equal(v1, v2)
-        except Exception:  # noqa: BLE001
+        equal = is_equal(v1, v2, on_error=on_error)
+        if equal is None:
             errors.append((k, v1, v2))
-        else:
-            if not equal:
-                if verbose:
-                    print(f"Not equal `{k}`: `{v1} != {v2}`")
-                return False
+        elif not equal:
+            if verbose:
+                print(f"Not equal `{k}`: `{v1} != {v2}`")
+            return False
     if errors:
         warnings.warn(f"Errors comparing keys and values: {errors}", stacklevel=3)
         return None
@@ -466,3 +512,48 @@ def is_classmethod(func: Callable) -> bool:
 def clip(x: float, min_value: float, max_value: float) -> float:
     """Clip a value to a range."""
     return max(min_value, min(x, max_value))
+
+
+def infer_shape(x: Any) -> tuple[int, ...]:  # noqa: PLR0911
+    """Infer the shape of a nested structure.
+
+    This function recursively determines the shape of nested lists, tuples,
+    or NumPy arrays. The recursion continues as long as all elements at a given
+    level are lists/tuples of the same length and have the same sub-shape.
+
+    If the structure is ragged (i.e., elements at a level have different
+    lengths or different sub-shapes), the shape up to that point is returned.
+    """
+    if isinstance(x, np.ndarray):
+        return x.shape
+
+    if isinstance(x, range):
+        x = list(x)
+
+    if not isinstance(x, (list, tuple)):
+        return ()
+
+    if not x:
+        return (0,)
+
+    # If not all items are lists, we can only determine the first dimension
+    if not all(isinstance(item, (list, tuple)) for item in x):
+        return (len(x),)
+
+    # All items are lists, check if they have the same length
+    first_len = len(x[0])
+    if not all(len(item) == first_len for item in x):
+        return (len(x),)
+
+    if first_len == 0:
+        return (len(x), 0)
+
+    # Recursively find the shape of sub-lists
+    sub_shapes = [infer_shape(item) for item in x]
+
+    # Check if all sub-shapes are identical
+    first_sub_shape = sub_shapes[0]
+    if not all(s == first_sub_shape for s in sub_shapes[1:]):
+        return (len(x), first_len)
+
+    return (len(x), *first_sub_shape)

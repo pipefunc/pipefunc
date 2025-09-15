@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 REPO_ROOT = Path(__file__).parent.parent
-console = Console()
+console = Console(width=1000)
 REPO_URL = "https://github.com/pipefunc/pipefunc"
 
 

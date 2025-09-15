@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from pipefunc import NestedPipeFunc, Pipeline, pipefunc
+from pipefunc._plotting import _AUTO_GROUP_ARGS_THRESHOLD
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -20,6 +21,17 @@ has_holoviews = importlib.util.find_spec("holoviews") is not None
 has_graphviz = importlib.util.find_spec("graphviz") is not None
 has_anywidget = importlib.util.find_spec("graphviz_anywidget") is not None
 has_graphviz_exec = shutil.which("dot") is not None
+
+
+@pytest.fixture(autouse=True)
+def patch_pyviz_comms():
+    # To avoid https://github.com/holoviz/pyviz_comms/issues/137
+    # Remove once https://github.com/holoviz/pyviz_comms/pull/138 is merged
+    try:
+        with patch("pyviz_comms._in_ipython", new=False) as mock_in_ipython:
+            yield mock_in_ipython
+    except ImportError:
+        yield
 
 
 @pytest.fixture(autouse=True)
@@ -258,23 +270,24 @@ def test_plotting_widget(everything_pipeline: Pipeline) -> None:
     assert orient_dropdown is not None
 
     # Check that group args toggle is present
+    assert len(everything_pipeline.graph.nodes) > _AUTO_GROUP_ARGS_THRESHOLD
     group_args_toggle = next(
         (
             item
             for item in extra_controls_hbox.children
-            if isinstance(item, ipywidgets.ToggleButton) and "Group args" in item.description
+            if isinstance(item, ipywidgets.ToggleButton) and "Ungroup args" in item.description
         ),
         None,
     )
     assert group_args_toggle is not None
-    assert group_args_toggle.value is False
-    assert group_args_toggle.description == "Group args"
-    assert group_args_toggle.icon == "plus-square-o"
-    assert group_args_toggle.button_style == "info"
-    group_args_toggle.value = True  # Simulate click
+    assert group_args_toggle.value is True
     assert group_args_toggle.description == "Ungroup args"
     assert group_args_toggle.icon == "minus-square-o"
     assert group_args_toggle.button_style == "success"
+    group_args_toggle.value = False  # Simulate click
+    assert group_args_toggle.description == "Group args"
+    assert group_args_toggle.icon == "plus-square-o"
+    assert group_args_toggle.button_style == "info"
 
 
 @pytest.mark.skipif(

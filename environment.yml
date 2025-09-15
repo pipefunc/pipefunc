@@ -20,6 +20,8 @@ dependencies:
   # optional-dependencies: cli
   - pydantic
   - rich-argparse
+  # optional-dependencies: mcp
+  - fastmcp<2.10.0
   # optional-dependencies: pandas
   - pandas
   # optional-dependencies: plotting
@@ -29,8 +31,6 @@ dependencies:
   - matplotlib
   # optional-dependencies: profiling
   - psutil
-  # optional-dependencies: pydantic
-  # optional-dependencies: rich
   # optional-dependencies: widgets
   - graphviz-anywidget>=0.7.0
   - ipywidgets
@@ -43,6 +43,7 @@ dependencies:
   - coverage
   - pytest-asyncio
   - pytest-codspeed
+  - cffi<2.0.0
   - pytest-cov
   - pytest-timeout
   - pytest-xdist

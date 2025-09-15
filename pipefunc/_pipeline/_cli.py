@@ -222,6 +222,7 @@ def _add_map_arguments(parser: argparse.ArgumentParser) -> None:
             {arg: default},
             {arg: p.annotation},
             skip_optional=True,
+            emojis=True,
         )
         help_text = str(row[-1]).replace("``", "`")
         parser.add_argument(

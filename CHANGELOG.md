@@ -5,6 +5,485 @@ If it is out of date, please run
 
 GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 
+## v0.85.2 (2025-07-15)
+
+### ✨ Enhancements
+
+- More comprehensive default value comparison with `is_equal` ([#860](https://github.com/pipefunc/pipefunc/pull/860))
+
+### 🐛 Bug Fixes
+
+- Consistently return None if error happens in `_is_equal` ([#863](https://github.com/pipefunc/pipefunc/pull/863))
+
+### 📚 Documentation
+
+- Add `pipefunc.helpers.launch_maps` to docs ([#862](https://github.com/pipefunc/pipefunc/pull/862))
+
+### 📊 Stats
+
+- `.md`: +78 lines, -0 lines
+- `.py`: +145 lines, -63 lines
+
+## v0.85.1 (2025-07-10)
+
+### 🐛 Bug Fixes
+
+- Cast to `bool` to prevent issues with custom equality methods ([#859](https://github.com/pipefunc/pipefunc/pull/859))
+- FIX Pipeline.update_defaults with inputs that do not support __eq__ ([#857](https://github.com/pipefunc/pipefunc/pull/857))
+
+### ✨ Enhancements
+
+- Allow comparing `pandas.DataFrame`s ([#858](https://github.com/pipefunc/pipefunc/pull/858))
+
+### 📊 Stats
+
+- `.py`: +71 lines, -2 lines
+
+## v0.85.0 (2025-07-08)
+
+### ✨ Enhancements
+
+- Add `pipeline.update_mapspec_axes` ([#855](https://github.com/pipefunc/pipefunc/pull/855))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#853](https://github.com/pipefunc/pipefunc/pull/853))
+
+### 📊 Stats
+
+- `.yaml`: +1 lines, -1 lines
+- `.py`: +92 lines, -0 lines
+
+## v0.84.0 (2025-07-02)
+
+### ✨ Enhancements
+
+- Keep `ErrorSnapshot` even when parallel ([#813](https://github.com/pipefunc/pipefunc/pull/813))
+- Add validation for inputs parameters to `gather_maps` ([#847](https://github.com/pipefunc/pipefunc/pull/847))
+
+### 🐛 Bug Fixes
+
+- Rename kwargs when creating `ErrorSnapshot` ([#851](https://github.com/pipefunc/pipefunc/pull/851))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#848](https://github.com/pipefunc/pipefunc/pull/848))
+- [pre-commit.ci] pre-commit autoupdate ([#845](https://github.com/pipefunc/pipefunc/pull/845))
+
+### 📚 Documentation
+
+- Measure overhead of `Pipeline.run` ([#850](https://github.com/pipefunc/pipefunc/pull/850))
+- Ensure that `gather_maps` and `launch_maps` are in the documentation ([#846](https://github.com/pipefunc/pipefunc/pull/846))
+
+### 🧹 Maintenance
+
+- Set `orient="TB"` and auto group args in plotting widget ([#849](https://github.com/pipefunc/pipefunc/pull/849))
+
+### 📊 Stats
+
+- `.py`: +352 lines, -126 lines
+- `.yaml`: +3 lines, -3 lines
+- `.yml`: +4 lines, -4 lines
+- `.md`: +49 lines, -5 lines
+- `.toml`: +4 lines, -1 lines
+
+## v0.83.0 (2025-06-20)
+
+### 🧹 Maintenance
+
+- Add typed `handle_pipefunc_error` function ([#844](https://github.com/pipefunc/pipefunc/pull/844))
+- Move `ErrorSnapshot` to `exceptions.py` ([#843](https://github.com/pipefunc/pipefunc/pull/843))
+
+### ✨ Enhancements
+
+- Add info about unresolved variants when `VariantPipeline.__getattr__` raises an `AttributeError` ([#841](https://github.com/pipefunc/pipefunc/pull/841))
+- Allow for a scope-keyed nested dictionary as `update_defaults` input ([#840](https://github.com/pipefunc/pipefunc/pull/840))
+
+### 🤖 CI
+
+- Fix labels in `.github/update-environment.py` script ([#839](https://github.com/pipefunc/pipefunc/pull/839))
+
+### 🧪 Testing
+
+- Update tests to new `adaptive-scheduler` ([#838](https://github.com/pipefunc/pipefunc/pull/838))
+
+### 📚 Documentation
+
+- Add documentation about "Splitting a `map` into Multiple Jobs" ([#837](https://github.com/pipefunc/pipefunc/pull/837))
+- Update `CHANGELOG.md` until v0.82.4 ([#836](https://github.com/pipefunc/pipefunc/pull/836))
+
+### 📊 Stats
+
+- `.py`: +345 lines, -131 lines
+- `.md`: +417 lines, -0 lines
+- `.yml`: +0 lines, -6 lines
+
+## v0.82.4 (2025-06-19)
+
+### ✨ Enhancements
+
+- Allow setting `size_per_learner` for `resources_scope == "map"` ([#835](https://github.com/pipefunc/pipefunc/pull/835))
+
+### 📊 Stats
+
+- `.py`: +3 lines, -3 lines
+
+## v0.82.3 (2025-06-19)
+
+### ✨ Enhancements
+
+- Better clearing of the `SlurmExecutor` dicts ([#834](https://github.com/pipefunc/pipefunc/pull/834))
+
+### 📊 Stats
+
+- `.py`: +64 lines, -13 lines
+
+## v0.82.2 (2025-06-19)
+
+### 🐛 Bug Fixes
+
+- Ensure `executor_type` is not None ([#833](https://github.com/pipefunc/pipefunc/pull/833))
+
+### 📊 Stats
+
+- `.py`: +11 lines, -1 lines
+
+## v0.82.1 (2025-06-19)
+
+### 🐛 Bug Fixes
+
+- Fix xarray conversion case where index is not hashable ([#832](https://github.com/pipefunc/pipefunc/pull/832))
+- Fix constructing `xarray.Dataset` when dims don't match ([#831](https://github.com/pipefunc/pipefunc/pull/831))
+
+### ✨ Enhancements
+
+- Validate inputs to `launch_maps` and `gather_maps` ([#830](https://github.com/pipefunc/pipefunc/pull/830))
+
+### 📊 Stats
+
+- `.py`: +240 lines, -25 lines
+
+## v0.82.0 (2025-06-18)
+
+### ✨ Enhancements
+
+- Add support for suppressing runtime error logs in `PipeFunc` and `Pipeline` classes ([#827](https://github.com/pipefunc/pipefunc/pull/827))
+- Add `max_completed_tabs` for `OutputTabs` ([#824](https://github.com/pipefunc/pipefunc/pull/824))
+- Track status in tabs of `OutputTabs` widget ([#821](https://github.com/pipefunc/pipefunc/pull/821))
+
+### 🧹 Maintenance
+
+- Create `OutputTabs` in the main thread instead of in async context ([#829](https://github.com/pipefunc/pipefunc/pull/829))
+
+### 🐛 Bug Fixes
+
+- Workaround for VS Code `ipywidgets` issue ([#828](https://github.com/pipefunc/pipefunc/pull/828))
+-  pipeline.subpipeline handles optional inputs as required when validating new root args ([#826](https://github.com/pipefunc/pipefunc/pull/826))
+
+### 📚 Documentation
+
+- FastMCP is pip-only ([#823](https://github.com/pipefunc/pipefunc/pull/823))
+- Include MCP in docs build ([#822](https://github.com/pipefunc/pipefunc/pull/822))
+
+### 📊 Stats
+
+- `.py`: +359 lines, -51 lines
+- `.yml`: +6 lines, -0 lines
+
+## v0.81.0 (2025-06-13)
+
+### ✨ Enhancements
+
+- Add widget for running multiple maps ([#819](https://github.com/pipefunc/pipefunc/pull/819))
+- Add `gather_maps` to start multiple `Pipeline.map_async` instances ([#818](https://github.com/pipefunc/pipefunc/pull/818))
+- Add `Pipeline.map_async(..., display_widgets=False)` argument ([#817](https://github.com/pipefunc/pipefunc/pull/817))
+- Add `Pipeline.map_async(..., start=False)` option ([#816](https://github.com/pipefunc/pipefunc/pull/816))
+
+### 📦 Dependencies
+
+- ⬆️ Update python to v3.13.5 ([#814](https://github.com/pipefunc/pipefunc/pull/814))
+
+### 📊 Stats
+
+- `.py`: +334 lines, -34 lines
+- `.yml`: +1 lines, -1 lines
+- `.yaml`: +1 lines, -1 lines
+
+## v0.80.2 (2025-06-12)
+
+### ✨ Enhancements
+
+- Allow setting `executor_type` for `SlurmExecutor` ([#812](https://github.com/pipefunc/pipefunc/pull/812))
+
+### 📊 Stats
+
+- `.py`: +47 lines, -3 lines
+
+## v0.80.1 (2025-06-10)
+
+### 🐛 Bug Fixes
+
+- Only auto-wrap in `FileArray` if `resource_scope="element"` ([#809](https://github.com/pipefunc/pipefunc/pull/809))
+
+### 📊 Stats
+
+- `.py`: +2 lines, -2 lines
+
+## v0.80.0 (2025-06-10)
+
+### ✨ Enhancements
+
+- Automatically wrap data in `FileArray` or `FileValue` ([#795](https://github.com/pipefunc/pipefunc/pull/795))
+
+### 📊 Stats
+
+- `.py`: +91 lines, -0 lines
+
+## v0.79.0 (2025-06-09)
+
+### ✨ Enhancements
+
+- Add `load_outputs` to MCP ([#808](https://github.com/pipefunc/pipefunc/pull/808))
+- Add `list_historical_runs` to MCP server ([#807](https://github.com/pipefunc/pipefunc/pull/807))
+- Add get `run_info` for MCP ([#806](https://github.com/pipefunc/pipefunc/pull/806))
+- Improve MCP instructions ([#805](https://github.com/pipefunc/pipefunc/pull/805))
+- Allow submitting async jobs with MCP ([#801](https://github.com/pipefunc/pipefunc/pull/801))
+- Add headless progressbar ([#802](https://github.com/pipefunc/pipefunc/pull/802))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#796](https://github.com/pipefunc/pipefunc/pull/796))
+
+### 🐛 Bug Fixes
+
+- Force 100% ANSI in MCP autogenerated docs ([#803](https://github.com/pipefunc/pipefunc/pull/803))
+
+### 🧹 Maintenance
+
+- Rename `input` to `inputs` for MCP ([#800](https://github.com/pipefunc/pipefunc/pull/800))
+
+### 📊 Stats
+
+- `.yaml`: +2 lines, -2 lines
+- `.py`: +1339 lines, -238 lines
+
+## v0.78.0 (2025-06-06)
+
+### ✨ Enhancements
+
+- Automatically generate an MCP tool for pipelines ([#798](https://github.com/pipefunc/pipefunc/pull/798))
+- Dynamically set the width of the description in the progress bar ([#799](https://github.com/pipefunc/pipefunc/pull/799))
+
+### 📦 Dependencies
+
+- ⬆️ Update python to v3.13.4 ([#797](https://github.com/pipefunc/pipefunc/pull/797))
+
+### 📊 Stats
+
+- `.yml`: +1 lines, -1 lines
+- `.yaml`: +1 lines, -1 lines
+- `.md`: +9 lines, -0 lines
+- `.py`: +568 lines, -4 lines
+- `.toml`: +2 lines, -1 lines
+
+## v0.77.3 (2025-05-29)
+
+### ✨ Enhancements
+
+- Use `chunksize=1` for `SlurmExecutor` when auto-chunking ([#794](https://github.com/pipefunc/pipefunc/pull/794))
+
+### 📊 Stats
+
+- `.py`: +10 lines, -7 lines
+
+## v0.77.2 (2025-05-29)
+
+### 🐛 Bug Fixes
+
+- Ensure that progress bar is displayed for `"eager"` scheduling ([#793](https://github.com/pipefunc/pipefunc/pull/793))
+
+### 🧹 Maintenance
+
+- Refactor `IPyWidgetsProgressTracker` ([#792](https://github.com/pipefunc/pipefunc/pull/792))
+
+### 📚 Documentation
+
+- Use sharp peak in adaptive docs ([#790](https://github.com/pipefunc/pipefunc/pull/790))
+
+### 📊 Stats
+
+- `.md`: +6 lines, -6 lines
+- `.py`: +129 lines, -83 lines
+
+## v0.77.1 (2025-05-28)
+
+### ✨ Enhancements
+
+- Show progress for auto-CLI ([#789](https://github.com/pipefunc/pipefunc/pull/789))
+
+### 🐛 Bug Fixes
+
+- Do not show_progress for Adaptive ([#788](https://github.com/pipefunc/pipefunc/pull/788))
+
+### 🧹 Maintenance
+
+- Fix type annotation of `Pipeline.info()` ([#787](https://github.com/pipefunc/pipefunc/pull/787))
+
+### 📊 Stats
+
+- `.py`: +5 lines, -5 lines
+
+## v0.77.0 (2025-05-27)
+
+### ✨ Enhancements
+
+- Implement a `rich` version of ProgressTracker ([#785](https://github.com/pipefunc/pipefunc/pull/785))
+- Add support for additional Executor classes  ([#786](https://github.com/pipefunc/pipefunc/pull/786))
+- Automatically show progress bar if `show_progress=None` if possible ([#783](https://github.com/pipefunc/pipefunc/pull/783))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#784](https://github.com/pipefunc/pipefunc/pull/784))
+- [pre-commit.ci] pre-commit autoupdate ([#782](https://github.com/pipefunc/pipefunc/pull/782))
+
+### 🧪 Testing
+
+- Use `nox` for testing ([#781](https://github.com/pipefunc/pipefunc/pull/781))
+
+### 🐛 Bug Fixes
+
+- Rename `container` CSS property to less generic `progress-vbox` ([#780](https://github.com/pipefunc/pipefunc/pull/780))
+
+### 📊 Stats
+
+- `.py`: +949 lines, -59 lines
+- `.yml`: +2 lines, -26 lines
+- `.yaml`: +1 lines, -1 lines
+- `.md`: +1 lines, -0 lines
+- `.ipynb`: +1 lines, -0 lines
+- `.py}`: +97 lines, -147 lines
+
+## v0.76.0 (2025-05-13)
+
+### 🐛 Bug Fixes
+
+- Fix `ref._evaluate` on Python 3.12 Linux ([#779](https://github.com/pipefunc/pipefunc/pull/779))
+
+### 🧹 Maintenance
+
+- Fix `pydantic` deprecation and serialization warnings ([#778](https://github.com/pipefunc/pipefunc/pull/778))
+- Reduce the number of warnings in the tests ([#777](https://github.com/pipefunc/pipefunc/pull/777))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#773](https://github.com/pipefunc/pipefunc/pull/773))
+
+### ✨ Enhancements
+
+- Automatically pick `storage` (if None) based on `run_folder` ([#776](https://github.com/pipefunc/pipefunc/pull/776))
+
+### 📊 Stats
+
+- `.yaml`: +1 lines, -1 lines
+- `.py`: +144 lines, -74 lines
+
+## v0.75.0 (2025-05-12)
+
+### ✨ Enhancements
+
+- Add a slight pulse animation when progress bar reaches 100% ([#775](https://github.com/pipefunc/pipefunc/pull/775))
+- Apply slight animation with CSS on hover ([#774](https://github.com/pipefunc/pipefunc/pull/774))
+
+### 📊 Stats
+
+- `.py`: +44 lines, -11 lines
+
+## v0.74.0 (2025-05-12)
+
+### ✨ Enhancements
+
+- Set background colors per scope in `ProgressTracker` widget ([#772](https://github.com/pipefunc/pipefunc/pull/772))
+- Use unique border colors different scopes for progress bars ([#771](https://github.com/pipefunc/pipefunc/pull/771))
+- Improved progress bar updating ([#764](https://github.com/pipefunc/pipefunc/pull/764))
+- Only show failed count if anything failed ([#760](https://github.com/pipefunc/pipefunc/pull/760))
+
+### 🧹 Maintenance
+
+- Remove `--cov-fail-under=35` because not needed (`codspeed` doesn't meet it) ([#770](https://github.com/pipefunc/pipefunc/pull/770))
+- Rename `AsyncMapStatusWidget` to `AsyncTaskStatusWidget` ([#761](https://github.com/pipefunc/pipefunc/pull/761))
+
+### 🐛 Bug Fixes
+
+- Improve displaying long names in progress bar widget ([#769](https://github.com/pipefunc/pipefunc/pull/769))
+- Allow `chunksizes={"": None, ...}` ([#767](https://github.com/pipefunc/pipefunc/pull/767))
+
+### 📊 Stats
+
+- `.py`: +191 lines, -91 lines
+- `.toml`: +0 lines, -1 lines
+
+## v0.73.0 (2025-05-09)
+
+### ✨ Enhancements
+
+- Implement `AsyncMapStatusWidget` with `ipyw.HTML` instead of `ipyw.Output` ([#759](https://github.com/pipefunc/pipefunc/pull/759))
+- Add widget that shows task status when running `pipeline.map_async` ([#755](https://github.com/pipefunc/pipefunc/pull/755))
+
+### 🐛 Bug Fixes
+
+- Fix `ProgressTracker` for async failures ([#758](https://github.com/pipefunc/pipefunc/pull/758))
+
+### 🧹 Maintenance
+
+- Use `Prepared` in `run_map_async` ([#757](https://github.com/pipefunc/pipefunc/pull/757))
+- Rely on NamedTuple returned by prepare_run ([#756](https://github.com/pipefunc/pipefunc/pull/756))
+
+### 📊 Stats
+
+- `.py`: +888 lines, -64 lines
+
+## v0.72.0 (2025-05-07)
+
+### ✨ Enhancements
+
+- Add `FileValue` and rename `FileArray.from_array` to `FileArray.from_data` ([#749](https://github.com/pipefunc/pipefunc/pull/749))
+- Add `FileArray.from_array` and allow to use it as input ([#747](https://github.com/pipefunc/pipefunc/pull/747))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#746](https://github.com/pipefunc/pipefunc/pull/746))
+
+### 📚 Documentation
+
+- Add `FileArray.from_array` SLURM docs ([#748](https://github.com/pipefunc/pipefunc/pull/748))
+
+### 📊 Stats
+
+- `.yaml`: +1 lines, -1 lines
+- `.md`: +107 lines, -0 lines
+- `.py`: +212 lines, -62 lines
+
+## v0.71.0 (2025-05-02)
+
+### 📚 Documentation
+
+- Fix type annotation in `docs/source/examples/weather-simulation.md` ([#745](https://github.com/pipefunc/pipefunc/pull/745))
+- Mention `load_dataframe(run_folder)` in docs ([#744](https://github.com/pipefunc/pipefunc/pull/744))
+- Update `CHANGELOG.md` until v0.70.0 ([#741](https://github.com/pipefunc/pipefunc/pull/741))
+
+### 🧹 Maintenance
+
+- Fix typos in code / doc-strings ([#743](https://github.com/pipefunc/pipefunc/pull/743))
+
+### ✨ Enhancements
+
+- Add `load_dataframe(run_folder)` ([#742](https://github.com/pipefunc/pipefunc/pull/742))
+
+### 📊 Stats
+
+- `.md`: +55 lines, -7 lines
+- `.py`: +59 lines, -21 lines
+
 ## v0.70.0 (2025-05-01)
 
 ### 📦 Dependencies

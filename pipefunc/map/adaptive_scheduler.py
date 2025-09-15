@@ -185,7 +185,6 @@ class _ResourcesContainer:
             else:
                 value = getattr(r, name)
             self.data[name].append(value)
-        # TODO: Allow setting any of EXECUTOR_TYPES
         self.data["executor_type"].append(_executor_type(index, r, func, run_info))
         self.data["extra_scheduler"].append(_extra_scheduler(index, r, func, run_info))
 
@@ -253,6 +252,9 @@ def __extra_scheduler(resources: Resources) -> list[str]:
         extra_scheduler.append(f"--time={resources.time}")
     if resources.extra_args:
         for key, value in resources.extra_args.items():
+            if key == "executor_type":
+                # This is handled separately in _executor_type
+                continue
             extra_scheduler.append(f"--{key}={value}")
     return extra_scheduler
 
@@ -274,7 +276,12 @@ def _executor_type(
 
 
 def __executor_type(resources: Resources) -> EXECUTOR_TYPES:
-    return "sequential" if resources.parallelization_mode == "internal" else "process-pool"
+    executor_type = resources.extra_args.get("executor_type")
+    if executor_type is not None:
+        return resources.extra_args["executor_type"]
+    if resources.parallelization_mode == "internal":
+        return "sequential"
+    return None
 
 
 def _or(

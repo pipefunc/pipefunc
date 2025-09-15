@@ -22,7 +22,7 @@ async def test_widget_initialization():
     """Test widget initialization and basic properties."""
     widget = AsyncTaskStatusWidget(display=False)
     assert widget._status_html_widget is not None
-    assert widget._main_widget is not None
+    assert widget.widget is not None
     assert widget._traceback_widget is not None
     assert widget._traceback_button is not None
     assert widget._start_time <= time.monotonic()
@@ -286,7 +286,7 @@ async def test_widget_display_method():
 
     with patch("IPython.display.display") as mock_display:
         widget.display()
-        mock_display.assert_called_once_with(widget._main_widget)
+        mock_display.assert_called_once_with(widget.widget)
 
 
 @pytest.mark.asyncio
@@ -341,14 +341,13 @@ async def test_update_interval_adjustment():
 @pytest.mark.asyncio
 async def test_maybe_async_task_status_widget_no_ipynb():
     """Test maybe_async_task_status_widget when not in ipynb."""
-    with patch("pipefunc._utils.is_running_in_ipynb", return_value=False):
 
-        async def test_task():
-            return "done"
+    async def test_task():
+        return "done"
 
-        task = asyncio.create_task(test_task())
-        widget = maybe_async_task_status_widget(task)
-        assert widget is None
+    task = asyncio.create_task(test_task())
+    widget = maybe_async_task_status_widget(task)
+    assert widget is None
 
 
 @pytest.mark.asyncio

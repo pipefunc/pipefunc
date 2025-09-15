@@ -63,6 +63,7 @@ class StorageBase(abc.ABC):
         shape: ShapeTuple,
         internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
+        irregular: bool = False,  # noqa: FBT002
     ) -> None: ...
 
     @functools.cached_property
