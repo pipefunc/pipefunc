@@ -84,7 +84,7 @@ class DictArray(StorageBase):
             return np.ma.empty(self.internal_shape, dtype=object)
         return np.ma.masked
 
-    def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
+    def __getitem__(self, key: tuple[int | slice, ...]) -> Any:  # noqa: PLR0912
         """Return the data associated with the given key."""
         key = normalize_key(key, self.resolved_shape, self.resolved_internal_shape, self.shape_mask)
         assert len(key) == len(self.full_shape)
@@ -271,6 +271,7 @@ class SharedMemoryDictArray(DictArray):
         shape: tuple[int, ...],
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
+        irregular: bool = False,  # noqa: FBT002
         *,
         mapping: DictProxy[tuple[int, ...], Any] | None = None,
     ) -> None:
@@ -283,6 +284,7 @@ class SharedMemoryDictArray(DictArray):
             shape=shape,
             internal_shape=internal_shape,
             shape_mask=shape_mask,
+            irregular=irregular,
             mapping=mapping,
         )
 
