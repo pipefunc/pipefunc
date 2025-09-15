@@ -19,6 +19,10 @@ from ._base import (
     select_by_mask,
 )
 
+# Constants for sparse array auto-detection thresholds
+SPARSE_THRESHOLD_SIZE = 10_000  # Minimum total size to consider sparse
+SPARSE_THRESHOLD_DENSITY = 0.1  # Maximum density to use sparse
+
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
     from multiprocessing.managers import DictProxy
@@ -154,10 +158,54 @@ class DictArray(StorageBase):
                 slice_indices.append(range(k, k + 1))
         return slice_indices
 
-    def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray:
-        """Return the array as a NumPy masked array."""
+    def to_array(
+        self,
+        *,
+        splat_internal: bool | None = None,
+        sparse: bool | None = None,
+    ) -> np.ma.core.MaskedArray | Any:
+        """Return the array as a NumPy masked array or sparse array.
+
+        Parameters
+        ----------
+        splat_internal
+            Whether to splat internal dimensions.
+        sparse
+            If True and array is irregular, return SparseIrregularArray.
+            If None, auto-detect based on size and density.
+
+        """
+        # Import here to avoid circular imports
+        from ._sparse import SparseIrregularArray
+
         if splat_internal is None:
             splat_internal = bool(self.resolved_internal_shape)
+
+        # Auto-detect when sparse is beneficial for irregular arrays
+        if sparse is None and self.irregular and self.resolved_internal_shape:
+            # Use sparse if internal shape is large or expected density is low
+            max_internal = max(self.resolved_internal_shape) if self.resolved_internal_shape else 0
+            total_size = np.prod(self.full_shape) if hasattr(self, "full_shape") else 0
+            stored_elements = len(self._dict) * (
+                max_internal if self.resolved_internal_shape else 1
+            )
+            density = stored_elements / total_size if total_size > 0 else 1.0
+
+            # Use sparse if: large arrays (>10k elements) or low density (<10%)
+            use_sparse: bool = bool(
+                total_size > SPARSE_THRESHOLD_SIZE or density < SPARSE_THRESHOLD_DENSITY,
+            )
+            sparse = use_sparse
+
+        # Return sparse representation if requested for irregular arrays
+        if sparse and self.irregular and splat_internal:
+            return SparseIrregularArray(
+                data_dict=self._dict,
+                shape=self.resolved_shape,
+                internal_shape=self.resolved_internal_shape,
+                shape_mask=self.shape_mask,
+            )
+
         if not splat_internal:
             data: np.ndarray = _masked_empty(self.resolved_shape)
             mask: np.ndarray = np.full(self.resolved_shape, fill_value=True, dtype=bool)
