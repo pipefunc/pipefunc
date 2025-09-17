@@ -12,14 +12,6 @@ import networkx as nx
 import numpy as np
 from networkx.drawing.nx_agraph import graphviz_layout
 
-try:  # pragma: no cover - defensive for older pyviz versions
-    import pyviz_comms  # type: ignore[import-not-found]
-
-    if not hasattr(pyviz_comms, "_in_ipython"):
-        pyviz_comms._in_ipython = False  # type: ignore[attr-defined]
-except ImportError:  # pragma: no cover
-    pyviz_comms = None  # type: ignore[assignment]
-
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._pipeline._base import _Bound, _Resources
 from pipefunc._plotting_utils import (
