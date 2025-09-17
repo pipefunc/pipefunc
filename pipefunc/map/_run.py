@@ -10,7 +10,7 @@ from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import numpy as np
 import numpy.typing as npt
@@ -59,8 +59,6 @@ if TYPE_CHECKING:
     from ._result import StoreType
     from ._run_info import RunInfo
     from ._types import ShapeTuple, UserShapeDict
-else:  # pragma: no cover
-    Awaitable = Callable = object  # type: ignore[assignment]
 
 
 def run_map(
@@ -1102,7 +1100,8 @@ def _maybe_parallel_map(
             if status is not None:
                 status.mark_in_progress()
             try:
-                return await cast("Awaitable[tuple[Any, ...]]", process_index(i))
+                result = await process_index(i)  # type: ignore[misc]
+                return (result,)
             finally:
                 if status is not None:
                     status.mark_complete()
@@ -1110,7 +1109,7 @@ def _maybe_parallel_map(
                     progress.update_progress()
 
         return [run_index(i) for i in indices]
-    sync_process_index = cast("Callable[[int], tuple[Any, ...]]", process_index)
+    sync_process_index = process_index
     ex = _executor_for_func(func, executor)
     if ex is not None:
         assert executor is not None
@@ -1118,19 +1117,16 @@ def _maybe_parallel_map(
             func,
             ex,
             executor,
-            cast("functools.partial[tuple[Any, ...]]", process_index),
+            process_index,  # type: ignore[arg-type]
             indices,
         )
         chunksize = _chunksize_for_func(func, chunksizes, len(indices), ex)
         chunks = list(_chunk_indices(indices, chunksize))
-        process_chunk = functools.partial(_process_chunk, process_index=sync_process_index)
+        process_chunk = functools.partial(_process_chunk, process_index=sync_process_index)  # type: ignore[arg-type]
         return [_submit(process_chunk, ex, status, progress, len(chunk), chunk) for chunk in chunks]
     if status is not None:
         assert progress is not None
-        sync_process_index = cast(
-            "Callable[[int], tuple[Any, ...]]",
-            _wrap_with_status_update(sync_process_index, status, progress),
-        )
+        sync_process_index = _wrap_with_status_update(sync_process_index, status, progress)
     # Put the process_index result in a tuple to have consistent shapes when func has mapspec
     return [(sync_process_index(i),) for i in indices]
 
