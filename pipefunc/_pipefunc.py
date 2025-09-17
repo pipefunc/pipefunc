@@ -8,6 +8,7 @@ These `PipeFunc` objects are used to construct a `pipefunc.Pipeline`.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import dataclasses
 import datetime
@@ -17,8 +18,8 @@ import os
 import warnings
 import weakref
 from collections import defaultdict
-from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, get_args, get_origin
+from collections.abc import Awaitable, Callable, Sequence
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, cast, get_args, get_origin
 
 import cloudpickle
 
@@ -46,9 +47,24 @@ if TYPE_CHECKING:
     from pipefunc._pipeline._types import OUTPUT_TYPE
     from pipefunc.map._types import ShapeTuple
 
-T = TypeVar("T", bound=Callable[..., Any])
+T = TypeVar(
+    "T",
+    Callable[..., Any],
+    Callable[..., Awaitable[Any]],
+)
 
 MAX_PARAMS_LEN = 15
+
+
+def _is_coroutine_callable(func: Any) -> bool:
+    """Return ``True`` if *func* is an async callable."""
+    if asyncio.iscoroutinefunction(func):
+        return True
+    try:
+        call_method = cast("Callable[..., Any]", func.__call__)
+    except AttributeError:
+        return False
+    return inspect.iscoroutinefunction(call_method)
 
 
 class PipeFunc(Generic[T]):
@@ -218,12 +234,15 @@ class PipeFunc(Generic[T]):
         resources_variable: str | None = None,
         resources_scope: Literal["map", "element"] = "map",
         scope: str | None = None,
+        run_in_executor: bool | None = None,
         variant: str | dict[str | None, str] | None = None,
         variant_group: str | None = None,  # deprecated
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
         self._pipelines: weakref.WeakSet[Pipeline] = weakref.WeakSet()
         self.func: Callable[..., Any] = func
+        self._is_async_func = _is_coroutine_callable(func)
+        self._run_in_executor: bool | None = run_in_executor
         self.__name__ = _get_name(func)
         self._output_name: OUTPUT_TYPE = output_name
         self.debug = debug
@@ -246,6 +265,7 @@ class PipeFunc(Generic[T]):
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")
         self._validate()
+        self._validate_async_compatibility()
         self.error_snapshot: ErrorSnapshot | None = None
 
     @property
@@ -273,6 +293,23 @@ class PipeFunc(Generic[T]):
         """
         # Is a property to prevent users mutating `bound` directly
         return self._bound
+
+    @property
+    def is_async(self) -> bool:
+        """Return ``True`` if the wrapped function is asynchronous."""
+        return self._is_async_func
+
+    @property
+    def run_in_executor(self) -> bool | None:
+        """User preference for running the function inside an executor."""
+        return self._run_in_executor
+
+    @property
+    def should_run_in_executor(self) -> bool:
+        """Determine whether this function should execute inside an executor."""
+        if self._run_in_executor is not None:
+            return self._run_in_executor
+        return not self.is_async
 
     @functools.cached_property
     def output_name(self) -> OUTPUT_TYPE:
@@ -576,6 +613,19 @@ class PipeFunc(Generic[T]):
         self._validate_names()
         self._validate_mapspec()
 
+    def _validate_async_compatibility(self) -> None:
+        if not self.is_async:
+            return
+        if self.cache:
+            warnings.warn(
+                (
+                    f"Async function '{self.__name__}' is configured with caching. "
+                    "Ensure the cache backend is safe for concurrent async usage."
+                ),
+                UserWarning,
+                stacklevel=2,
+            )
+
     def _validate_names(self) -> None:
         if common := set(self._defaults) & set(self._bound):
             msg = (
@@ -644,6 +694,7 @@ class PipeFunc(Generic[T]):
             "resources": self.resources,
             "resources_variable": self.resources_variable,
             "resources_scope": self.resources_scope,
+            "run_in_executor": self._run_in_executor,
             "variant": self.variant,
             "variant_group": None,  # deprecated
         }
@@ -661,14 +712,11 @@ class PipeFunc(Generic[T]):
     def _rename_to_native(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         return {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        """Call the wrapped function with the given arguments.
-
-        Returns
-        -------
-            The return value of the wrapped function.
-
-        """
+    def _prepare_call_arguments(
+        self,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+    ) -> tuple[tuple[Any, ...], dict[str, Any], Any]:
         evaluated_resources = kwargs.pop(_EVALUATED_RESOURCES, None)
         kwargs = self._flatten_scopes(kwargs)
         if extra := set(kwargs) - set(self.parameters):
@@ -679,43 +727,105 @@ class PipeFunc(Generic[T]):
             )
             raise ValueError(msg)
 
-        if args:  # Put positional arguments into kwargs
-            for p, v in zip(self.parameters, args):
-                if p in kwargs:
-                    msg = f"Multiple values provided for parameter `{p}`."
+        args_tuple = tuple(args)
+        if args_tuple:
+            for parameter, value in zip(self.parameters, args_tuple):
+                if parameter in kwargs:
+                    msg = f"Multiple values provided for parameter `{parameter}`."
                     raise ValueError(msg)
-                kwargs[p] = v
-            args = ()
+                kwargs[parameter] = value
+            args_tuple = ()
+
         kwargs = self.defaults | kwargs | self._bound
         kwargs = self._rename_to_native(kwargs)
+        return args_tuple, kwargs, evaluated_resources
 
-        with self._maybe_profiler():
-            if self._evaluate_lazy:
-                args = evaluate_lazy(args)
-                kwargs = evaluate_lazy(kwargs)
-            _maybe_update_kwargs_with_resources(
-                kwargs,
-                self.resources_variable,
-                evaluated_resources,
-                self.resources,
+    def _handle_call_exception(self, error: Exception, args: Any, kwargs: dict[str, Any]) -> None:
+        if self.print_error:
+            print(
+                f"An error occurred while calling the function `{self.__name__}`"
+                f" with the arguments `{args=}` and `{kwargs=}`.",
             )
-            try:
-                result = self.func(*args, **kwargs)
-            except Exception as e:
-                if self.print_error:
-                    print(
-                        f"An error occurred while calling the function `{self.__name__}`"
-                        f" with the arguments `{args=}` and `{kwargs=}`.",
-                    )
-                renamed_kwargs = self._rename_to_native(kwargs)
-                self.error_snapshot = ErrorSnapshot(self.func, e, args, renamed_kwargs)
-                raise
+        renamed_kwargs = self._rename_to_native(kwargs)
+        self.error_snapshot = ErrorSnapshot(self.func, error, args, renamed_kwargs)
 
+    def _finalize_result(self, result: Any, kwargs: dict[str, Any]) -> Any:
         if self.debug:
             _default_debug_printer(self, result, kwargs)
         if self.post_execution_hook is not None:
             self.post_execution_hook(self, result, kwargs)
         return result
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        """Call the wrapped function with the given arguments.
+
+        Returns
+        -------
+            The return value of the wrapped function.
+
+        """
+        args_tuple, call_kwargs, evaluated_resources = self._prepare_call_arguments(
+            tuple(args),
+            kwargs,
+        )
+        with self._maybe_profiler():
+            if self._evaluate_lazy:
+                args_tuple = evaluate_lazy(args_tuple)
+                call_kwargs = evaluate_lazy(call_kwargs)
+            _maybe_update_kwargs_with_resources(
+                call_kwargs,
+                self.resources_variable,
+                evaluated_resources,
+                self.resources,
+            )
+            if self._is_async_func:
+                try:
+                    asyncio.get_running_loop()
+                except RuntimeError as exc:  # pragma: no cover - depends on runtime context
+                    msg = (
+                        f"Async function '{self.__name__}' cannot be called from a synchronous context."
+                        " Use `await PipeFunc.__call_async__` or pipeline async execution methods."
+                    )
+                    raise RuntimeError(msg) from exc
+                msg = (
+                    f"Async function '{self.__name__}' requires async execution."
+                    " Await `pipefunc.__call_async__(...)` or use `Pipeline.run_async`."
+                )
+                raise RuntimeError(msg)
+            try:
+                result = self.func(*args_tuple, **call_kwargs)
+            except Exception as e:
+                self._handle_call_exception(e, args_tuple, call_kwargs)
+                raise
+
+        return self._finalize_result(result, call_kwargs)
+
+    async def __call_async__(self, *args: Any, **kwargs: Any) -> Any:
+        """Asynchronously call the wrapped function with the given arguments."""
+        args_tuple, call_kwargs, evaluated_resources = self._prepare_call_arguments(
+            tuple(args),
+            kwargs,
+        )
+        with self._maybe_profiler():
+            if self._evaluate_lazy:
+                args_tuple = evaluate_lazy(args_tuple)
+                call_kwargs = evaluate_lazy(call_kwargs)
+            _maybe_update_kwargs_with_resources(
+                call_kwargs,
+                self.resources_variable,
+                evaluated_resources,
+                self.resources,
+            )
+            try:
+                if self._is_async_func:
+                    result = await self.func(*args_tuple, **call_kwargs)
+                else:
+                    result = self.func(*args_tuple, **call_kwargs)
+            except Exception as e:
+                self._handle_call_exception(e, args_tuple, call_kwargs)
+                raise
+
+        return self._finalize_result(result, call_kwargs)
 
     @functools.cached_property
     def __signature__(self) -> inspect.Signature:
@@ -1269,6 +1379,8 @@ class NestedPipeFunc(PipeFunc):
         self.resources_scope = resources_scope
         functions = [f.copy(resources=self.resources) for f in pipefuncs]
         self.pipeline = Pipeline(functions)  # type: ignore[arg-type]
+        self._is_async_func = any(f.is_async for f in self.pipeline.functions)
+        self._run_in_executor: bool | None = None
         _validate_output_name(output_name, self._all_outputs)
         self._output_name: OUTPUT_TYPE = output_name or self._all_outputs
         self.function_name = function_name
@@ -1296,6 +1408,8 @@ class NestedPipeFunc(PipeFunc):
         for f in self.pipeline.functions:
             f.mapspec = None  # MapSpec is handled by the NestedPipeFunc
         self._validate()
+        self._validate_async_compatibility()
+        self.error_snapshot = None
 
     def copy(self, **update: Any) -> NestedPipeFunc:
         # Pass the mapspec to the new instance because we set
@@ -1383,8 +1497,19 @@ class NestedPipeFunc(PipeFunc):
         return tuple(sorted(inputs))
 
     @functools.cached_property
-    def func(self) -> Callable[..., tuple[Any, ...]]:  # type: ignore[override]
+    def func(self) -> Callable[..., Any]:  # type: ignore[override]
         outputs = [f.output_name for f in self.pipeline.leaf_nodes]
+        if self._is_async_func:
+
+            async def call_full_output(**kwargs: Any) -> dict[str, Any]:
+                return await self.pipeline.run_async(
+                    self._output_name,
+                    full_output=True,
+                    kwargs=kwargs,
+                )
+
+            return _NestedAsyncFuncWrapper(call_full_output, self._output_name, self.function_name)
+
         func = self.pipeline.func(outputs)
         return _NestedFuncWrapper(func.call_full_output, self._output_name, self.function_name)
 
@@ -1435,6 +1560,29 @@ class _NestedFuncWrapper:
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         result_dict = self.func(*args, **kwds)
+        if isinstance(self.output_name, str):
+            return result_dict[self.output_name]
+        return tuple(result_dict[name] for name in self.output_name)
+
+
+class _NestedAsyncFuncWrapper:
+    """Async wrapper for nested functions returning selected outputs."""
+
+    def __init__(
+        self,
+        func: Callable[..., Awaitable[dict[str, Any]]],
+        output_name: OUTPUT_TYPE,
+        function_name: str | None = None,
+    ) -> None:
+        self.func = func
+        self.output_name = output_name
+        if function_name is not None:
+            self.__name__ = function_name
+        else:
+            self.__name__ = f"NestedPipeFunc_{'_'.join(at_least_tuple(output_name))}"
+
+    async def __call__(self, *args: Any, **kwds: Any) -> Any:
+        result_dict = await self.func(*args, **kwds)
         if isinstance(self.output_name, str):
             return result_dict[self.output_name]
         return tuple(result_dict[name] for name in self.output_name)
