@@ -10,7 +10,7 @@ from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -41,7 +41,7 @@ from ._shapes import external_shape_from_mask, internal_shape_from_mask, shape_i
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Coroutine, Generator, Iterable, Sequence
+    from collections.abc import Awaitable, Callable, Coroutine, Generator, Iterable, Sequence
 
     import pydantic
     from adaptive_scheduler import MultiRunManager
@@ -59,6 +59,8 @@ if TYPE_CHECKING:
     from ._result import StoreType
     from ._run_info import RunInfo
     from ._types import ShapeTuple, UserShapeDict
+else:  # pragma: no cover
+    Awaitable = Callable = object  # type: ignore[assignment]
 
 
 def run_map(
@@ -78,6 +80,7 @@ def run_map(
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
+    allow_unused_inputs: bool = False,
 ) -> ResultDict:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -177,6 +180,9 @@ def run_map(
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+    allow_unused_inputs
+        Whether to permit inputs that are not consumed by the pipeline's root arguments.
+        When set to ``False`` (default), a :class:`ValueError` is raised if extra inputs are passed.
 
     """
     prep = prepare_run(
@@ -194,6 +200,7 @@ def run_map(
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,
         in_async=False,
+        allow_unused_inputs=allow_unused_inputs,
     )
 
     with _maybe_executor(prep.executor, prep.parallel) as ex:
@@ -299,6 +306,7 @@ def run_map_async(
     return_results: bool = True,
     display_widgets: bool = True,
     start: bool = True,
+    allow_unused_inputs: bool = False,
 ) -> AsyncMap:
     """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -402,6 +410,10 @@ def run_map_async(
     start
         Whether to start the pipeline immediately. If ``False``, the pipeline is not started until the
         `start()` method on the `AsyncMap` instance is called.
+    allow_unused_inputs
+        Whether to allow extra inputs beyond the pipeline root arguments when preparing the
+        asynchronous execution. Set to ``True`` when passing convenience values that individual
+        nodes may ignore.
 
     """
     prep = prepare_run(
@@ -419,6 +431,7 @@ def run_map_async(
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,
         in_async=True,
+        allow_unused_inputs=allow_unused_inputs,
     )
 
     multi_run_manager = maybe_multi_run_manager(prep.executor)
@@ -615,6 +628,33 @@ def _get_or_set_cache(
     return result
 
 
+async def _get_or_set_cache_async(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    cache: _CacheBase | None,
+    compute_fn: Callable[[], Coroutine[Any, Any, Any] | Any],
+) -> Any:
+    if cache is None:
+        result = compute_fn()
+        if asyncio.iscoroutine(result):
+            return await result
+        return result
+    cache_key = (func._cache_id, to_hashable(kwargs))
+
+    if cache_key in cache:
+        return cache.get(cache_key)
+    if isinstance(cache, HybridCache):
+        t = time.monotonic()
+    result = compute_fn()
+    if asyncio.iscoroutine(result):
+        result = await result
+    if isinstance(cache, HybridCache):
+        cache.put(cache_key, result, time.monotonic() - t)
+    else:
+        cache.put(cache_key, result)
+    return result
+
+
 _EVALUATED_RESOURCES = "__pipefunc_internal_evaluated_resources__"
 
 
@@ -635,6 +675,25 @@ def _run_iteration(
             raise  # pragma: no cover
 
     return _get_or_set_cache(func, selected, cache, compute_fn)
+
+
+async def _run_iteration_async(
+    func: PipeFunc,
+    selected: dict[str, Any],
+    cache: _CacheBase | None,
+    in_executor: bool,
+) -> Any:
+    async def compute_fn() -> Any:
+        try:
+            if func.is_async:
+                return await func.__call_async__(**selected)
+            return func(**selected)
+        except Exception as e:
+            if not in_executor:
+                handle_pipefunc_error(e, func, selected)
+            raise
+
+    return await _get_or_set_cache_async(func, selected, cache, compute_fn)
 
 
 def _try_shape(x: Any) -> tuple[int, ...]:
@@ -669,6 +728,37 @@ def _run_iteration_and_process(
 ) -> tuple[Any, ...]:
     selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
     output = _run_iteration(func, selected, cache, in_executor)
+    outputs = _pick_output(func, output)
+    has_dumped = _update_array(
+        func,
+        arrays,
+        shape,
+        shape_mask,
+        index,
+        outputs,
+        in_post_process=False,
+        force_dump=force_dump,
+    )
+    if has_dumped and not return_results:
+        return _InternalShape.from_outputs(outputs)
+    return outputs
+
+
+async def _run_iteration_and_process_async(
+    index: int,
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    shape: ShapeTuple,
+    shape_mask: tuple[bool, ...],
+    arrays: Sequence[StorageBase],
+    cache: _CacheBase | None = None,
+    *,
+    in_executor: bool,
+    return_results: bool = True,
+    force_dump: bool = False,
+) -> tuple[Any, ...]:
+    selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
+    output = await _run_iteration_async(func, selected, cache, in_executor)
     outputs = _pick_output(func, output)
     has_dumped = _update_array(
         func,
@@ -824,7 +914,7 @@ def _maybe_executor(
 
 @dataclass
 class _MapSpecArgs:
-    process_index: functools.partial[tuple[Any, ...]]
+    process_index: Callable[[int], Awaitable[tuple[Any, ...]] | tuple[Any, ...]]
     existing: list[int]
     missing: list[int]
     result_arrays: list[np.ndarray] | None
@@ -848,15 +938,16 @@ def _prepare_submit_map_spec(
     mask = run_info.shape_masks[func.output_name]
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     result_arrays = _init_result_arrays(func.output_name, shape, return_results)
+    processor = _run_iteration_and_process_async if func.is_async else _run_iteration_and_process
     process_index = functools.partial(
-        _run_iteration_and_process,
+        processor,
         func=func,
         kwargs=kwargs,
         shape=shape,
         shape_mask=mask,
         arrays=arrays,
         cache=cache,
-        in_executor=in_executor,
+        in_executor=in_executor if not func.is_async else False,
         return_results=return_results,
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
@@ -905,20 +996,29 @@ def _submit(
     *args: Any,
 ) -> Future:
     if status is None:
-        return executor.submit(func, *args)
-    assert progress is not None
-    status.mark_in_progress(n=chunksize)
-    fut = executor.submit(func, *args)
-    mark_complete = functools.partial(status.mark_complete, n=chunksize)
-    fut.add_done_callback(mark_complete)
-    if not progress.in_async:
-        fut.add_done_callback(progress.update_progress)
+        fut = executor.submit(func, *args)
+    else:
+        assert progress is not None
+        status.mark_in_progress(n=chunksize)
+        fut = executor.submit(func, *args)
+        mark_complete = functools.partial(status.mark_complete, n=chunksize)
+        fut.add_done_callback(mark_complete)
+        if not progress.in_async:
+            fut.add_done_callback(progress.update_progress)
+
+    if is_slurm_executor(executor):
+        tasks = getattr(executor, "_all_tasks", None)
+        if tasks is None:
+            tasks = []
+            executor._all_tasks = tasks
+        tasks.append(fut)  # type: ignore[arg-type]
+
     return fut
 
 
 def _process_chunk(
     chunk: list[int],
-    process_index: functools.partial[tuple[Any, ...]],
+    process_index: Callable[[int], tuple[Any, ...]],
 ) -> list[Any]:
     return list(map(process_index, chunk))
 
@@ -998,7 +1098,7 @@ def _get_optimal_chunk_size(
 
 def _maybe_parallel_map(
     func: PipeFunc,
-    process_index: functools.partial[tuple[Any, ...]],
+    process_index: Callable[[int], Awaitable[tuple[Any, ...]] | tuple[Any, ...]],
     indices: list[int],
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
@@ -1007,19 +1107,43 @@ def _maybe_parallel_map(
 ) -> list[Any]:
     if not indices:
         return []
+    if func.is_async:
+
+        async def run_index(i: int) -> Any:
+            if status is not None:
+                status.mark_in_progress()
+            try:
+                return await cast("Awaitable[tuple[Any, ...]]", process_index(i))
+            finally:
+                if status is not None:
+                    status.mark_complete()
+                    assert progress is not None
+                    progress.update_progress()
+
+        return [run_index(i) for i in indices]
+    sync_process_index = cast("Callable[[int], tuple[Any, ...]]", process_index)
     ex = _executor_for_func(func, executor)
     if ex is not None:
         assert executor is not None
-        ex = maybe_update_slurm_executor_map(func, ex, executor, process_index, indices)
+        ex = maybe_update_slurm_executor_map(
+            func,
+            ex,
+            executor,
+            cast("functools.partial[tuple[Any, ...]]", process_index),
+            indices,
+        )
         chunksize = _chunksize_for_func(func, chunksizes, len(indices), ex)
         chunks = list(_chunk_indices(indices, chunksize))
-        process_chunk = functools.partial(_process_chunk, process_index=process_index)
+        process_chunk = functools.partial(_process_chunk, process_index=sync_process_index)
         return [_submit(process_chunk, ex, status, progress, len(chunk), chunk) for chunk in chunks]
     if status is not None:
         assert progress is not None
-        process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
+        sync_process_index = cast(
+            "Callable[[int], tuple[Any, ...]]",
+            _wrap_with_status_update(sync_process_index, status, progress),
+        )
     # Put the process_index result in a tuple to have consistent shapes when func has mapspec
-    return [(process_index(i),) for i in indices]
+    return [(sync_process_index(i),) for i in indices]
 
 
 def _wrap_with_status_update(
@@ -1047,11 +1171,28 @@ def _maybe_execute_single(
     cache: _CacheBase | None,
 ) -> Any:
     args = (func, kwargs, store, cache)  # args for _execute_single
-    ex = _executor_for_func(func, executor)
+    ex = None
+    if executor is not None and not func.is_async and func.should_run_in_executor:
+        ex = _executor_for_func(func, executor)
     if ex is not None:
         assert executor is not None
         ex = maybe_update_slurm_executor_single(func, ex, executor, kwargs)
         return _submit(_execute_single, ex, status, progress, 1, *args)
+    if func.is_async:
+        if status is not None:
+            status.mark_in_progress()
+
+        async def _runner() -> Any:
+            try:
+                return await _execute_single_async(*args)
+            finally:
+                if status is not None:
+                    status.mark_complete()
+                    assert progress is not None
+                    progress.update_progress()
+
+        return _runner()
+
     if status is not None:
         assert progress is not None
         return _wrap_with_status_update(_execute_single, status, progress)(*args)
@@ -1081,6 +1222,30 @@ def _execute_single(
             raise  # pragma: no cover
 
     return _get_or_set_cache(func, kwargs, cache, compute_fn)
+
+
+async def _execute_single_async(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    store: dict[str, StoreType],
+    cache: _CacheBase | None,
+) -> Any:
+    output, exists = _load_from_store(func.output_name, store, return_output=True)
+    if exists:
+        return output
+
+    _load_data(kwargs)
+
+    async def compute_fn() -> Any:
+        try:
+            if func.is_async:
+                return await func.__call_async__(**kwargs)
+            return func(**kwargs)
+        except Exception as e:
+            handle_pipefunc_error(e, func, kwargs)
+            raise
+
+    return await _get_or_set_cache_async(func, kwargs, cache, compute_fn)
 
 
 def _load_data(kwargs: dict[str, Any]) -> None:
@@ -1199,6 +1364,7 @@ def _submit_func(
     status = progress.progress_dict[func.output_name] if progress is not None else None
     cache = cache if func.cache else None
     if func.requires_mapping:
+        in_executor_flag = bool(executor) and not func.is_async
         args = _prepare_submit_map_spec(
             func,
             kwargs,
@@ -1207,7 +1373,7 @@ def _submit_func(
             fixed_indices,
             status,
             return_results,
-            in_executor=bool(executor),
+            in_executor=in_executor_flag,
             cache=cache,
         )
         r = _maybe_parallel_map(
@@ -1373,10 +1539,14 @@ async def _result_async(
     run_info: RunInfo | None = None,
 ) -> Any:
     try:
-        return await asyncio.wrap_future(task, loop=loop)
+        if isinstance(task, Future):
+            return await asyncio.wrap_future(task, loop=loop)
+        if asyncio.isfuture(task) or asyncio.iscoroutine(task):
+            return await task  # type: ignore[arg-type]
     except Exception as e:
         _raise_and_set_error_snapshot(e, func, kwargs, index=index, run_info=run_info)
         raise  # pragma: no cover
+    return task
 
 
 def _to_result_dict(
@@ -1473,7 +1643,6 @@ async def _process_task_async(
             return_results,
         )
     else:
-        assert isinstance(task, Future)
         r = await _result_async(task, loop, func, kwargs)
         output = _dump_single_output(func, r, store, run_info)
     if return_results:

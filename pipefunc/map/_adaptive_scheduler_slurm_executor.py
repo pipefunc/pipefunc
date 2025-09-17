@@ -131,6 +131,10 @@ def _adaptive_scheduler_imported() -> bool:
     if not is_min_version("adaptive_scheduler", min_version):  # pragma: no cover
         msg = f"The 'adaptive_scheduler' package must be at least version {min_version}."
         raise ImportError(msg)
+    from adaptive_scheduler import SlurmExecutor
+
+    if not isinstance(getattr(SlurmExecutor, "_all_tasks", None), _AllTasksDescriptor):
+        SlurmExecutor._all_tasks = _AllTasksDescriptor()
     return True
 
 
@@ -210,10 +214,16 @@ def _new_slurm_executor(
     from adaptive_scheduler import SlurmExecutor
 
     if is_slurm_executor(executor):  # type: ignore[arg-type]
-        return executor.new(update=kwargs)
+        new_executor = executor.new(update=kwargs)
+        if not hasattr(new_executor, "_all_tasks"):
+            new_executor._all_tasks = []  # type: ignore[attr-defined]
+        return new_executor
     assert isinstance(executor, type)
     assert issubclass(executor, SlurmExecutor)
-    return executor(**kwargs)
+    new_executor = executor(**kwargs)
+    if not hasattr(new_executor, "_all_tasks"):
+        new_executor._all_tasks = []  # type: ignore[attr-defined]
+    return new_executor
 
 
 def _adaptive_scheduler_resource_dict(
@@ -274,3 +284,22 @@ def _list_of_dicts_to_dict_of_tuples(
     tuples = {k: tuple(d[k] for d in list_of_dicts) for k in list_of_dicts[0]}
     # Remove keys with all None or [] values
     return {k: v for k, v in tuples.items() if any(v)}
+
+
+class _AllTasksDescriptor:
+    def __get__(self, instance: Any, owner: type[Any]) -> Any:
+        if instance is None:
+            return self
+        return instance.__dict__.setdefault("_all_tasks", [])
+
+    def __set__(self, instance: Any, value: Any) -> None:
+        instance.__dict__["_all_tasks"] = value
+
+
+try:  # pragma: no cover - import guard for optional dependency
+    from adaptive_scheduler import SlurmExecutor as _PatchedSlurmExecutor
+
+    if not isinstance(getattr(_PatchedSlurmExecutor, "_all_tasks", None), _AllTasksDescriptor):
+        _PatchedSlurmExecutor._all_tasks = _AllTasksDescriptor()
+except ImportError:  # pragma: no cover
+    _PatchedSlurmExecutor = None

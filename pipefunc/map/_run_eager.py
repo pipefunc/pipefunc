@@ -53,6 +53,7 @@ def run_map_eager(
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
+    allow_unused_inputs: bool = False,
 ) -> ResultDict:
     """Eagerly schedule pipeline functions as soon as their dependencies are met.
 
@@ -156,6 +157,9 @@ def run_map_eager(
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+    allow_unused_inputs
+        Whether to allow extra inputs beyond those required by the pipeline root arguments
+        when preparing the eager scheduler.
 
     """
     # Prepare the run (this call sets up the run folder, storage, progress, etc.)
@@ -174,6 +178,7 @@ def run_map_eager(
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,
         in_async=False,
+        allow_unused_inputs=allow_unused_inputs,
     )
 
     dependency_info = _build_dependency_graph(prep.pipeline)
