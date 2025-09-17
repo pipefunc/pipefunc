@@ -182,8 +182,7 @@ def _validate_complete_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> Non
         missing_args = ", ".join(missing)
         msg = f"Missing inputs: `{missing_args}`."
         raise ValueError(msg)
-    extra = set(inputs_with_defaults) - root_args
-    if extra:
+    if extra := set(inputs_with_defaults) - root_args:
         extra_args = ", ".join(extra)
         msg = f"Got extra inputs: `{extra_args}` that are not accepted by this pipeline."
         raise ValueError(msg)

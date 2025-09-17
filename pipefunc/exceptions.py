@@ -97,8 +97,3 @@ class ErrorSnapshot:
         from IPython.display import HTML, display
 
         display(HTML(f"<pre>{self}</pre>"))
-
-
-from pipefunc._error_handling import PropagatedErrorSnapshot  # noqa: E402  (re-export)
-
-__all__ = ["ErrorSnapshot", "PropagatedErrorSnapshot", "UnusedParametersError"]
