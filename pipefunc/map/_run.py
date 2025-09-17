@@ -80,7 +80,6 @@ def run_map(
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
-    allow_unused_inputs: bool = False,
 ) -> ResultDict:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -180,9 +179,6 @@ def run_map(
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
-    allow_unused_inputs
-        Whether to permit inputs that are not consumed by the pipeline's root arguments.
-        When set to ``False`` (default), a :class:`ValueError` is raised if extra inputs are passed.
 
     """
     prep = prepare_run(
@@ -200,7 +196,6 @@ def run_map(
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,
         in_async=False,
-        allow_unused_inputs=allow_unused_inputs,
     )
 
     with _maybe_executor(prep.executor, prep.parallel) as ex:
@@ -306,7 +301,6 @@ def run_map_async(
     return_results: bool = True,
     display_widgets: bool = True,
     start: bool = True,
-    allow_unused_inputs: bool = False,
 ) -> AsyncMap:
     """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -410,10 +404,6 @@ def run_map_async(
     start
         Whether to start the pipeline immediately. If ``False``, the pipeline is not started until the
         `start()` method on the `AsyncMap` instance is called.
-    allow_unused_inputs
-        Whether to allow extra inputs beyond the pipeline root arguments when preparing the
-        asynchronous execution. Set to ``True`` when passing convenience values that individual
-        nodes may ignore.
 
     """
     prep = prepare_run(
@@ -431,7 +421,6 @@ def run_map_async(
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,
         in_async=True,
-        allow_unused_inputs=allow_unused_inputs,
     )
 
     multi_run_manager = maybe_multi_run_manager(prep.executor)

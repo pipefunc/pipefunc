@@ -930,7 +930,6 @@ class Pipeline:
         show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
-        allow_unused_inputs: bool = False,
     ) -> ResultDict:
         """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -1039,9 +1038,6 @@ class Pipeline:
               without waiting for entire generations to complete. Can improve performance
               by maximizing parallel execution, especially for complex dependency graphs
               with varied execution times.
-        allow_unused_inputs
-            Whether to permit inputs that are not consumed by the pipeline's root arguments.
-            When ``False`` (default), providing extra inputs raises a :class:`ValueError`.
 
         See Also
         --------
@@ -1082,7 +1078,6 @@ class Pipeline:
             auto_subpipeline=auto_subpipeline,
             show_progress=show_progress,
             return_results=return_results,
-            allow_unused_inputs=allow_unused_inputs,
         )
 
     def map_async(
@@ -1104,7 +1099,6 @@ class Pipeline:
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
         start: bool = True,
-        allow_unused_inputs: bool = False,
     ) -> AsyncMap:
         """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -1217,9 +1211,6 @@ class Pipeline:
         start
             Whether to start the pipeline immediately. If ``False``, the pipeline is not started until the
             `start()` method on the `AsyncMap` instance is called.
-        allow_unused_inputs
-            Whether to allow inputs that are not part of the pipeline's root arguments when
-            preparing the asynchronous map run.
 
         See Also
         --------
@@ -1258,7 +1249,6 @@ class Pipeline:
             display_widgets=display_widgets,
             return_results=return_results,
             start=start,
-            allow_unused_inputs=allow_unused_inputs,
         )
 
     def arg_combinations(self, output_name: OUTPUT_TYPE) -> set[tuple[str, ...]]:

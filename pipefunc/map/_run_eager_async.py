@@ -56,7 +56,6 @@ def run_map_eager_async(
     display_widgets: bool = True,
     return_results: bool = True,
     start: bool = True,
-    allow_unused_inputs: bool = False,
 ) -> AsyncMap:
     """Asynchronously run a pipeline with eager scheduling for optimal parallelism.
 
@@ -165,9 +164,6 @@ def run_map_eager_async(
     start
         Whether to start the pipeline immediately. If ``False``, the pipeline is not started until the
         `start()` method on the `AsyncMap` instance is called.
-    allow_unused_inputs
-        Whether to allow inputs that are not part of the pipeline's root arguments when
-        preparing the eager asynchronous execution.
 
     """
     prep = prepare_run(
@@ -185,7 +181,6 @@ def run_map_eager_async(
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,
         in_async=True,
-        allow_unused_inputs=allow_unused_inputs,
     )
 
     multi_run_manager = maybe_multi_run_manager(prep.executor)

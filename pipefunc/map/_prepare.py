@@ -57,7 +57,6 @@ def prepare_run(
     auto_subpipeline: bool,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None,
     in_async: bool,
-    allow_unused_inputs: bool,
 ) -> Prepared:
     if not parallel and executor:
         msg = "Cannot use an executor without `parallel=True`."
@@ -69,7 +68,7 @@ def prepare_run(
         pipeline = pipeline.subpipeline(set(inputs), output_names)
     executor = _expand_output_name_in_executor(pipeline, executor)
     validate_slurm_executor(executor, in_async)
-    _validate_complete_inputs(pipeline, inputs, allow_unused_inputs=allow_unused_inputs)
+    _validate_complete_inputs(pipeline, inputs)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
     chunksizes = _expand_output_name_in_chunksizes(pipeline, chunksizes)
@@ -170,12 +169,7 @@ def _check_parallel(
         return
 
 
-def _validate_complete_inputs(
-    pipeline: Pipeline,
-    inputs: dict[str, Any],
-    *,
-    allow_unused_inputs: bool,
-) -> None:
+def _validate_complete_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
     """Validate that all required inputs are provided.
 
     Note that `output_name is None` means that all outputs are required!
@@ -189,8 +183,6 @@ def _validate_complete_inputs(
         msg = f"Missing inputs: `{missing_args}`."
         raise ValueError(msg)
     extra = set(inputs_with_defaults) - root_args
-    if allow_unused_inputs:
-        return
     if extra:
         extra_args = ", ".join(extra)
         msg = f"Got extra inputs: `{extra_args}` that are not accepted by this pipeline."
