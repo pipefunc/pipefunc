@@ -1,8 +1,3 @@
-## `pipefunc.resources` module
+# pipefunc.resources
 
-```{eval-rst}
-.. automodule:: pipefunc.resources
-    :members:
-    :undoc-members:
-    :show-inheritance:
-```
+::: pipefunc.resources

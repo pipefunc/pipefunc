@@ -1,8 +1,3 @@
-## `pipefunc.mcp` module
+# pipefunc.mcp
 
-```{eval-rst}
-.. automodule:: pipefunc.mcp
-    :members:
-    :undoc-members:
-    :show-inheritance:
-```
+::: pipefunc.mcp

@@ -106,11 +106,12 @@ ds.sum_.astype(float).plot(x="c", y="d")
 ```
 
 
-```{important}
+!!! important
+
 One major advantage of this gridded sweep is that the data is all structured nicely and the parallelism in all captured by the `pipeline.map` function.
 
 Currently, using `adaptive` as desribed below is a bit more cumbersome, however, there are plans to make this more seamless in the future.
-```
+
 
 
 ## Using `adaptive` for adaptive sweeps

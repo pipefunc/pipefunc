@@ -17,9 +17,10 @@ kernelspec:
 ```{try-notebook}
 ```
 
-```{note}
+!!! note
+
 This example uses `scikit-image` for image processing. If you don't have it installed, you can install it using `pip install scikit-image`.
-```
+
 
 In this example, we'll process a batch of images to:
 

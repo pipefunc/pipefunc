@@ -1,8 +1,3 @@
-## `pipefunc.cache` module
+# pipefunc.cache
 
-```{eval-rst}
-.. automodule:: pipefunc.cache
-    :members:
-    :undoc-members:
-    :show-inheritance:
-```
+::: pipefunc.cache

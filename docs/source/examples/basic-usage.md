@@ -17,7 +17,7 @@ kernelspec:
 ```{try-notebook}
 ```
 
-This example demonstrates a simple pipeline using the {func}`@pipefunc <pipefunc.pipefunc>` decorator and the {class}`~pipefunc.Pipeline` class. It showcases a basic workflow with sequential execution.
+This example demonstrates a simple pipeline using the `@pipefunc <pipefunc.pipefunc>` decorator and the ``pipefunc.Pipeline`` class. It showcases a basic workflow with sequential execution.
 
 ## Code
 
@@ -65,10 +65,10 @@ print(result)
 
 **Features Demonstrated:**
 
-- {func}`@pipefunc <pipefunc.pipefunc>`: Decorator to make a function "pipeable."
-- {class}`~pipefunc.Pipeline`: Class to create and manage a pipeline of functions.
-- Visualization using {meth}`~pipefunc.Pipeline.visualize`.
-- Sequential execution using `pipeline()` (or equivalently, {meth}`~pipefunc.Pipeline.run`).
+- `@pipefunc <pipefunc.pipefunc>`: Decorator to make a function "pipeable."
+- ``pipefunc.Pipeline``: Class to create and manage a pipeline of functions.
+- Visualization using ``pipefunc.Pipeline.visualize``.
+- Sequential execution using `pipeline()` (or equivalently, ``pipefunc.Pipeline.run``).
 
 **Further Exploration:**
 
