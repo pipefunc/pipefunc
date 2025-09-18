@@ -124,7 +124,8 @@ class DictArray(StorageBase):
                 for s, k in zip(self.full_shape, key)
                 if isinstance(k, slice)
             )
-            return data.reshape(new_shape)
+            result = data.reshape(new_shape)
+            return self._ensure_masked_array_for_irregular(result)
 
         external_key = tuple(x for x, m in zip(key, self.shape_mask) if m)  # type: ignore[misc]
         internal_key = tuple(x for x, m in zip(key, self.shape_mask) if not m)  # type: ignore[misc]

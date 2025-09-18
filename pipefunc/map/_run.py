@@ -18,6 +18,7 @@ import numpy.typing as npt
 from pipefunc._pipefunc_utils import handle_pipefunc_error
 from pipefunc._utils import (
     at_least_tuple,
+    create_mask_for_masked_values,
     dump,
     get_ncores,
     is_running_in_ipynb,
@@ -1334,9 +1335,8 @@ def _output_from_mapspec_task(
     if func._irregular_output:
         masked_arrays = []
         for arr in reshaped:
-            # Use frompyfunc to efficiently check for np.ma.masked sentinels
-            is_masked = np.frompyfunc(lambda x: x is np.ma.masked, 1, 1)
-            mask = is_masked(arr).astype(bool)
+            # Use helper to efficiently check for np.ma.masked sentinels
+            mask = create_mask_for_masked_values(arr)
             masked_arrays.append(np.ma.MaskedArray(arr, mask=mask))
         return tuple(masked_arrays)
 

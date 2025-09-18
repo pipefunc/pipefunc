@@ -7,15 +7,15 @@ import functools
 import itertools
 from typing import TYPE_CHECKING, Any
 
-from pipefunc._utils import prod
+import numpy as np
+
+from pipefunc._utils import create_mask_for_masked_values, prod
 from pipefunc.map._mapspec import shape_to_strides
 from pipefunc.map._shapes import shape_is_resolved
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
-
-    import numpy as np
 
     from pipefunc.map._types import ShapeTuple
 
@@ -52,6 +52,7 @@ class StorageBase(abc.ABC):
     shape: ShapeTuple
     internal_shape: ShapeTuple
     shape_mask: tuple[bool, ...]
+    irregular: bool
     storage_id: str
     requires_serialization: bool
     _is_resolved: bool = False
@@ -124,6 +125,28 @@ class StorageBase(abc.ABC):
     def rank(self) -> int:
         """Return the rank of the array."""
         return len(self.resolved_shape)
+
+    def _ensure_masked_array_for_irregular(self, data: Any) -> Any:
+        """Convert arrays with masked sentinels to MaskedArrays if irregular=True.
+
+        This should be called at the end of __getitem__ implementations
+        to ensure consistent behavior across all storage types.
+        """
+        if not self.irregular:
+            return data
+
+        # Only process numpy arrays
+        if not isinstance(data, np.ndarray):
+            return data
+
+        # Check if data contains any masked sentinels
+        mask = create_mask_for_masked_values(data)
+
+        if np.any(mask):
+            # Contains masked values - return MaskedArray
+            return np.ma.MaskedArray(data, mask=mask, dtype=object)
+
+        return data
 
     @functools.cached_property
     def full_shape(self) -> tuple[int, ...]:
