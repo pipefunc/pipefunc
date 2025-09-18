@@ -1,8 +1,3 @@
-## `pipefunc.map.adaptive_scheduler` module
+# pipefunc.map.adaptive_scheduler
 
-```{eval-rst}
-.. automodule:: pipefunc.map.adaptive_scheduler
-    :members:
-    :undoc-members:
-    :show-inheritance:
-```
+::: pipefunc.map.adaptive_scheduler

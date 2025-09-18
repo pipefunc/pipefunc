@@ -1,8 +1,3 @@
-## `pipefunc.sweep` module
+# pipefunc.sweep
 
-```{eval-rst}
-.. automodule:: pipefunc.sweep
-    :members:
-    :undoc-members:
-    :show-inheritance:
-```
+::: pipefunc.sweep
