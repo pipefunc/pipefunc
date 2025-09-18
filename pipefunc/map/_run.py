@@ -1328,23 +1328,19 @@ def _output_from_mapspec_task(
 
     # Reshape the result arrays
     reshaped = tuple(x.reshape(shape) for x in args.result_arrays)  # type: ignore[union-attr]
-    if not func._irregular_output:
-        return reshaped
-    # For irregular outputs, convert arrays with np.ma.masked sentinels to proper MaskedArrays
-    masked_arrays = []
-    for arr in reshaped:
-        # Create mask by checking for np.ma.masked sentinel values
-        flat_arr = arr.ravel()
-        mask_flat = np.array([x is np.ma.masked for x in flat_arr], dtype=bool)
 
-        # Create data array (replace sentinels with 0, it will be masked anyway)
-        data_flat = np.array([0 if x is np.ma.masked else x for x in flat_arr], dtype=object)
+    # For irregular outputs, ensure we return MaskedArrays
+    # The arrays contain np.ma.masked sentinels that need to be converted to proper masks
+    if func._irregular_output:
+        masked_arrays = []
+        for arr in reshaped:
+            # Use frompyfunc to efficiently check for np.ma.masked sentinels
+            is_masked = np.frompyfunc(lambda x: x is np.ma.masked, 1, 1)
+            mask = is_masked(arr).astype(bool)
+            masked_arrays.append(np.ma.MaskedArray(arr, mask=mask))
+        return tuple(masked_arrays)
 
-        # Reshape both and create MaskedArray
-        mask = mask_flat.reshape(arr.shape)
-        data = data_flat.reshape(arr.shape)
-        masked_arrays.append(np.ma.MaskedArray(data, mask=mask))
-    return tuple(masked_arrays)
+    return reshaped
 
 
 def _internal_shape(output: Any, storage: StorageBase) -> tuple[int, ...]:
