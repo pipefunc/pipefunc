@@ -18,6 +18,7 @@ import numpy.typing as npt
 from pipefunc._pipefunc_utils import handle_pipefunc_error
 from pipefunc._utils import (
     at_least_tuple,
+    create_mask_for_masked_values,
     dump,
     get_ncores,
     is_running_in_ipynb,
@@ -748,7 +749,13 @@ def _set_output(
             external_index,
             internal_index,
         )
-        arr[flat_index] = output[internal_index]
+        try:
+            _output = output[internal_index]
+        except IndexError:
+            if not func._irregular_output:
+                raise
+            _output = np.ma.masked
+        arr[flat_index] = _output
 
 
 def _validate_internal_shape(
@@ -756,6 +763,8 @@ def _validate_internal_shape(
     internal_shape: tuple[int, ...],
     func: PipeFunc,
 ) -> None:
+    if func._irregular_output:
+        return
     shape = np.shape(output)[: len(internal_shape)]
     if shape != internal_shape:
         msg = (
@@ -1317,7 +1326,21 @@ def _output_from_mapspec_task(
 
     if args.result_arrays is None:
         return None
-    return tuple(x.reshape(shape) for x in args.result_arrays)  # type: ignore[union-attr]
+
+    # Reshape the result arrays
+    reshaped = tuple(x.reshape(shape) for x in args.result_arrays)  # type: ignore[union-attr]
+
+    # For irregular outputs, ensure we return MaskedArrays
+    # The arrays contain np.ma.masked sentinels that need to be converted to proper masks
+    if func._irregular_output:
+        masked_arrays = []
+        for arr in reshaped:
+            # Use helper to efficiently check for np.ma.masked sentinels
+            mask = create_mask_for_masked_values(arr)
+            masked_arrays.append(np.ma.MaskedArray(arr, mask=mask))
+        return tuple(masked_arrays)
+
+    return reshaped
 
 
 def _internal_shape(output: Any, storage: StorageBase) -> tuple[int, ...]:

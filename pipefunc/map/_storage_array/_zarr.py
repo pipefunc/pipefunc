@@ -37,11 +37,15 @@ class ZarrFileArray(StorageBase):
         shape: ShapeTuple,
         internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
+        irregular: bool = False,  # noqa: FBT002
         *,
         store: zarr.storage.Store | str | Path | None = None,
         object_codec: Any = None,
     ) -> None:
         """Initialize the ZarrFileArray."""
+        if irregular:
+            msg = "irregular arrays are not supported yet"
+            raise NotImplementedError(msg)
         if internal_shape and shape_mask is None:
             msg = "shape_mask must be provided if internal_shape is provided"
             raise ValueError(msg)
@@ -266,6 +270,7 @@ class ZarrMemoryArray(ZarrFileArray):
         shape: tuple[int, ...],
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
+        irregular: bool = False,  # noqa: FBT002
         *,
         store: zarr.storage.Store | None = None,
         object_codec: Any = None,
@@ -278,6 +283,7 @@ class ZarrMemoryArray(ZarrFileArray):
             shape=shape,
             internal_shape=internal_shape,
             shape_mask=shape_mask,
+            irregular=irregular,
             store=store,
             object_codec=object_codec,
         )
@@ -325,6 +331,7 @@ class ZarrSharedMemoryArray(ZarrMemoryArray):
         shape: tuple[int, ...],
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
+        irregular: bool = False,  # noqa: FBT002
         *,
         store: zarr.storage.Store | None = None,
         object_codec: Any = None,
@@ -337,6 +344,7 @@ class ZarrSharedMemoryArray(ZarrMemoryArray):
             shape=shape,
             internal_shape=internal_shape,
             shape_mask=shape_mask,
+            irregular=irregular,
             store=store,
             object_codec=object_codec,
         )

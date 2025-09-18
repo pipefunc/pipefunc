@@ -62,7 +62,7 @@ class ArraySpec:
             msg = f"Array name '{self.name}' is not a valid Python identifier"
             raise ValueError(msg)
         for i in self.axes:
-            if not (i is None or i.isidentifier()):
+            if not (i is None or i.removesuffix("*").isidentifier()):
                 msg = f"Index name '{i}' is not a valid Python identifier."
                 raise ValueError(msg)
 
@@ -535,3 +535,10 @@ def trace_dependencies(mapspecs: list[MapSpec]) -> dict[str, dict[str, tuple[str
         output_name: {name: order_like_mapspec_axes(name, axs) for name, axs in dct.items()}
         for output_name, dct in reordered.items()
     }
+
+
+def is_irregular(mapspec: MapSpec | None) -> bool:
+    """Check if the mapspec is irregular."""
+    if mapspec is None:
+        return False
+    return any(name.endswith("*") for name in mapspec.output_indices)

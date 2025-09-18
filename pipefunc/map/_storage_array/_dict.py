@@ -38,6 +38,7 @@ class DictArray(StorageBase):
         shape: ShapeTuple,
         internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
+        irregular: bool = False,  # noqa: FBT002
         *,
         mapping: MutableMapping[tuple[int, ...], Any] | None = None,
     ) -> None:
@@ -52,6 +53,7 @@ class DictArray(StorageBase):
         self.shape = tuple(shape)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
+        self.irregular = irregular
         if mapping is None:
             mapping = {}
         self._dict: dict[tuple[int, ...], Any] = mapping  # type: ignore[assignment]
@@ -82,7 +84,7 @@ class DictArray(StorageBase):
             return np.ma.empty(self.internal_shape, dtype=object)
         return np.ma.masked
 
-    def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
+    def __getitem__(self, key: tuple[int | slice, ...]) -> Any:  # noqa: PLR0912
         """Return the data associated with the given key."""
         key = normalize_key(key, self.resolved_shape, self.resolved_internal_shape, self.shape_mask)
         assert len(key) == len(self.full_shape)
@@ -100,7 +102,14 @@ class DictArray(StorageBase):
                     internal_key = tuple(x for x, m in zip(index, self.shape_mask) if not m)
                     if external_key in self._dict:
                         arr = np.asarray(self._dict[external_key])
-                        value = arr[internal_key]
+                        try:
+                            value = arr[internal_key]
+                        except IndexError:
+                            # For irregular arrays, return masked value when out of bounds
+                            if self.irregular:
+                                value = np.ma.masked
+                            else:
+                                raise
                     else:
                         value = self._internal_mask()[internal_key]
                 else:  # noqa: PLR5501
@@ -115,7 +124,8 @@ class DictArray(StorageBase):
                 for s, k in zip(self.full_shape, key)
                 if isinstance(k, slice)
             )
-            return data.reshape(new_shape)
+            result = data.reshape(new_shape)
+            return self._ensure_masked_array_for_irregular(result)
 
         external_key = tuple(x for x, m in zip(key, self.shape_mask) if m)  # type: ignore[misc]
         internal_key = tuple(x for x, m in zip(key, self.shape_mask) if not m)  # type: ignore[misc]
@@ -126,7 +136,13 @@ class DictArray(StorageBase):
             return self._internal_mask()
         if internal_key:
             arr = np.asarray(data)
-            return arr[internal_key]
+            try:
+                return arr[internal_key]
+            except IndexError as e:
+                if not self.irregular:
+                    msg = f"Index {internal_key} out of bounds for array with shape {arr.shape}"
+                    raise IndexError(msg) from e
+                return np.ma.masked
         return data
 
     def _slice_indices(self, key: tuple[int | slice, ...], shape: tuple[int, ...]) -> list[range]:
@@ -169,10 +185,18 @@ class DictArray(StorageBase):
                 data[full_index] = value_array
                 mask[full_index] = False
             else:
+                # Irregular case - shapes don't match
                 for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
-                    data[full_index] = value_array[internal_index]
-                    mask[full_index] = False
+                    try:
+                        data[full_index] = value_array[internal_index]
+                        mask[full_index] = False
+                    except IndexError:
+                        # Out of bounds for irregular array - keep as masked
+                        if not self.irregular:
+                            raise
+                        # data[full_index] already contains np.ma.masked from _masked_empty
+                        # mask[full_index] is already True
         return np.ma.MaskedArray(data, mask=mask, dtype=object)
 
     @property
@@ -263,6 +287,7 @@ class SharedMemoryDictArray(DictArray):
         shape: tuple[int, ...],
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
+        irregular: bool = False,  # noqa: FBT002
         *,
         mapping: DictProxy[tuple[int, ...], Any] | None = None,
     ) -> None:
@@ -275,6 +300,7 @@ class SharedMemoryDictArray(DictArray):
             shape=shape,
             internal_shape=internal_shape,
             shape_mask=shape_mask,
+            irregular=irregular,
             mapping=mapping,
         )
 
