@@ -1,8 +1,3 @@
-## `pipefunc.map.adaptive` module
+# pipefunc.map.adaptive
 
-```{eval-rst}
-.. automodule:: pipefunc.map.adaptive
-    :members:
-    :undoc-members:
-    :show-inheritance:
-```
+::: pipefunc.map.adaptive

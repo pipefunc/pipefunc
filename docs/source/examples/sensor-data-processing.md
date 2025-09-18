@@ -17,9 +17,10 @@ kernelspec:
 ```{try-notebook}
 ```
 
-```{note}
+!!! note
+
 This example uses `scipy` and `seaborn` libraries for data processing and visualization. Make sure to install these libraries before running the code.
-```
+
 
 Let's create a detailed example for the sensor data processing pipeline. This example will simulate the following steps:
 

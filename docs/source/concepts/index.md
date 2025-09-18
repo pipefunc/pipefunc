@@ -1,30 +1,10 @@
 # Concepts
 
-```{toctree}
-:hidden:
 
-Function Inputs and Outputs <function-io>
-Understanding mapspec <mapspec>
-Parallelism and Execution <execution-and-parallelism>
-Parameter Scopes <parameter-scopes>
-Error Handling <error-handling>
-Type Checking <type-checking>
-Variants <variants>
-Caching <caching>
-Automatic CLI <cli>
-SLURM integration <slurm>
-Resource Management <resource-management>
-Simplifying Pipelines <simplifying-pipelines>
-Adaptive integration <adaptive-integration>
-Testing <testing>
-Overhead and Efficiency <overhead-and-efficiency.md>
-Parameter Sweeps <parameter-sweeps>
-```
 
-```{admonition} Getting Started
-:class: tip
+!!! tip "Getting Started"
 If you're new to `pipefunc`, we recommend starting with the [Tutorial](../tutorial) to get a hands-on introduction to the library. Then, explore the concepts in this section to deepen your understanding.
-```
+
 
 Welcome to the Concepts section of the `pipefunc` documentation.
 Here, we delve into the core ideas and design principles that underpin the library.

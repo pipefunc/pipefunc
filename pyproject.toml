@@ -52,18 +52,13 @@ test = [
     "versioningit",
 ]
 docs = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings[python]",
+    "mkdocs-jupyter",
+    "mkdocs-mermaid2-plugin",
     "emoji",
     "jupytext",
-    "myst-nb",
-    "myst-parser",
-    "sphinx-autodoc-typehints",
-    "sphinx-book-theme",
-    "sphinx-copybutton",
-    "sphinx-llms-txt",
-    "sphinx-notfound-page",
-    "sphinx-togglebutton",
-    "sphinx",
-    "sphinxcontrib-mermaid",
     "versioningit",
     # Used for the example notebook
     "nltk",
@@ -207,3 +202,12 @@ max-complexity = 18
 
 [tool.mypy]
 python_version = "3.10"
+
+[dependency-groups]
+dev = [
+    "mkdocs>=1.6.1",
+    "mkdocs-jupyter>=0.25.1",
+    "mkdocs-material>=9.6.20",
+    "mkdocs-mermaid2-plugin>=1.2.2",
+    "mkdocstrings[python]>=0.30.0",
+]

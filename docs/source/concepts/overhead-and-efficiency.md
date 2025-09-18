@@ -22,9 +22,10 @@ kernelspec:
 
 ## What is the overhead / efficiency / performance of `pipefunc`?
 
-```{note}
+!!! note
+
 **tl;dr**: About 10 µs per iteration on a MacBook Pro M4 for a simple pipeline with three functions.
-```
+
 
 To benchmark the performance of `pipefunc`, you can measure the execution time of a pipeline using different input sizes.
 Below is a simple benchmarking code example that evaluates the performance of a pipeline with three functions and a 3D sweep of 125,000 iterations.

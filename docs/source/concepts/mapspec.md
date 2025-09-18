@@ -24,12 +24,8 @@ kernelspec:
 `mapspec` is a powerful string-based syntax within `pipefunc` that defines how data is mapped between functions in a pipeline, especially when dealing with arrays or lists of inputs.
 It allows you to express element-wise operations, reductions, and even the creation of new dimensions, enabling **parallel computations**.
 
-:::{admonition} Go through the main tutorial first!
-:class: warning, dropdown
-
-We recommend going through the main [pipefunc tutorial](../tutorial) before diving into `mapspec`, as it provides a comprehensive overview of the `pipefunc` library and its core concepts.
-
-:::
+??? warning "Go through the main tutorial first!"
+    We recommend going through the main [pipefunc tutorial](../tutorial) before diving into `mapspec`, as it provides a comprehensive overview of the `pipefunc` library and its core concepts.
 
 ## Basic Syntax
 
@@ -475,7 +471,7 @@ This demonstrates how easily you can extend the dimensionality of your pipeline 
 
 **Key Takeaway:**
 
-{meth}`~pipefunc.Pipeline.add_mapspec_axis` simplifies introducing or modifying dimensions, especially when dealing with pipelines that have many functions or high-dimensional data.
+``pipefunc.Pipeline.add_mapspec_axis`` simplifies introducing or modifying dimensions, especially when dealing with pipelines that have many functions or high-dimensional data.
 It allows for easy extension of your pipeline's capabilities to handle multi-dimensional data by automatically managing `mapspec` changes, making your code more concise and adaptable.
 
 ## Tips and Best Practices

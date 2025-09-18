@@ -15,15 +15,15 @@ kernelspec:
 
 PipeFunc integrates with SLURM on a high level without requiring you to write `sbatch` scripts or manage job submission manually.
 
-PipeFunc allows you to submit jobs to a SLURM cluster using the {class}`adaptive_scheduler.SlurmExecutor` and set its resources for individual functions using the `resources` parameter in `@pipefunc(..., resources=...)`.
-The `resources` parameter can be a dictionary or a {class}`~pipefunc.resources.Resources` object.
+PipeFunc allows you to submit jobs to a SLURM cluster using the `adaptive_scheduler.SlurmExecutor` and set its resources for individual functions using the `resources` parameter in `@pipefunc(..., resources=...)`.
+The `resources` parameter can be a dictionary or a ``pipefunc.resources.Resources`` object.
 This tutorial explains how to:
 
 - **Submit jobs using SlurmExecutor.**
 - **Specify Resources statically or dynamically.**
 - **Control resource allocation scopes** so that resources apply either to the entire mapspec or to each individual iteration.
 - **Have functions manage their own parallelization** when running a SLURM job.
-- **Use a dictionary of executors** to run some functions via SLURM while others run on a {class}`concurrent.futures.ThreadPoolExecutor`.
+- **Use a dictionary of executors** to run some functions via SLURM while others run on a `concurrent.futures.ThreadPoolExecutor`.
 
 ## tl;dr
 
@@ -53,22 +53,19 @@ The two sources of resource specifications are:
    When you instantiate a SlurmExecutor (e.g. `SlurmExecutor(cores_per_node=2)`), you set default values. These defaults serve as a fallback for any function that does not override the resources.
 
 2. **Function-Specific Resources:**
-   When decorating your function with PipeFunc, you can pass `resources={"cpus": 2, ...}` (or a {class}`~pipefunc.resources.Resources` object). These values will overwrite the executor defaults for that function’s job submission.
+   When decorating your function with PipeFunc, you can pass `resources={"cpus": 2, ...}` (or a ``pipefunc.resources.Resources`` object). These values will overwrite the executor defaults for that function’s job submission.
 
 This design ensures flexibility: you have a cluster-wide default configuration that can be tailored on a per-function basis.
 
-:::{admonition} `resources=Resouces(...)` vs `resources={...}`
-:class: important
-
-The {class}`~pipefunc.resources.Resources` object provided (either as a dict or via `Resources(...)`) must have keys matching those defined by the Resources class (such as `"cpus"`, `"memory"`, etc.).
-:::
+!!! important "`resources=Resouces(...)` vs `resources={...}`"
+    The ``pipefunc.resources.Resources`` object provided (either as a dict or via `Resources(...)`) must have keys matching those defined by the Resources class (such as `"cpus"`, `"memory"`, etc.).
 
 ---
 
 ## Resource Allocation Scopes
 
 PipeFunc supports two modes for SLURM job submission when using mapspec.
-The **resources_scope** parameter (in `@pipefunc(..., resources_scope=...)`) controls how the {class}`~pipefunc.resources.Resources` provided are applied:
+The **resources_scope** parameter (in `@pipefunc(..., resources_scope=...)`) controls how the ``pipefunc.resources.Resources`` provided are applied:
 
 - **Map Scope (`resources_scope=="map"`):**
   The entire mapspec operation for the function is submitted as a single SLURM job using the provided resources.
@@ -140,7 +137,7 @@ The resources specified on the function override the executor’s defaults for t
 
 ### Static Resources
 
-You can specify a fixed resource requirement by passing a dictionary or a {class}`~pipefunc.resources.Resources` instance when decorating your function:
+You can specify a fixed resource requirement by passing a dictionary or a ``pipefunc.resources.Resources`` instance when decorating your function:
 
 ```python
 @pipefunc(output_name="geo", resources={"cpus": 4, "memory": "8GB"})
@@ -226,7 +223,7 @@ This gives you fine-grained control over job submission without changing your fu
 ## Functions Managing Their Own Parallelization
 
 Sometimes you want the SLURM job to have resources allocated while allowing your function to control its own parallelism internally.
-You can achieve this by specifying `parallelization_mode="internal"` in {class}`~pipefunc.resources.Resources`.
+You can achieve this by specifying `parallelization_mode="internal"` in ``pipefunc.resources.Resources``.
 In this mode, the SLURM job is submitted with the allocated resources, but the function is executed sequentially; it is then up to your function to manage internal parallelization (for example, by creating its own process pool).
 
 ```python
@@ -255,13 +252,13 @@ pipeline = Pipeline([process_data])
 result = pipeline(data=[1, 2, 3])
 ```
 
-Inside `process_data`, the {class}`~pipefunc.resources.Resources` object is injected via `resources_variable` so you can adapt the internal behavior based on the allocated resources.
+Inside `process_data`, the ``pipefunc.resources.Resources`` object is injected via `resources_variable` so you can adapt the internal behavior based on the allocated resources.
 
 ---
 
 ## Using a Dictionary of Executors
 
-For pipelines where different functions have very different runtimes, you can provide a dictionary of executors so that fast functions run with minimal overhead (using a {class}`~concurrent.futures.ThreadPoolExecutor`) while slower, resource‐intensive functions run on SLURM.
+For pipelines where different functions have very different runtimes, you can provide a dictionary of executors so that fast functions run with minimal overhead (using a ``concurrent.futures.ThreadPoolExecutor``) while slower, resource‐intensive functions run on SLURM.
 
 For example:
 
@@ -304,7 +301,7 @@ print("Result from fast_function (b):", result["b"].output)
 In this example, the dictionary `executors` assigns:
 
 - **Output "a"** (from `slow_function`) to a SLURM job.
-- **Output "b"** (from `fast_function`) to a {class}`~concurrent.futures.ThreadPoolExecutor` for lower overhead.
+- **Output "b"** (from `fast_function`) to a ``concurrent.futures.ThreadPoolExecutor`` for lower overhead.
 
 This hybrid approach allows you to optimize the overall pipeline execution by assigning appropriate executors based on the function’s runtime characteristics.
 
@@ -324,7 +321,7 @@ The lightweight reference objects are then passed to `pipeline.map_async`.
 
 ### 1. Large Array-Like Inputs (for `MapSpec` iteration)
 
-For large array-like inputs (e.g., lists of objects, large NumPy arrays) that are processed element-wise a `MapSpec`, use {class}`~pipefunc.helpers.FileArray.from_data`.
+For large array-like inputs (e.g., lists of objects, large NumPy arrays) that are processed element-wise a `MapSpec`, use ``pipefunc.helpers.FileArray.from_data``.
 
 **How it works:**
 
@@ -363,7 +360,7 @@ runner = pipeline.map_async(
 
 ### 2. Single Large Non-Iterable Inputs
 
-For single, potentially large, non-iterable inputs (e.g., a large configuration dictionary, a pre-trained model object) that need to be passed to multiple jobs without re-serializing each time, use {class}`~pipefunc.helpers.FileValue.from_data`.
+For single, potentially large, non-iterable inputs (e.g., a large configuration dictionary, a pre-trained model object) that need to be passed to multiple jobs without re-serializing each time, use ``pipefunc.helpers.FileValue.from_data``.
 
 **How it works:**
 
@@ -427,7 +424,7 @@ By using these techniques, you can significantly improve the performance and sca
   - **Statically:** Pass a fixed dict or `Resources` instance.
   - **Dynamically:** Pass a callable that returns the resource dict (using only parameters available in the function signature).
 - **Functions Managing Their Own Parallelization:**
-  Use `parallelization_mode="internal"` in {class}`~pipefunc.resources.Resources` so that while SLURM allocates the requested resources, your function can handle internal parallelism. The `resources_variable` parameter injects the allocated `Resources` object.
+  Use `parallelization_mode="internal"` in ``pipefunc.resources.Resources`` so that while SLURM allocates the requested resources, your function can handle internal parallelism. The `resources_variable` parameter injects the allocated `Resources` object.
 - **Dictionary of Executors:**
   You can pass a dict to the `executor` argument so that different functions run on different executors (for example, fast functions can use a ThreadPoolExecutor, while heavy ones run on SLURM).
 - **Handling Large Input Arrays:**
@@ -437,16 +434,17 @@ By using these techniques, you can significantly improve the performance and sca
 
 ## Alternative SLURM Submission Using Adaptive Learners
 
-```{note}
-We will assume familiarity with the `adaptive` and `adaptive_scheduler` packages in this section.
-```
+!!! note
 
-In addition to using the {class}`adaptive_scheduler.SlurmExecutor` for SLURM job submissions (as described above), PipeFunc also supports an alternative method based on creating Adaptive Learners first and then submitting to SLURM via Adaptive Scheduler.
+We will assume familiarity with the `adaptive` and `adaptive_scheduler` packages in this section.
+
+
+In addition to using the `adaptive_scheduler.SlurmExecutor` for SLURM job submissions (as described above), PipeFunc also supports an alternative method based on creating Adaptive Learners first and then submitting to SLURM via Adaptive Scheduler.
 This approach is particularly well suited for _really_ big sweeps where communication overhead between SLURM jobs and the local notebook kernel might become a bottleneck.
 
 ### How It Works
 
-Instead of submitting each function call via an executor that mimics local execution, you can use the {func}`pipefunc.map.adaptive.create_learners` function to convert your pipeline into a dictionary of {class}`adaptive.SequenceLearner` objects.
+Instead of submitting each function call via an executor that mimics local execution, you can use the `pipefunc.map.adaptive.create_learners` function to convert your pipeline into a dictionary of `adaptive.SequenceLearner` objects.
 These learners are then submitted to SLURM.
 
 The key advantages (👍) of this approach include:
@@ -466,7 +464,7 @@ The disadvantages (👎) of this approach include:
   The setup is more complex than using the `SlurmExecutor` directly, as you need to manage the Adaptive Learners and the SLURM submission separately, instead of changing _only_ the executor in `pipeline.map_async`.
 
 - **No Dynamic `internal_shapes`:**
-  The {func}`~pipefunc.map.adaptive.create_learners` function does not support dynamic `internal_shapes` (as introduced [here](../tutorial.md#dynamic-output-shapes-and-internal-shapes)), so you need to manually specify `internal_shapes` if needed.
+  The ``pipefunc.map.adaptive.create_learners`` function does not support dynamic `internal_shapes` (as introduced [here](../tutorial.md#dynamic-output-shapes-and-internal-shapes)), so you need to manually specify `internal_shapes` if needed.
 
 ### Using Adaptive Learners with SLURM
 

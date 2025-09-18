@@ -51,10 +51,11 @@ pipeline = Pipeline([f, g])
 In this example, function `f` outputs an `int`, but function `g` expects a `str` input.
 When we try to create the pipeline, it will raise a `TypeError` due to this type mismatch.
 
-```{note}
+!!! note
+
 `pipefunc` only checks the type hints during pipeline construction, not during function execution.
 However, *soon* we will add runtime type checking as an option.
-```
+
 
 To turn off this type checking, you can set the `validate_type_annotations` argument to `False` in the `Pipeline` constructor:
 
@@ -72,8 +73,8 @@ The results of a ND map operation are always stored in a numpy object array, whi
 This means the type hints for the function should be `numpy.ndarray[Any, np.dtype[numpy.object_]]`.
 Unfortunately, it is not possible to statically check the types of the elements in the object array (e.g., with `mypy`).
 We can however, check the types of the elements at runtime.
-To do this, we can use the {class}`~pipefunc.typing.Array` type hint from `pipefunc.typing`.
-This `Array` generic contains the correct `numpy.ndarray` type hint for object arrays, but is annotated with the element type using {class}`typing.Annotated`.
+To do this, we can use the ``pipefunc.typing.Array`` type hint from `pipefunc.typing`.
+This `Array` generic contains the correct `numpy.ndarray` type hint for object arrays, but is annotated with the element type using `typing.Annotated`.
 When using e.g., `Array[int]`, the type hint is `numpy.ndarray[Any, np.dtype[numpy.object_]]` with the element type `int` in the metadata of `Annotated`.
 MyPy will ensure the numpy array type, however, `PipeFunc` will ensure both the numpy object array and its element type.
 

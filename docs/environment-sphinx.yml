@@ -40,18 +40,13 @@ dependencies:
   - zarr>=2,<3
   - numcodecs<0.16.0
   # optional-dependencies: docs
+  - mkdocs
+  - mkdocs-material
+  - mkdocstrings
+  - mkdocs-jupyter
+  - mkdocs-mermaid2-plugin
   - emoji
   - jupytext
-  - myst-nb
-  - myst-parser
-  - sphinx-autodoc-typehints
-  - sphinx-book-theme
-  - sphinx-copybutton
-  - sphinx-llms-txt
-  - sphinx-notfound-page
-  - sphinx-togglebutton
-  - sphinx
-  - sphinxcontrib-mermaid
   - versioningit
   - nltk
   - scikit-image

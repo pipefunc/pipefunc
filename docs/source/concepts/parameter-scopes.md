@@ -125,13 +125,9 @@ pipeline2.update_renames({"a": "my_scope.a", "b": "my_scope.b", "y": "my_scope.y
 After applying the scope, the parameter names and output names of the functions in the pipeline are prefixed with `my_scope.`.
 We can confirm this by inspecting the `PipeFunc` objects:
 
-:::{admonition} Get the <code>PipeFunc</code> objects using <code>pipeline[output_name]</code>
-:class: note, dropdown
-
-The functions passed to the `Pipeline` constructor are copied using `PipeFunc.copy()`, so the original functions are not modified.
-Therefore, to get the `PipeFunc` objects from the pipeline, you can use `pipeline[output_name]` to retrieve the functions by their output names.
-
-:::
+??? note "Get the <code>PipeFunc</code> objects using <code>pipeline[output_name]</code>"
+    The functions passed to the `Pipeline` constructor are copied using `PipeFunc.copy()`, so the original functions are not modified.
+    Therefore, to get the `PipeFunc` objects from the pipeline, you can use `pipeline[output_name]` to retrieve the functions by their output names.
 
 ```{code-cell} ipython3
 f = pipeline["my_scope.y"]

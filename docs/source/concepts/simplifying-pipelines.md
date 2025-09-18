@@ -20,7 +20,7 @@ kernelspec:
 :depth: 2
 ```
 
-This section is about {meth}`pipefunc.Pipeline.simplified_pipeline`, which is a convenient way to simplify a pipeline by merging multiple nodes into a single node (creating a {class}`pipefunc.NestedPipeFunc`).
+This section is about `pipefunc.Pipeline.simplified_pipeline`, which is a convenient way to simplify a pipeline by merging multiple nodes into a single node (creating a `pipefunc.NestedPipeFunc`).
 Consider the following pipeline (look at the `visualize()` output to see the structure of the pipeline):
 
 ```{code-cell} ipython3
@@ -76,10 +76,10 @@ simplified_pipeline_complex.visualize()  # A `NestedPipeFunc` will have a red ed
 
 However, simplifying a pipeline comes with a trade-off. The simplification process removes intermediate nodes that may be necessary for debugging or inspection.
 
-For instance, if a developer wants to monitor the output of `f3` while processing the pipeline, they would not be able to do so in the simplified pipeline as `f3` has been merged into a {class}`pipefunc.NestedPipeFunc`.
+For instance, if a developer wants to monitor the output of `f3` while processing the pipeline, they would not be able to do so in the simplified pipeline as `f3` has been merged into a `pipefunc.NestedPipeFunc`.
 +++
 
-The simplified pipeline now contains a {class}`pipefunc.NestedPipeFunc` object, which is a subclass of {class}`~pipefunc.PipeFunc` but contains an internal pipeline.
+The simplified pipeline now contains a `pipefunc.NestedPipeFunc` object, which is a subclass of ``pipefunc.PipeFunc`` but contains an internal pipeline.
 
 ```{code-cell} ipython3
 simplified_pipeline_complex.functions

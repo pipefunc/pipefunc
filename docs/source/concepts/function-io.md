@@ -25,9 +25,9 @@ kernelspec:
 You can provide defaults in
 
 - The original function definition (the normal way)
-- The `pipefunc` decorator `@`{class}` pipefunc.pipefunc``(..., defaults={...}) `
-- Update the defaults of a `PipeFunc` object (a wrapped function) via {class}` pipefunc.PipeFunc.update_defaults``({...}) `
-- Update the defaults of an entire pipeline via {class}` pipefunc.Pipeline.update_defaults``({...}) `
+- The `pipefunc` decorator `@`` pipefunc.pipefunc``(..., defaults={...}) `
+- Update the defaults of a `PipeFunc` object (a wrapped function) via ` pipefunc.PipeFunc.update_defaults``({...}) `
+- Update the defaults of an entire pipeline via ` pipefunc.Pipeline.update_defaults``({...}) `
 
 Some examples in code:
 
@@ -41,19 +41,15 @@ def f(a, x):
 
 This function `f` has a default value for `x` set to 2.
 
-:::{admonition} Do the same by constructing a <code>PipeFunc</code> object directly
-:class: note, dropdown
+??? note "Do the same by constructing a <code>PipeFunc</code> object directly"
+    ```python
+    from pipefunc import PipeFunc
 
-```python
-from pipefunc import PipeFunc
+    def f(a, x):
+        return a * x
 
-def f(a, x):
-    return a * x
-
-f_func = PipeFunc(f, output_name="y", defaults={"x": 2})
-```
-
-:::
+    f_func = PipeFunc(f, output_name="y", defaults={"x": 2})
+    ```
 
 We can also update the defaults of the function afterwards:
 
@@ -97,7 +93,7 @@ This will remove the defaults that pipefunc has set for the function `g`, and le
 
 ## How to rename inputs and outputs?
 
-The `renames` attribute in `@`{class}`~pipefunc.pipefunc` and {class}`~pipefunc.PipeFunc` allows you to rename the inputs and outputs of a function before passing them to the next step in the pipeline.
+The `renames` attribute in `@```pipefunc.pipefunc`` and ``pipefunc.PipeFunc`` allows you to rename the inputs and outputs of a function before passing them to the next step in the pipeline.
 This can be particularly useful when:
 
 - The same function is used multiple times in a pipeline
@@ -144,20 +140,16 @@ pipeline.update_renames({"a": "aa", "b": "bb"}, update_from="original")
 
 When specifying renames, you can choose to update from the original argument names (`update_from="original"`) or from the current renamed arguments (`update_from="current"`).
 
-:::{admonition} We can also update the <code>output_name</code>
-:class: note, dropdown
+??? note "We can also update the <code>output_name</code>"
+    ```{code-cell} ipython3
+    @pipefunc(output_name=("i", "j"))
+    def f(a, b):
+        return a, b
 
-```{code-cell} ipython3
-@pipefunc(output_name=("i", "j"))
-def f(a, b):
-    return a, b
-
-# renames must be in terms of individual output strings
-f.update_renames({"i": "ii"}, update_from="current")
-assert f.output_name == ("ii", "j")
-```
-
-:::
+    # renames must be in terms of individual output strings
+    f.update_renames({"i": "ii"}, update_from="current")
+    assert f.output_name == ("ii", "j")
+    ```
 
 Some key things to note:
 
@@ -252,8 +244,8 @@ Instead of using defaults, you can bind parameters to a fixed value using the `b
 
 See:
 
-- The `pipefunc` decorator `@`{class}` pipefunc.pipefunc``(..., bound={...}) `
-- Update the bound arguments of a `PipeFunc` object (a wrapped function) via {class}` pipefunc.PipeFunc.update_bound``({...}) `
+- The `pipefunc` decorator `@`` pipefunc.pipefunc``(..., bound={...}) `
+- Update the bound arguments of a `PipeFunc` object (a wrapped function) via ` pipefunc.PipeFunc.update_bound``({...}) `
 
 ```{code-cell} ipython3
 @pipefunc(output_name="y", bound={"x": 2})  # x is now fixed to 2
@@ -263,19 +255,15 @@ def f(a, x):
 f(a=1, x=999)  # x is ignored and replaced by the bound value
 ```
 
-:::{admonition} Do the same by constructing a <code>PipeFunc</code> object directly
-:class: note, dropdown
+??? note "Do the same by constructing a <code>PipeFunc</code> object directly"
+    ```python
+    from pipefunc import PipeFunc
 
-```python
-from pipefunc import PipeFunc
+    def f(a, x):
+       return a + x
 
-def f(a, x):
-   return a + x
-
-f_func = PipeFunc(f, output_name="y", bound={"x": 2})
-```
-
-:::
+    f_func = PipeFunc(f, output_name="y", bound={"x": 2})
+    ```
 
 Bound arguments show as red hexagons in the pipeline visualization.
 
@@ -400,23 +388,19 @@ assert result["dataclass"].output == InputDataClass(a=1, b=2)
 assert result["pydantic"].output == PydanticModel(x=3, y=4)
 ```
 
-:::{admonition} Careful with `default_factory`!
-:class: warning
-When using `dataclasses` or `pydantic.BaseModel` with `dataclasses.field(..., default_factory=...)` or `pydantic.Field(..., default_factory=...)`, the default value will be computed only once when the `PipeFunc` class is defined.
-So if you are using mutable defaults, make sure to not mutate the value in the function body!
-This is the same behavior as with regular Python functions.
-:::
+!!! warning "Careful with `default_factory`!"
+    When using `dataclasses` or `pydantic.BaseModel` with `dataclasses.field(..., default_factory=...)` or `pydantic.Field(..., default_factory=...)`, the default value will be computed only once when the `PipeFunc` class is defined.
+    So if you are using mutable defaults, make sure to not mutate the value in the function body!
+    This is the same behavior as with regular Python functions.
 
 ## How to collect results as a step in my `Pipeline`?
 
 Sometimes you might need to collect specific inputs and/or outputs of different `PipeFunc`s within your pipeline.
-You can achieve this by using {class}`pipefunc.helpers.collect_kwargs` to create a `PipeFunc` that gathers these values into a dictionary.
+You can achieve this by using `pipefunc.helpers.collect_kwargs` to create a `PipeFunc` that gathers these values into a dictionary.
 
-:::{admonition} Using `pipeline.map` automatically collects all results
-:class: note, dropdown
-When using `pipeline.map`, all results are automatically collected and returned as a dictionary of `Result` objects.
-These `Result` objects contain the `kwargs` and `output` of each function in the pipeline.
-:::
+??? note "Using `pipeline.map` automatically collects all results"
+    When using `pipeline.map`, all results are automatically collected and returned as a dictionary of `Result` objects.
+    These `Result` objects contain the `kwargs` and `output` of each function in the pipeline.
 
 Here's an example:
 

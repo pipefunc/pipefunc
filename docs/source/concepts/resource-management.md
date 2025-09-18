@@ -22,11 +22,12 @@ kernelspec:
 
 ## How to inspect the `Resources` inside a `PipeFunc`?
 
-```{note}
+!!! note
+
 Using `resouces` requires an execution environment that supports resource management.
 Currently, only the Adaptive Scheduler execution environment supports resource management, see [SLURM integration](./slurm.md).
 In all cases, you can set and inspect the `Resources` object, but whether these resources are actually used depends on the execution environment.
-```
+
 
 When the `resources_variable` argument is provided, you can access the `resources` object inside the function to inspect the `Resources` associated with the `PipeFunc`.
 
@@ -79,10 +80,11 @@ You can set the `Resources` for a `PipeFunc` dynamically based on the input argu
 This ensures lazy evaluation of the resources, allowing you to determine the resources at runtime based on the input arguments.
 The callable should take a dictionary of input arguments and return a `Resources` instance.
 
-```{note}
+!!! note
+
 This becomes a powerful feature when combined with the `resources_variable` argument, but we first demonstrate it without using `resources_variable`.
 See the next example for how to use it in combination with `resources_variable`.
-```
+
 
 Here's an example that uses a function to determine the resources for a `PipeFunc`:
 

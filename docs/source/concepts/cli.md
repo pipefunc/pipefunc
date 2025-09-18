@@ -13,7 +13,7 @@ kernelspec:
 
 # Pipeline CLI Interface
 
-The {meth}`~pipefunc.Pipeline.cli()` method provides an out‐of‐the‐box command‐line interface (CLI) for executing your PipeFunc pipelines directly from the terminal.
+The ``pipefunc.Pipeline.cli`()` method provides an out‐of‐the‐box command‐line interface (CLI) for executing your PipeFunc pipelines directly from the terminal.
 This feature leverages your pipeline’s input schema—generated automatically via Pydantic—and even extracts detailed parameter descriptions from your docstrings.
 With a single call to `pipeline.cli()`, you can run your entire pipeline without writing any additional command-line parsing code, load inputs from a JSON file, or simply view the pipeline documentation.
 
@@ -25,10 +25,11 @@ In other words, you can:
 - **Configure mapping options** (e.g., parallel execution, storage method, and cleanup) via dedicated command‐line flags.
 - **Print pipeline documentation** directly via the `docs` subcommand.
 
-```{note}
+!!! note
+
 The CLI works with simple input types that can be represented in JSON.
 This means that multi-dimensional arrays or any non-JSON-serializable types must be provided in a simplified form (e.g., as nested lists) so that Pydantic can later coerce them to the correct type (such as NumPy arrays) based on your type annotations.
-```
+
 
 ---
 
@@ -69,13 +70,13 @@ In CLI and JSON modes, additional mapping options (prefixed with `--map-`) allow
 When you invoke `pipeline.cli()`, the following steps occur:
 
 1. **Pydantic Model Generation:**
-   The CLI inspects your pipeline’s root input parameters and generates a Pydantic model (see {meth}`pipefunc.Pipeline.pydantic_model`).
-   It automatically uses the default values, type hints, and even the descriptions extracted from your (NumPy, Google, or Sphinx)-style docstrings (see {meth}`pipefunc.Pipeline.print_documentation`) to create a robust input schema.
+   The CLI inspects your pipeline’s root input parameters and generates a Pydantic model (see `pipefunc.Pipeline.pydantic_model`).
+   It automatically uses the default values, type hints, and even the descriptions extracted from your (NumPy, Google, or Sphinx)-style docstrings (see `pipefunc.Pipeline.print_documentation`) to create a robust input schema.
    For parameters associated with multi-dimensional arrays (using mapspecs), the CLI expects these values to be represented as nested lists in JSON.
    Pydantic then coerces these lists into the appropriate array type (e.g., NumPy arrays) based on your type annotations.
 
 2. **Argument Parsing:**
-   An {class}`argparse.ArgumentParser` is created with three subcommands:
+   An `argparse.ArgumentParser` is created with three subcommands:
    - **`cli`**: Accepts individual command-line arguments.
    - **`json`**: Requires a JSON file that contains all inputs.
    - **`docs`**: Prints the pipeline documentation.
@@ -85,7 +86,7 @@ When you invoke `pipeline.cli()`, the following steps occur:
 
 4. **Input Validation and Execution:**
    For the `cli` and `json` subcommands, the CLI parses and validates the inputs using the generated Pydantic model.
-   Once validated, it executes the pipeline via {meth}`pipefunc.Pipeline.map()`, and the results are printed to the terminal using a rich, formatted output, and stored to disk in the specified run folder.
+   Once validated, it executes the pipeline via `pipefunc.Pipeline.map()`, and the results are printed to the terminal using a rich, formatted output, and stored to disk in the specified run folder.
    In **docs mode**, instead of executing the pipeline, the CLI simply calls `pipeline.print_documentation()` to display the documentation and then exits.
 
 ---

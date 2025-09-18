@@ -17,9 +17,10 @@ kernelspec:
 ```{try-notebook}
 ```
 
-```{note}
+!!! note
+
 This example uses `nltk` for text processing. If you don't have it installed, you can install it using `pip install nltk`.
-```
+
 
 Let's create a simplified NLP workflow for text summarization with steps involving tokenization, keyword extraction, summary generation, and sentiment analysis. This example will demonstrate the use of `pipefunc` to handle dependencies and illustrate `mapspec` by processing multiple texts.
 

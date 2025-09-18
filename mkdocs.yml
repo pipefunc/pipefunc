@@ -1,0 +1,172 @@
+site_name: pipefunc
+docs_dir: docs/source
+site_url: https://pipefunc.readthedocs.io
+site_description: A lightweight Python library for defining, managing, and executing pipelines of computational steps.
+site_author: PipeFunc Developers
+
+repo_url: https://github.com/pipefunc/pipefunc
+repo_name: pipefunc/pipefunc
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  logo: https://github.com/basnijholt/nijho.lt/raw/92b0aa820318f466388d828adf01120760255acf/content/project/pipefunc/featured.png
+  favicon: https://github.com/basnijholt/nijho.lt/raw/92b0aa820318f466388d828adf01120760255acf/content/project/pipefunc/featured.png
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.indexes
+    - navigation.top
+    - toc.follow
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.action.edit
+    - content.action.view
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to system preference
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: numpy
+            docstring_section_style: table
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_signature_annotations: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            merge_init_into_class: true
+            separate_signature: true
+            summary: true
+            filters: ["!^_"]
+  - mkdocs-jupyter:
+      execute: false
+      include_source: false
+      allow_errors: false
+      kernel_name: python3
+  - mermaid2:
+      arguments:
+        theme: 'default'
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.tilde
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - def_list
+  - footnotes
+  - tables
+  - attr_list
+  - md_in_html
+
+extra_javascript:
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+# Analytics can be configured later if needed
+# extra:
+#   analytics:
+#     provider: google
+#     property: G-XXXXXXXXXX
+
+nav:
+  - Home: index.md
+  - Tutorial: tutorial.md
+  - Examples:
+    - examples/index.md
+    - Basic Usage: examples/basic-usage.md
+    - Image Processing: examples/image-processing.md
+    - NLP Text Summarization: examples/nlp-text-summarization.md
+    - Physics Simulation: examples/physics-simulation.md
+    - Sensor Data Processing: examples/sensor-data-processing.md
+    - Weather Simulation: examples/weather-simulation.md
+  - Concepts:
+    - concepts/index.md
+    - Function I/O: concepts/function-io.md
+    - Simplifying Pipelines: concepts/simplifying-pipelines.md
+    - Parameter Sweeps: concepts/parameter-sweeps.md
+    - MapSpec: concepts/mapspec.md
+    - Caching: concepts/caching.md
+    - Testing: concepts/testing.md
+    - Type Checking: concepts/type-checking.md
+    - CLI: concepts/cli.md
+    - Variants: concepts/variants.md
+    - Adaptive Integration: concepts/adaptive-integration.md
+    - Error Handling: concepts/error-handling.md
+    - Execution and Parallelism: concepts/execution-and-parallelism.md
+    - Overhead and Efficiency: concepts/overhead-and-efficiency.md
+    - Parameter Scopes: concepts/parameter-scopes.md
+    - Resource Management: concepts/resource-management.md
+    - SLURM: concepts/slurm.md
+  - FAQ: faq.md
+  - Changelog: changelog.md
+  - API Reference:
+    - reference/index.md
+    - pipefunc: reference/pipefunc.md
+    - pipefunc.cache: reference/pipefunc.cache.md
+    - pipefunc.helpers: reference/pipefunc.helpers.md
+    - pipefunc.lazy: reference/pipefunc.lazy.md
+    - pipefunc.map: reference/pipefunc.map.md
+    - pipefunc.map.adaptive: reference/pipefunc.map.adaptive.md
+    - pipefunc.map.adaptive_scheduler: reference/pipefunc.map.adaptive_scheduler.md
+    - pipefunc.map.xarray: reference/pipefunc.map.xarray.md
+    - pipefunc.mcp: reference/pipefunc.mcp.md
+    - pipefunc.resources: reference/pipefunc.resources.md
+    - pipefunc.sweep: reference/pipefunc.sweep.md
+    - pipefunc.testing: reference/pipefunc.testing.md
+    - pipefunc.typing: reference/pipefunc.typing.md
+
+watch:
+  - pipefunc

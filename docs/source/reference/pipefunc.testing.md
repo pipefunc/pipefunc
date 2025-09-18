@@ -1,8 +1,3 @@
-## `pipefunc.testing` module
+# pipefunc.testing
 
-```{eval-rst}
-.. automodule:: pipefunc.testing
-    :members:
-    :undoc-members:
-    :show-inheritance:
-```
+::: pipefunc.testing

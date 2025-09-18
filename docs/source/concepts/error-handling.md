@@ -22,7 +22,7 @@ kernelspec:
 
 ## What is the `ErrorSnapshot` feature in `pipefunc`?
 
-The {class}`~pipefunc.ErrorSnapshot` feature captures detailed information about errors occurring during the execution of a `PipeFunc`. It aids in debugging by storing snapshots of error states, including the function, exception details, arguments, timestamp, and environment. This snapshot can be used to reproduce the error and examine the error context.
+The ``pipefunc.ErrorSnapshot`` feature captures detailed information about errors occurring during the execution of a `PipeFunc`. It aids in debugging by storing snapshots of error states, including the function, exception details, arguments, timestamp, and environment. This snapshot can be used to reproduce the error and examine the error context.
 
 **Key Features:**
 
@@ -71,7 +71,7 @@ except Exception:
     print(snapshot)
 ```
 
-In the same way, for a {class}`~pipefunc.Pipeline` we can also access the error snapshot of the last failed function using the `error_snapshot` attribute.
+In the same way, for a ``pipefunc.Pipeline`` we can also access the error snapshot of the last failed function using the `error_snapshot` attribute.
 
 ```{code-cell} ipython3
 from pipefunc import Pipeline
@@ -84,4 +84,4 @@ except Exception:
     print(snapshot)
 ```
 
-{class}`~pipefunc.ErrorSnapshot` is very useful for debugging complex pipelines, making it easy to replicate and understand issues as they occur.
+``pipefunc.ErrorSnapshot`` is very useful for debugging complex pipelines, making it easy to replicate and understand issues as they occur.
