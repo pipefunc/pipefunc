@@ -86,7 +86,7 @@ class StorageBase(abc.ABC):
         internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         irregular: bool = False,  # noqa: FBT002
-    ) -> None: ...  # pragma: no cover
+    ) -> None: ...
 
     @functools.cached_property
     def resolved_shape(self) -> tuple[int, ...]:
@@ -120,11 +120,7 @@ class StorageBase(abc.ABC):
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any: ...
 
     @abc.abstractmethod
-    def to_array(
-        self,
-        *,
-        splat_internal: bool | None = None,
-    ) -> np.ma.core.MaskedArray: ...
+    def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray: ...
 
     @property
     @abc.abstractmethod
@@ -138,7 +134,7 @@ class StorageBase(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def dump_in_subprocess(self) -> bool:  # pragma: no cover
+    def dump_in_subprocess(self) -> bool:
         """Indicates if the storage can be dumped in a subprocess and read by the main process."""
 
     # ---- Irregular array helpers -------------------------------------------------
