@@ -123,6 +123,7 @@ def test_storage_base_irregular_extent_defaults() -> None:
 
 def test_infer_length_variants() -> None:
     masked_constant = np.ma.masked
+    masked_scalar = np.ma.array(1, mask=True)
     masked_data = np.ma.array([1, 2], mask=np.ma.nomask)
     masked_with_gap = np.ma.array([1, np.ma.masked, 3, 4], mask=[False, True, False, False])
     all_masked = np.ma.array([np.ma.masked, np.ma.masked], mask=[True, True])
@@ -133,6 +134,7 @@ def test_infer_length_variants() -> None:
     for infer in (infer_irregular_length,):
         assert infer(None) == 0
         assert infer(masked_constant) == 0
+        assert infer(masked_scalar) == 0
         assert infer(masked_data) == 2
         assert infer(masked_with_gap) == 4
         assert infer(all_masked) == 0
