@@ -5,6 +5,7 @@ import pytest
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map import load_outputs
+from pipefunc.map._run import _set_output
 from pipefunc.typing import Array
 
 
@@ -383,6 +384,14 @@ def test_irregular_syntax_detection():
     assert results["irregular"].output[2, 2] == 3  # [3, 3, 3]
 
 
+def test_pipefunc_without_mapspec_is_not_irregular():
+    @pipefunc(output_name="plain")
+    def plain(n: int) -> int:
+        return n
+
+    assert not plain._irregular_output
+
+
 def test_empty_irregular_arrays():
     """Test irregular arrays with empty entries."""
 
@@ -409,3 +418,24 @@ def test_empty_irregular_arrays():
     assert data.mask[1, 2]
     assert all(data.mask[2, :])  # Third row all masked (empty)
     assert not any(data.mask[3, :])  # Fourth row not masked
+
+
+def test_regular_output_index_error_propagates():
+    class RaisingArray(np.ndarray):
+        def __getitem__(self, key):
+            msg = "intentional index error"
+            raise IndexError(msg)
+
+    @pipefunc(output_name="values", mapspec="n[i] -> values[i, j]")
+    def produce_raising_array(n: int) -> np.ndarray:
+        base = np.zeros(2)
+        return base.view(RaisingArray)
+
+    func = produce_raising_array
+    arr = np.empty(4, dtype=object)
+    output = produce_raising_array(0)
+    shape = (2, 2)
+    shape_mask = (True, False)
+
+    with pytest.raises(IndexError, match="intentional index error"):
+        _set_output(arr, output, 0, shape, shape_mask, func)
