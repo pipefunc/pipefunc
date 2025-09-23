@@ -111,30 +111,30 @@ class StorageBase(abc.ABC):
         return self._is_resolved
 
     @abc.abstractmethod
-    def get_from_index(self, index: int) -> Any: ...  # pragma: no cover
+    def get_from_index(self, index: int) -> Any: ...
 
     @abc.abstractmethod
-    def has_index(self, index: int) -> bool: ...  # pragma: no cover
+    def has_index(self, index: int) -> bool: ...
 
     @abc.abstractmethod
-    def __getitem__(self, key: tuple[int | slice, ...]) -> Any: ...  # pragma: no cover
+    def __getitem__(self, key: tuple[int | slice, ...]) -> Any: ...
 
     @abc.abstractmethod
     def to_array(
         self,
         *,
         splat_internal: bool | None = None,
-    ) -> np.ma.core.MaskedArray: ...  # pragma: no cover
+    ) -> np.ma.core.MaskedArray: ...
 
     @property
     @abc.abstractmethod
-    def mask(self) -> np.ma.core.MaskedArray: ...  # pragma: no cover
+    def mask(self) -> np.ma.core.MaskedArray: ...
 
     @abc.abstractmethod
-    def mask_linear(self) -> list[bool]: ...  # pragma: no cover
+    def mask_linear(self) -> list[bool]: ...
 
     @abc.abstractmethod
-    def dump(self, key: tuple[int | slice, ...], value: Any) -> None: ...  # pragma: no cover
+    def dump(self, key: tuple[int | slice, ...], value: Any) -> None: ...
 
     @property
     @abc.abstractmethod
