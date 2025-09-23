@@ -10,7 +10,7 @@ from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -810,26 +810,99 @@ def _update_result_array(
             result_array[index] = _output
 
 
+class _IrregularSkipContext:
+    """Derives mask information for irregular element-wise maps."""
+
+    def __init__(
+        self,
+        func: PipeFunc,
+        kwargs: dict[str, Any],
+        shape: ShapeTuple,
+        shape_mask: tuple[bool, ...],
+    ) -> None:
+        mapspec = func.mapspec if isinstance(func.mapspec, MapSpec) else None
+        if mapspec is None:
+            self.enabled = False
+            return
+
+        irregular_axes = [axis for axis in mapspec.output_indices if axis.endswith("*")]
+        if len(irregular_axes) != 1:
+            # Multiple ragged axes require hierarchical metadata; fall back to
+            # the previous behaviour until we can represent those safely.
+            self.enabled = False
+            return
+
+        self.axis = irregular_axes[0]
+        external_shape = external_shape_from_mask(shape, shape_mask)
+        if not all(isinstance(dim, int) for dim in external_shape):
+            self.enabled = False
+            return
+        self.external_shape = cast("tuple[int, ...]", external_shape)
+        self.mapspec = mapspec
+        self.probes: list[tuple[StorageBase, str, int]] = []
+
+        for spec in mapspec.inputs:
+            if self.axis not in spec.axes:
+                continue
+            value = kwargs.get(spec.name)
+            if not isinstance(value, StorageBase) or not value.irregular:
+                continue
+            if not value.internal_shape or len(value.internal_shape) != 1:
+                continue
+            axis_index = spec.axes.index(self.axis)
+            self.probes.append((value, spec.name, axis_index))
+
+        self.enabled = bool(self.probes)
+
+    def should_skip(self, index: int) -> bool:
+        if not self.enabled:
+            return False
+
+        input_keys = self.mapspec.input_keys(self.external_shape, index)
+        for storage, name, axis_index in self.probes:
+            key = input_keys.get(name)
+            if key is None:
+                continue
+            if axis_index >= len(key):
+                continue
+            axis_entry = key[axis_index]
+            if not isinstance(axis_entry, int):
+                return False
+            if storage.is_element_masked(key):
+                return True
+        return False
+
+
 def _existing_and_missing_indices(
     arrays: list[StorageBase],
     fixed_mask: np.flatiter[npt.NDArray[np.bool_]] | None,
-) -> tuple[list[int], list[int]]:
+    *,
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    shape: ShapeTuple,
+    shape_mask: tuple[bool, ...],
+) -> tuple[list[int], list[int], list[int]]:
     # TODO: when `fixed_indices` are used we could be more efficient by not
     # computing the full mask.
     masks = (arr.mask_linear() for arr in arrays)
     if fixed_mask is None:
         fixed_mask = itertools.repeat(object=True)  # type: ignore[assignment]
 
-    existing_indices = []
-    missing_indices = []
+    existing_indices: list[int] = []
+    missing_indices: list[int] = []
+    skipped_indices: list[int] = []
+    skip_context = _IrregularSkipContext(func, kwargs, shape, shape_mask)
     for i, (*mask_values, select) in enumerate(zip(*masks, fixed_mask)):  # type: ignore[arg-type]
         if not select:
             continue
         if any(mask_values):  # rerun if any of the outputs are missing
+            if skip_context.should_skip(i):
+                skipped_indices.append(i)
+                continue
             missing_indices.append(i)
         else:
             existing_indices.append(i)
-    return existing_indices, missing_indices
+    return existing_indices, missing_indices, skipped_indices
 
 
 @contextmanager
@@ -849,6 +922,7 @@ class _MapSpecArgs:
     process_index: functools.partial[tuple[Any, ...]]
     existing: list[int]
     missing: list[int]
+    skipped: list[int]
     result_arrays: list[np.ndarray] | None
     mask: tuple[bool, ...]
     arrays: list[StorageBase]
@@ -882,9 +956,16 @@ def _prepare_submit_map_spec(
         return_results=return_results,
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
-    existing, missing = _existing_and_missing_indices(arrays, fixed_mask)  # type: ignore[arg-type]
+    existing, missing, skipped = _existing_and_missing_indices(
+        arrays,
+        fixed_mask,
+        func=func,
+        kwargs=kwargs,
+        shape=shape,
+        shape_mask=mask,
+    )
     _update_status_if_needed(status, existing, missing)
-    return _MapSpecArgs(process_index, existing, missing, result_arrays, mask, arrays)
+    return _MapSpecArgs(process_index, existing, missing, skipped, result_arrays, mask, arrays)
 
 
 def _mask_fixed_axes(
@@ -1302,7 +1383,7 @@ def _submit_generation(
     }
 
 
-def _output_from_mapspec_task(
+def _output_from_mapspec_task(  # noqa: PLR0912
     func: PipeFunc,
     store: dict[str, StoreType],
     args: _MapSpecArgs,
@@ -1330,6 +1411,22 @@ def _output_from_mapspec_task(
             shape = _maybe_resolve_shapes_from_map(func, store, args, outputs, return_results)
             first = False
         _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
+
+    if args.skipped:
+        if first and not args.missing and not args.existing:
+            shape = args.arrays[0].full_shape
+        assert "shape" in locals()
+        if args.result_arrays is not None:
+            masked_outputs = [np.ma.masked for _ in at_least_tuple(func.output_name)]
+            for index in args.skipped:
+                _update_result_array(
+                    args.result_arrays,
+                    index,
+                    masked_outputs,
+                    shape,
+                    args.mask,
+                    func,
+                )
 
     if not args.missing and not args.existing:  # shape variable does not exist
         shape = args.arrays[0].full_shape

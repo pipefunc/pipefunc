@@ -1,5 +1,7 @@
 """Tests for irregular/jagged arrays support."""
 
+from typing import Any
+
 import numpy as np
 import pytest
 
@@ -418,6 +420,97 @@ def test_empty_irregular_arrays():
     assert data.mask[1, 2]
     assert all(data.mask[2, :])  # Third row all masked (empty)
     assert not any(data.mask[3, :])  # Fourth row not masked
+
+
+def test_irregular_masks_skip_function_calls():
+    """Element-wise maps should not execute for padded masked entries."""
+
+    call_order: list[Any] = []
+
+    @pipefunc(output_name="x", mapspec="n[i] -> x[i, j*]")
+    def generate_values(n: int) -> list[int]:
+        return list(range(n))
+
+    @pipefunc(output_name="y", mapspec="x[i, j*] -> y[i, j*]")
+    def double_entry(x: int) -> Any:
+        call_order.append(x)
+        if x is np.ma.masked:
+            return np.ma.masked  # type: ignore[return-value]
+        return 2 * x
+
+    pipeline = Pipeline([generate_values, double_entry])
+
+    inputs = {"n": [1, 3, 0]}
+    results = pipeline.map(
+        inputs=inputs,
+        internal_shapes={"x": (5,), "y": (5,)},
+        parallel=False,
+        storage="dict",
+    )
+
+    expected_inputs: list[int] = [0, 0, 1, 2]
+    assert call_order == expected_inputs
+
+    y_array = results["y"].output
+    assert isinstance(y_array, np.ma.MaskedArray)
+    # First column (full length) is unmasked, ragged column ends with masked sentinel
+    # Each row corresponds to an input element; mask tails past realised length
+    np.testing.assert_array_equal(y_array[0].compressed(), [0])
+    assert y_array.mask[0, 1:].all()
+    np.testing.assert_array_equal(y_array[1].compressed(), [0, 2, 4])
+    assert y_array.mask[1, 3:].all()
+    assert y_array[2].mask.all()
+
+    x_store = results["x"].store
+    assert x_store.irregular_extent((0,)) == (1,)
+    assert x_store.irregular_extent((0,)) == (1,)  # cached result
+    assert x_store.is_element_masked((0, 1))
+    assert not x_store.is_element_masked((0, 0))
+    assert not x_store.is_element_masked((0, slice(None)))
+
+
+def test_irregular_masks_skip_function_calls_file_storage(tmp_path):
+    """Skip behaviour also applies to file-backed irregular storage."""
+
+    call_order: list[Any] = []
+
+    @pipefunc(output_name="seq", mapspec="n[i] -> seq[i, j*]")
+    def sequence(n: int) -> list[int]:
+        return list(range(n))
+
+    @pipefunc(output_name="scaled", mapspec="seq[i, j*] -> scaled[i, j*]")
+    def scale(seq: int) -> Any:
+        call_order.append(seq)
+        if seq is np.ma.masked:
+            return np.ma.masked  # type: ignore[return-value]
+        return seq + 1
+
+    pipeline = Pipeline([sequence, scale])
+
+    inputs = {"n": [2, 1]}
+    results = pipeline.map(
+        inputs=inputs,
+        internal_shapes={"seq": (4,), "scaled": (4,)},
+        run_folder=tmp_path,
+        parallel=False,
+        storage="file_array",
+    )
+
+    assert call_order == [0, 1, 0]
+
+    seq_store = results["seq"].store
+    assert seq_store.irregular_extent((0,)) == (2,)
+    assert seq_store.irregular_extent((0,)) == (2,)
+    assert seq_store.is_element_masked((0, 3))
+    assert not seq_store.is_element_masked((0, 0))
+    assert not seq_store.is_element_masked((0, slice(None)))
+
+    scaled_array = results["scaled"].output
+    assert isinstance(scaled_array, np.ma.MaskedArray)
+    np.testing.assert_array_equal(scaled_array[0].compressed(), [1, 2])
+    assert scaled_array.mask[0, 2:].all()
+    np.testing.assert_array_equal(scaled_array[1].compressed(), [1])
+    assert scaled_array.mask[1, 1:].all()
 
 
 def test_regular_output_index_error_propagates():

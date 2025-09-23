@@ -6,7 +6,7 @@ import concurrent.futures
 import itertools
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import cloudpickle
 import numpy as np
@@ -15,6 +15,7 @@ from pipefunc._utils import dump, load
 
 from ._base import (
     StorageBase,
+    infer_irregular_length,
     iterate_shape_indices,
     normalize_key,
     register_storage,
@@ -295,6 +296,41 @@ class FileArray(StorageBase):
     def dump_in_subprocess(self) -> bool:
         """Indicates if the storage can be dumped in a subprocess and read by the main process."""
         return True
+
+    def _compute_irregular_extent(self, external_index: tuple[int, ...]) -> tuple[int, ...] | None:
+        if not self.irregular or not self.internal_shape or len(self.internal_shape) != 1:
+            return None
+
+        file = self._key_to_file(external_index)
+        if not file.is_file():
+            return (0,)
+
+        try:
+            value = load(file)
+        except FileNotFoundError:  # pragma: no cover - race condition guard
+            return (0,)
+
+        length = infer_irregular_length(value)
+        max_len = self.resolved_internal_shape[0]
+        return (min(length, max_len),)
+
+    def is_element_masked(self, key: tuple[int | slice, ...]) -> bool:
+        masked = False
+        if self.irregular and self.internal_shape and len(self.internal_shape) == 1:
+            normalized = self._normalize_key(key)
+            internal_index_all = tuple(x for x, m in zip(normalized, self.shape_mask) if not m)
+            if internal_index_all and not any(isinstance(x, slice) for x in internal_index_all):
+                internal_index = tuple(cast("int", x) for x in internal_index_all)
+                external_index_all = tuple(x for x, m in zip(normalized, self.shape_mask) if m)
+                if all(isinstance(x, int) for x in external_index_all):
+                    external_index = tuple(cast("int", x) for x in external_index_all)
+                    extent = self.irregular_extent(external_index)
+                    if extent is not None:
+                        for idx, size in zip(internal_index, extent):
+                            if idx >= size:
+                                masked = True
+                                break
+        return masked
 
     @classmethod
     def from_data(cls, data: list[Any] | np.ndarray, folder: str | Path) -> FileArray:
