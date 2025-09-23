@@ -656,7 +656,7 @@ def test_dict_array_raises_when_data_too_short() -> None:
     with pytest.raises(IndexError, match="out of bounds"):
         arr[(slice(None), slice(None))]
 
-    with pytest.raises(IndexError, match=r"Index \(1,\) out of bounds"):
+    with pytest.raises(IndexError, match=r"index 1 is out of bounds"):
         arr[(0, 1)]
 
     with pytest.raises(IndexError, match="out of bounds"):
@@ -670,7 +670,7 @@ def test_file_array_raises_when_data_too_short(tmp_path: Path) -> None:
     with pytest.raises(IndexError, match="out of bounds"):
         arr[(slice(None), slice(None))]
 
-    with pytest.raises(IndexError, match=r"Index \(1,\) out of bounds"):
+    with pytest.raises(IndexError, match=r"index 1 is out of bounds"):
         arr[(0, 1)]
 
     with pytest.raises(IndexError, match="out of bounds"):
