@@ -867,6 +867,9 @@ class _IrregularSkipContext:
             self.enabled = False
             return
         self.external_shape = external_shape
+        self.internal_shape = internal_shape_from_mask(shape, shape_mask)
+        self.shape_mask = shape_mask
+        self.full_shape = select_by_mask(shape_mask, external_shape, self.internal_shape)
         self.mapspec = mapspec
         self.probes: list[tuple[StorageBase, str, int]] = []
 
@@ -887,7 +890,12 @@ class _IrregularSkipContext:
         if not self.enabled:
             return False
 
-        input_keys = self.mapspec.input_keys(self.external_shape, index)
+        full_index = _shape_to_key(self.full_shape, index)
+        internal_index = tuple(x for x, m in zip(full_index, self.shape_mask) if not m)
+        input_keys = self.mapspec.input_keys(
+            self.external_shape,
+            index % prod(self.external_shape or (1,)),
+        )
         for storage, name, axis_index in self.probes:
             key = input_keys.get(name)
             if key is None:
@@ -895,7 +903,14 @@ class _IrregularSkipContext:
             if axis_index >= len(key):
                 continue
             axis_entry = key[axis_index]
-            if not isinstance(axis_entry, int):
+            if isinstance(axis_entry, slice):
+                if axis_entry != slice(None):
+                    return False
+                key = tuple(
+                    internal_index[0] if i == axis_index else component
+                    for i, component in enumerate(key)
+                )
+            elif not isinstance(axis_entry, int):
                 return False
             if storage.is_element_masked(key):
                 return True
@@ -1363,7 +1378,8 @@ def _update_status_if_needed(
     missing: list[int],
 ) -> None:
     if status is not None and status.n_total is None:
-        status.n_total = len(missing) + len(existing)
+        status.n_total = len(missing)
+        status.n_completed += len(existing)
 
 
 def _executor_for_func(
