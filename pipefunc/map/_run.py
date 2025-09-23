@@ -550,9 +550,47 @@ def _select_kwargs(
     external_shape = external_shape_from_mask(shape, shape_mask)
     input_keys = func.mapspec.input_keys(external_shape, index)  # type: ignore[arg-type]
     normalized_keys = {k: v[0] if len(v) == 1 else v for k, v in input_keys.items()}
-    selected = {k: v[normalized_keys[k]] if k in normalized_keys else v for k, v in kwargs.items()}
+
+    selected: dict[str, Any] = {}
+    for name, source in kwargs.items():
+        if name in normalized_keys:
+            key = normalized_keys[name]
+            value = source[key]
+            if _should_trim_irregular_slice(source, key):
+                value = _trim_irregular_slice(value)
+            selected[name] = value
+        else:
+            selected[name] = source
     _load_data(selected)
     return selected
+
+
+def _should_trim_irregular_slice(source: Any, key: tuple[int | slice, ...] | int | slice) -> bool:
+    if not isinstance(source, StorageBase):
+        return False
+    if not source.irregular:
+        return False
+    if not source.internal_shape or len(source.internal_shape) != 1:
+        return False
+    key_tuple = key if isinstance(key, tuple) else (key,)
+    if len(key_tuple) != len(source.shape_mask):
+        return False
+    internal_positions = [idx for idx, flag in enumerate(source.shape_mask) if not flag]
+    if len(internal_positions) != 1:
+        return False
+    axis_key = key_tuple[internal_positions[0]]
+    return (
+        isinstance(axis_key, slice)
+        and axis_key.start is None
+        and axis_key.stop is None
+        and axis_key.step is None
+    )
+
+
+def _trim_irregular_slice(value: Any) -> Any:
+    if isinstance(value, np.ma.MaskedArray) and value.ndim == 1:
+        return value.compressed()
+    return value
 
 
 def _maybe_eval_resources_in_selected(

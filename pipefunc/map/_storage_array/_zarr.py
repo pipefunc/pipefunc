@@ -60,6 +60,7 @@ class ZarrFileArray(StorageBase):
         self.shape = tuple(shape)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
+        self.irregular = irregular
 
         if self.object_codec is None:
             object_codec = CloudPickleCodec()

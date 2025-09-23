@@ -151,10 +151,21 @@ class FileArray(StorageBase):
                     internal_index = tuple(i for i, m in zip(index, self.shape_mask) if not m)
                     if internal_index:
                         sub_array = np.asarray(sub_array)  # could be a list
-                        sliced_sub_array = sub_array[internal_index]
-                        sliced_data.append(sliced_sub_array)
-                    else:
-                        sliced_data.append(sub_array)
+                        try:
+                            sliced_sub_array = sub_array[internal_index]
+                            sliced_data.append(sliced_sub_array)
+                            sliced_mask.append(False)
+                        except IndexError as e:
+                            if not self.irregular:
+                                msg = (
+                                    f"Index {internal_index} out of bounds for array "
+                                    f"with shape {sub_array.shape}"
+                                )
+                                raise IndexError(msg) from e
+                            sliced_data.append(np.ma.masked)
+                            sliced_mask.append(True)
+                        continue
+                    sliced_data.append(sub_array)
                     sliced_mask.append(False)
                 else:
                     sliced_data.append(np.ma.masked)

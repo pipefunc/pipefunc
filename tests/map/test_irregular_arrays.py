@@ -1,5 +1,6 @@
 """Tests for irregular/jagged arrays support."""
 
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -8,6 +9,7 @@ import pytest
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map import load_outputs
 from pipefunc.map._run import _set_output
+from pipefunc.map._storage_array._base import StorageBase
 from pipefunc.typing import Array
 
 
@@ -51,17 +53,18 @@ def test_basic_irregular_dimension():
     # Check that x is properly stored with masking
     x_array = results["x"].output
     assert isinstance(x_array, np.ma.MaskedArray)
+    x_mask = np.asarray(x_array.mask)
     # First row should have [0] and rest masked
     assert x_array[0, 0] == 0
-    assert all(x_array.mask[0, 1:])
+    assert all(x_mask[0, 1:])
     # Second row should have [0, 1] and rest masked
     assert x_array[1, 0] == 0
     assert x_array[1, 1] == 1
-    assert all(x_array.mask[1, 2:])
+    assert all(x_mask[1, 2:])
     # Fifth row should have [0, 1, 2, 3, 4] with no masking
     assert x_array[4, 0] == 0
     assert x_array[4, 4] == 4
-    assert not any(x_array.mask[4, :])
+    assert not any(x_mask[4, :])
 
     # Check y values (doubled)
     y_array = results["y"].output
@@ -79,7 +82,7 @@ def test_basic_irregular_dimension():
     assert sum_array[4] == 20  # sum([0, 2, 4, 6, 8])
 
 
-def test_irregular_with_different_storage(tmp_path):
+def test_irregular_with_different_storage(tmp_path: Path) -> None:
     """Test irregular arrays with file storage."""
 
     @pipefunc(output_name="data", mapspec="size[i] -> data[i, j*]")
@@ -105,23 +108,25 @@ def test_irregular_with_different_storage(tmp_path):
     # Check values and masking
     assert data[0, 0] == 0.0
     assert data[0, 1] == 1.0
-    assert data.mask[0, 2]  # Should be masked
+    data_mask = np.asarray(data.mask)
+    assert data_mask[0, 2]  # Should be masked
 
     assert data[1, 0] == 0.0
     assert data[1, 1] == 1.0
     assert data[1, 2] == 2.0
-    assert not any(data.mask[1, :])  # No masking in row 1
+    assert not any(data_mask[1, :])  # No masking in row 1
 
     assert data[2, 0] == 0.0
-    assert all(data.mask[2, 1:])  # Rest should be masked
+    assert all(data_mask[2, 1:])  # Rest should be masked
 
     # Test loading from disk
     loaded = load_outputs("data", run_folder=tmp_path)
     assert isinstance(loaded, np.ma.MaskedArray)
     # Compare masks
-    np.testing.assert_array_equal(loaded.mask, data.mask)
+    loaded_mask = np.asarray(loaded.mask)
+    np.testing.assert_array_equal(loaded_mask, data_mask)
     # Compare only non-masked values (masked values might differ)
-    assert loaded[~loaded.mask].tolist() == data[~data.mask].tolist()
+    assert loaded[~loaded_mask].tolist() == data[~data_mask].tolist()
 
 
 def test_irregular_string_arrays():
@@ -213,14 +218,16 @@ def test_multiple_irregular_dimensions():
 
     array1 = results["array1"].output
     assert array1.shape == (3, 3)
-    assert not array1.mask[0, 0]
-    assert all(array1.mask[0, 1:])  # size1[0]=1, so only 1 element
+    array1_mask = np.asarray(array1.mask)
+    assert not array1_mask[0, 0]
+    assert all(array1_mask[0, 1:])  # size1[0]=1, so only 1 element
 
     array2 = results["array2"].output
     assert array2.shape == (2, 4)
-    assert not any(array2.mask[0, :])  # size2[0]=2 -> 4 elements
-    assert not any(array2.mask[1, :2])  # size2[1]=1 -> 2 elements
-    assert all(array2.mask[1, 2:])
+    array2_mask = np.asarray(array2.mask)
+    assert not any(array2_mask[0, :])  # size2[0]=2 -> 4 elements
+    assert not any(array2_mask[1, :2])  # size2[1]=1 -> 2 elements
+    assert all(array2_mask[1, 2:])
 
 
 def test_irregular_with_downstream_operations():
@@ -239,15 +246,8 @@ def test_irregular_with_downstream_operations():
 
     @pipefunc(output_name="row_sums", mapspec="doubled[i, :] -> row_sums[i]")
     def sum_row(doubled: Array[int]) -> int:
-        # Should handle masked array or object array with sentinels
-        if hasattr(doubled, "compressed"):
-            return sum(doubled.compressed())
-        # Handle object array with np.ma.masked sentinels
-        total = 0
-        for val in doubled:
-            if val is not np.ma.masked:
-                total += val
-        return total
+        assert isinstance(doubled, np.ndarray)
+        return int(np.sum(doubled)) if doubled.size else 0
 
     pipeline = Pipeline([make_lists, double, sum_row])
 
@@ -279,6 +279,33 @@ def test_irregular_with_downstream_operations():
     assert row_sums[0] == 0  # sum([0])
     assert row_sums[1] == 4  # sum([0, 4])
     assert row_sums[2] == 18  # sum([0, 6, 12])
+
+
+def test_irregular_dict_storage_slice_reducer() -> None:
+    """Reducers over dict storage receive trimmed 1D arrays."""
+
+    seen: list[type[Any]] = []
+
+    @pipefunc(output_name="data", mapspec="n[i] -> data[i, j*]")
+    def create(n: int) -> list[int]:
+        return list(range(n))
+
+    @pipefunc(output_name="totals", mapspec="data[i, :] -> totals[i]")
+    def totals(data: Array[int]) -> int:
+        assert isinstance(data, np.ndarray)
+        seen.append(type(data))
+        return int(np.sum(data)) if data.size else 0
+
+    pipeline = Pipeline([create, totals])
+    results = pipeline.map(
+        inputs={"n": [0, 3]},
+        internal_shapes={"data": (4,)},
+        storage="dict",
+        parallel=False,
+    )
+
+    np.testing.assert_array_equal(results["totals"].output, [0, 3])
+    assert seen == [np.ndarray, np.ndarray]
 
 
 def test_irregular_dimension_errors():
@@ -336,12 +363,13 @@ def test_irregular_with_parallel_execution():
     data = results["data"].output
     assert isinstance(data, np.ma.MaskedArray)
     assert data.shape == (10, 10)
+    data_mask = np.asarray(data.mask)
 
     # Check first and last rows
     assert data[0, 0] == 0
-    assert all(data.mask[0, 1:])
+    assert all(data_mask[0, 1:])
 
-    assert not any(data.mask[9, :])  # Last row should have all 10 elements
+    assert not any(data_mask[9, :])  # Last row should have all 10 elements
     assert data[9, 9] == 9
 
 
@@ -414,12 +442,13 @@ def test_empty_irregular_arrays():
     )
 
     data = results["data"].output
-    assert all(data.mask[0, :])  # First row all masked (empty)
-    assert not data.mask[1, 0]
-    assert not data.mask[1, 1]
-    assert data.mask[1, 2]
-    assert all(data.mask[2, :])  # Third row all masked (empty)
-    assert not any(data.mask[3, :])  # Fourth row not masked
+    data_mask = np.asarray(data.mask)
+    assert all(data_mask[0, :])  # First row all masked (empty)
+    assert not data_mask[1, 0]
+    assert not data_mask[1, 1]
+    assert data_mask[1, 2]
+    assert all(data_mask[2, :])  # Third row all masked (empty)
+    assert not any(data_mask[3, :])  # Fourth row not masked
 
 
 def test_irregular_masks_skip_function_calls():
@@ -453,15 +482,17 @@ def test_irregular_masks_skip_function_calls():
 
     y_array = results["y"].output
     assert isinstance(y_array, np.ma.MaskedArray)
+    y_mask = np.asarray(y_array.mask)
     # First column (full length) is unmasked, ragged column ends with masked sentinel
     # Each row corresponds to an input element; mask tails past realised length
     np.testing.assert_array_equal(y_array[0].compressed(), [0])
-    assert y_array.mask[0, 1:].all()
+    assert y_mask[0, 1:].all()
     np.testing.assert_array_equal(y_array[1].compressed(), [0, 2, 4])
-    assert y_array.mask[1, 3:].all()
+    assert y_mask[1, 3:].all()
     assert y_array[2].mask.all()
 
     x_store = results["x"].store
+    assert isinstance(x_store, StorageBase)
     assert x_store.irregular_extent((0,)) == (1,)
     assert x_store.irregular_extent((0,)) == (1,)  # cached result
     assert x_store.is_element_masked((0, 1))
@@ -469,7 +500,7 @@ def test_irregular_masks_skip_function_calls():
     assert not x_store.is_element_masked((0, slice(None)))
 
 
-def test_irregular_masks_skip_function_calls_file_storage(tmp_path):
+def test_irregular_masks_skip_function_calls_file_storage(tmp_path: Path) -> None:
     """Skip behaviour also applies to file-backed irregular storage."""
 
     call_order: list[Any] = []
@@ -499,6 +530,7 @@ def test_irregular_masks_skip_function_calls_file_storage(tmp_path):
     assert call_order == [0, 1, 0]
 
     seq_store = results["seq"].store
+    assert isinstance(seq_store, StorageBase)
     assert seq_store.irregular_extent((0,)) == (2,)
     assert seq_store.irregular_extent((0,)) == (2,)
     assert seq_store.is_element_masked((0, 3))
@@ -507,10 +539,47 @@ def test_irregular_masks_skip_function_calls_file_storage(tmp_path):
 
     scaled_array = results["scaled"].output
     assert isinstance(scaled_array, np.ma.MaskedArray)
+    scaled_mask = np.asarray(scaled_array.mask)
     np.testing.assert_array_equal(scaled_array[0].compressed(), [1, 2])
-    assert scaled_array.mask[0, 2:].all()
+    assert scaled_mask[0, 2:].all()
     np.testing.assert_array_equal(scaled_array[1].compressed(), [1])
-    assert scaled_array.mask[1, 1:].all()
+    assert scaled_mask[1, 1:].all()
+
+
+def test_irregular_file_storage_slice_reducer(tmp_path: Path) -> None:
+    """Reproducer: reduction over irregular FileArray should not crash."""
+
+    @pipefunc(output_name="data", mapspec="n[i] -> data[i, j*]")
+    def generate_data(n: int) -> list[int]:
+        return list(range(n))
+
+    @pipefunc(output_name="totals", mapspec="data[i, :] -> totals[i]")
+    def sum_row(data: Array[int]) -> int:
+        assert isinstance(data, np.ndarray)
+        return int(np.sum(data)) if data.size else 0
+
+    pipeline = Pipeline([generate_data, sum_row])
+
+    results = pipeline.map(
+        inputs={"n": [1, 3, 0]},
+        internal_shapes={"data": (4,)},
+        run_folder=tmp_path,
+        storage="file_array",
+        parallel=False,
+    )
+
+    data = results["data"].output
+    assert isinstance(data, np.ma.MaskedArray)
+    assert data.shape == (3, 4)
+    np.testing.assert_array_equal(data[0].compressed(), [0])
+    data_mask = np.asarray(data.mask)
+    assert data_mask[0, 1:].all()
+    np.testing.assert_array_equal(data[1].compressed(), [0, 1, 2])
+    assert data_mask[1, 3:].all()
+    assert data_mask[2].all()
+
+    totals = results["totals"].output
+    np.testing.assert_array_equal(totals, [0, 3, 0])
 
 
 def test_regular_output_index_error_propagates():

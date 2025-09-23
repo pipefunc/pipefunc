@@ -110,24 +110,24 @@ Dict-backed and file-backed storages support irregular arrays. Zarr storage does
 
 ## Working with Downstream Functions
 
-Functions that receive irregular data (declared with a `*` in their mapspec) get MaskedArrays automatically; regular dimensions stay as plain NumPy arrays. Typing with `pipefunc.typing.Array` helps document the expectation but does not change the runtime behaviour.
+Functions that receive irregular data (declared with a `*` in their mapspec) behave slightly differently depending on how you access that axis:
+
+- Element-wise maps (`values[i, j*] -> …`) still receive scalar elements and never see padded sentinels—the scheduler skips masked coordinates entirely.
+- Reducers that take the full span of a single irregular axis (`values[i, :] -> …`) now receive a 1‑D NumPy array where the masked tail has already been trimmed.
+- Higher-dimensional slices continue to arrive as `numpy.ma.MaskedArray` objects so you can preserve structure.
+
+Typing with `pipefunc.typing.Array` helps document the expectation but does not change the runtime behaviour.
 
 ```{code-cell} ipython3
 @pipefunc(output_name="sentence_length", mapspec="words[i, :] -> sentence_length[i]")
-def count_words(words: np.ma.MaskedArray | np.ndarray) -> int:
-    """Count non-masked words in a sentence."""
-    # Check if it's a MaskedArray
-    if hasattr(words, "compressed"):
-        # compressed() returns only valid (non-masked) values
-        return len(words.compressed())
+def count_words(words: np.ndarray) -> int:
+    """Count real words in a sentence."""
     return len(words)
 
 @pipefunc(output_name="total_chars", mapspec="lengths[i, :] -> total_chars[i]")
-def sum_lengths(lengths: np.ma.MaskedArray | np.ndarray) -> int:
+def sum_lengths(lengths: np.ndarray) -> int:
     """Sum the lengths of all words."""
-    if hasattr(lengths, "compressed"):
-        return sum(lengths.compressed())
-    return sum(lengths)
+    return int(np.sum(lengths))
 
 # Add to pipeline (using the functions from above)
 pipeline2 = Pipeline([split_text, word_lengths, count_words, sum_lengths])
@@ -158,10 +158,8 @@ def find_factors(n: int) -> list[int]:
     return factors
 
 @pipefunc(output_name="factor_count", mapspec="factors[i, :] -> factor_count[i]")
-def count_factors(factors: np.ma.MaskedArray | np.ndarray) -> int:
+def count_factors(factors: np.ndarray) -> int:
     """Count the number of factors."""
-    if hasattr(factors, "compressed"):
-        return len(factors.compressed())
     return len(factors)
 
 pipeline3 = Pipeline([find_factors, count_factors])
@@ -229,7 +227,15 @@ def double_value(values: int) -> int:
 
 ### 3. Handle MaskedArrays in Reductions
 
-When receiving entire rows/slices, check if your input is a MaskedArray:
+When you reduce over a single irregular axis (e.g. `values[i, :] -> …`), pipefunc now hands you a dense 1‑D array with the mask already trimmed away. That means you can use ordinary NumPy/NumPy-like code for the common case:
+
+```python
+@pipefunc(..., mapspec="values[i, :] -> totals[i]")
+def totals(values: np.ndarray) -> float:
+    return float(np.sum(values))
+```
+
+If you slice across multiple irregular axes, the result is still a `MaskedArray`, so it remains good practice to be defensive when you expect higher-rank data:
 
 ```{code-cell} ipython3
 def process_irregular_data(data: np.ma.MaskedArray | np.ndarray) -> float:
@@ -300,10 +306,11 @@ def count_words_in_sentence(sentences: str) -> int:
 @pipefunc(output_name="avg_words", mapspec="words_per_sentence[i, :] -> avg_words[i]")
 def average_words(words_per_sentence: Array[int]) -> float:
     """Calculate average words per sentence."""
-    if hasattr(words_per_sentence, "compressed"):
-        valid = words_per_sentence.compressed()
-        return np.mean(valid) if len(valid) > 0 else 0.0
-    return np.mean(words_per_sentence)
+    if isinstance(words_per_sentence, np.ndarray):
+        return float(np.mean(words_per_sentence)) if words_per_sentence.size else 0.0
+    # Higher-dimensional slices still arrive as MaskedArrays; fall back to masked semantics.
+    valid = words_per_sentence.compressed()
+    return float(np.mean(valid)) if len(valid) > 0 else 0.0
 
 # Create pipeline
 text_pipeline = Pipeline([split_sentences, count_words_in_sentence, average_words])
