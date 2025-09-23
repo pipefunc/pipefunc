@@ -556,34 +556,32 @@ def _select_kwargs(
         if name in normalized_keys:
             key = normalized_keys[name]
             value = source[key]
-            if _should_trim_irregular_slice(source, key):
-                value = _trim_irregular_slice(value)
-            selected[name] = value
+            selected[name] = _maybe_trim_irregular_slice(source, key, value)
         else:
             selected[name] = source
     _load_data(selected)
     return selected
 
 
-def _should_trim_irregular_slice(source: Any, key: tuple[int | slice, ...] | int | slice) -> bool:
+def _maybe_trim_irregular_slice(
+    source: Any,
+    key: tuple[int | slice, ...] | int | slice,
+    value: Any,
+) -> Any:
     if not isinstance(source, StorageBase):
-        return False
-    if not source.irregular:
-        return False
-    if not source.internal_shape or len(source.internal_shape) != 1:
-        return False
+        return value
+    if not source.irregular or not source.internal_shape or len(source.internal_shape) != 1:
+        return value
     key_tuple = key if isinstance(key, tuple) else (key,)
     internal_axis = source.shape_mask.index(False)
     axis_key = key_tuple[internal_axis]
-    return (
+    if not (
         isinstance(axis_key, slice)
         and axis_key.start is None
         and axis_key.stop is None
         and axis_key.step is None
-    )
-
-
-def _trim_irregular_slice(value: Any) -> Any:
+    ):
+        return value
     if isinstance(value, np.ma.MaskedArray) and value.ndim == 1:
         return value.compressed()
     return value
