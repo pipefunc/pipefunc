@@ -241,13 +241,7 @@ class DictArray(StorageBase):
         self._dict[key] = value  # type: ignore[index]
 
     def _compute_irregular_extent(self, external_index: tuple[int, ...]) -> tuple[int, ...] | None:
-        key: tuple[int, ...]
-        if len(external_index) == len(self.shape):
-            key = external_index
-        else:
-            key = external_index if isinstance(external_index, tuple) else (external_index,)
-
-        value = self._dict.get(key)
+        value = self._dict.get(external_index)
         if value is None:
             return (0,)
 
