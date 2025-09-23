@@ -86,7 +86,7 @@ class StorageBase(abc.ABC):
         internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         irregular: bool = False,  # noqa: FBT002
-    ) -> None: ...
+    ) -> None: ...  # pragma: no cover
 
     @functools.cached_property
     def resolved_shape(self) -> tuple[int, ...]:
@@ -111,30 +111,34 @@ class StorageBase(abc.ABC):
         return self._is_resolved
 
     @abc.abstractmethod
-    def get_from_index(self, index: int) -> Any: ...
+    def get_from_index(self, index: int) -> Any: ...  # pragma: no cover
 
     @abc.abstractmethod
-    def has_index(self, index: int) -> bool: ...
+    def has_index(self, index: int) -> bool: ...  # pragma: no cover
 
     @abc.abstractmethod
-    def __getitem__(self, key: tuple[int | slice, ...]) -> Any: ...
+    def __getitem__(self, key: tuple[int | slice, ...]) -> Any: ...  # pragma: no cover
 
     @abc.abstractmethod
-    def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray: ...
-
-    @property
-    @abc.abstractmethod
-    def mask(self) -> np.ma.core.MaskedArray: ...
-
-    @abc.abstractmethod
-    def mask_linear(self) -> list[bool]: ...
-
-    @abc.abstractmethod
-    def dump(self, key: tuple[int | slice, ...], value: Any) -> None: ...
+    def to_array(
+        self,
+        *,
+        splat_internal: bool | None = None,
+    ) -> np.ma.core.MaskedArray: ...  # pragma: no cover
 
     @property
     @abc.abstractmethod
-    def dump_in_subprocess(self) -> bool:
+    def mask(self) -> np.ma.core.MaskedArray: ...  # pragma: no cover
+
+    @abc.abstractmethod
+    def mask_linear(self) -> list[bool]: ...  # pragma: no cover
+
+    @abc.abstractmethod
+    def dump(self, key: tuple[int | slice, ...], value: Any) -> None: ...  # pragma: no cover
+
+    @property
+    @abc.abstractmethod
+    def dump_in_subprocess(self) -> bool:  # pragma: no cover
         """Indicates if the storage can be dumped in a subprocess and read by the main process."""
 
     # ---- Irregular array helpers -------------------------------------------------
@@ -158,16 +162,42 @@ class StorageBase(abc.ABC):
 
     def is_element_masked(
         self,
-        key: tuple[int | slice, ...],  # noqa: ARG002
+        key: tuple[int | slice, ...],
     ) -> bool:
-        """Return ``True`` if the element requested by ``key`` is masked.
+        """Return ``True`` if the element requested by ``key`` is masked."""
+        if not (self.irregular and self.internal_shape and len(self.internal_shape) == 1):
+            return False
 
-        The default implementation only handles storages without irregular axes
-        (always returning ``False``). Subclasses dealing with irregular data
-        should override this to provide a mask-aware check that avoids loading
-        the full payload when possible.
-        """
-        return False
+        normalized = normalize_key(
+            key,
+            self.resolved_shape,
+            self.resolved_internal_shape,
+            self.shape_mask,
+        )
+
+        internal_components = tuple(x for x, m in zip(normalized, self.shape_mask) if not m)
+        if not internal_components:
+            return False
+
+        external_components = tuple(x for x, m in zip(normalized, self.shape_mask) if m)
+
+        if any(isinstance(x, slice) for x in (*internal_components, *external_components)):
+            return False
+
+        internal_list = [x for x in internal_components if isinstance(x, int)]
+        external_list = [x for x in external_components if isinstance(x, int)]
+        if len(internal_list) != len(internal_components) or len(external_list) != len(
+            external_components,
+        ):
+            return False
+        internal_index = tuple(internal_list)
+        external_index = tuple(external_list)
+
+        extent = self.irregular_extent(external_index)
+        if extent is None:
+            return False
+
+        return any(idx >= size for idx, size in zip(internal_index, extent))
 
     @property
     def size(self) -> int:
