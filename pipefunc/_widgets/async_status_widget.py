@@ -122,7 +122,7 @@ class AsyncTaskStatusWidget:
 
         # Initial display
         self._refresh_display("initializing")
-        if display:
+        if display:  # pragma: no cover
             self.display()
 
     def _get_elapsed_time(self) -> float:
