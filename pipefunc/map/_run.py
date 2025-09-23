@@ -763,9 +763,22 @@ def _validate_internal_shape(
     internal_shape: tuple[int, ...],
     func: PipeFunc,
 ) -> None:
-    if func._irregular_output:
-        return
     shape = np.shape(output)[: len(internal_shape)]
+    if func._irregular_output:
+        # Permit irregular outputs to be shorter than the declared internal
+        # shape, but never allow them to exceed the allocated capacity - that
+        # would silently drop data when we later write into the result array.
+        for actual, expected in zip(shape, internal_shape):
+            if isinstance(expected, int) and isinstance(actual, int) and actual > expected:
+                msg = (
+                    f"Irregular output shape {shape} of function '{func.__name__}'"
+                    f" (output '{func.output_name}') exceeds the configured"
+                    f" internal shape {internal_shape} used in the `mapspec`"
+                    f" '{func.mapspec}'. Increase the internal shape or reduce"
+                    " the emitted data."
+                )
+                raise ValueError(msg)
+        return
     if shape != internal_shape:
         msg = (
             f"Output shape {shape} of function '{func.__name__}'"

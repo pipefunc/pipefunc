@@ -1,6 +1,7 @@
 """Tests for irregular/jagged arrays support."""
 
 import numpy as np
+import pytest
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map import load_outputs
@@ -286,19 +287,14 @@ def test_irregular_dimension_errors():
 
     pipeline = Pipeline([make_data])
 
-    # Test without providing internal_shape - auto-infers from first output
-    # This can lead to data truncation if subsequent outputs are larger
-    results = pipeline.map(
-        inputs={"n": [2, 3]},
-        parallel=False,
-        storage="dict",
-    )
-    # Auto-inferred shape is (2,) based on first output
-    # Second output [0, 1, 2] gets truncated to [0, 1]
-    data = results["data"].output
-    assert data.shape == (2, 2)  # Auto-inferred from first output
-    assert list(data[0]) == [0, 1]
-    assert list(data[1]) == [0, 1]  # Truncated from [0, 1, 2]
+    # Without internal_shape, the first result fixes the capacity. Larger
+    # subsequent outputs must now raise instead of being truncated.
+    with pytest.raises(ValueError, match="exceeds the configured internal shape"):
+        pipeline.map(
+            inputs={"n": [2, 3]},
+            parallel=False,
+            storage="dict",
+        )
 
     # Test when actual data exceeds internal_shape
     @pipefunc(output_name="data2", mapspec="n[i] -> data2[i, j*]")
@@ -308,16 +304,13 @@ def test_irregular_dimension_errors():
     pipeline2 = Pipeline([make_too_much_data])
 
     # This should work but data will be truncated
-    results = pipeline2.map(
-        inputs={"n": [2, 3]},
-        internal_shapes={"data2": (3,)},  # Max 3, but n=3 will produce 6 elements
-        parallel=False,
-        storage="dict",
-    )
-
-    # Check that excess data is handled (likely truncated or raises error)
-    data2 = results["data2"].output
-    assert data2.shape == (2, 3)
+    with pytest.raises(ValueError, match="exceeds the configured internal shape"):
+        pipeline2.map(
+            inputs={"n": [2, 3]},
+            internal_shapes={"data2": (3,)},  # Max 3, but n=3 will produce 6 elements
+            parallel=False,
+            storage="dict",
+        )
 
 
 def test_irregular_with_parallel_execution():
