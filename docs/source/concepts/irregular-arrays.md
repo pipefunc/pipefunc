@@ -22,7 +22,7 @@ kernelspec:
 ```
 
 Irregular (or jagged) arrays are arrays where different elements have different lengths.
-`pipefunc` provides built-in support for irregular arrays through special `mapspec` syntax and automatic handling of masked values for outputs whose mapspec uses the `*` suffix.
+`pipefunc` provides built-in support for irregular arrays through special `mapspec` syntax. Whenever an output axis uses the `*` suffix, the runtime allocates space for the maximum length you configure, fills unused slots with `np.ma.masked`, and—starting with the irregular-array scheduler improvements described here—skips calling your mapped function for those padded positions. The produced arrays still arrive as `numpy.ma.MaskedArray` instances with masks that mark the gaps.
 
 :::{admonition} Prerequisites
 :class: info
@@ -59,9 +59,6 @@ def split_text(text: str) -> list[str]:
 @pipefunc(output_name="lengths", mapspec="words[i, j*] -> lengths[i, j*]")
 def word_lengths(words: str) -> int:
     """Get the length of each word."""
-    # Handle masked values for irregular dimensions
-    if np.ma.is_masked(words):
-        return np.ma.masked
     return len(words)
 
 pipeline = Pipeline([split_text, word_lengths])
@@ -82,6 +79,8 @@ results = pipeline.map(
 print("Words array shape:", results["words"].output.shape)
 print("Words array:\n", results["words"].output)
 ```
+
+Because `pipefunc` probes the irregular storage up-front, `word_lengths` is only invoked for the real words that exist in each row. The framework writes `np.ma.masked` into every unused slot automatically, so you no longer pay the cost of calling your function for padded indices.
 
 ## Understanding Masked Arrays
 
@@ -211,22 +210,21 @@ ValueError: Irregular output shape (2,) of function '...' (output '...') exceeds
 To avoid that crash, estimate the maximum size up front or pre-compute the results you plan to map over and size `internal_shapes` from their lengths.
 ````
 
-### 2. Handle Masked Values in Element-wise Operations
+### 2. Automatic Skipping of Padded Entries
 
-When a function operates on individual elements from an irregular dimension (using `j*` notation), it may receive `np.ma.masked` sentinel values:
+For element-wise mapspecs (`values[i, j*] -> …`), `pipefunc` now inspects the irregular storage before dispatching work. If every upstream input is masked at a given `(i, j)` coordinate, the scheduler simply does not call your function; it pre-fills the result arrays with `np.ma.masked` instead. This keeps the executor from wasting time on padded positions—including when you run work in parallel.
+
+In normal operation that means your element-wise functions only see real data. You can still add a defensive guard if you expect to call them manually or if you deliberately propagate masked values:
 
 ```{code-cell} ipython3
 @pipefunc(output_name="doubled", mapspec="values[i, j*] -> doubled[i, j*]")
 def double_value(values: int) -> int:
-    """Double a value, handling masked sentinels."""
-    # IMPORTANT: Check for masked sentinel first!
-    if np.ma.is_masked(values):
-        return np.ma.masked
-    return values * 2
-    # Alternatively (cheap identity check):
-    # if values is np.ma.masked:
+    """Double a value from an irregular dimension."""
+    # Optional defensive guard: uncomment if you plan to call ``double_value``
+    # outside of ``pipeline.map`` and might supply masked sentinels manually.
+    # if np.ma.is_masked(values):
     #     return np.ma.masked
-    # return values * 2
+    return values * 2
 ```
 
 ### 3. Handle MaskedArrays in Reductions
