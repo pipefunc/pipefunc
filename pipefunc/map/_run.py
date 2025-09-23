@@ -573,12 +573,8 @@ def _should_trim_irregular_slice(source: Any, key: tuple[int | slice, ...] | int
     if not source.internal_shape or len(source.internal_shape) != 1:
         return False
     key_tuple = key if isinstance(key, tuple) else (key,)
-    if len(key_tuple) != len(source.shape_mask):
-        return False
-    internal_positions = [idx for idx, flag in enumerate(source.shape_mask) if not flag]
-    if len(internal_positions) != 1:
-        return False
-    axis_key = key_tuple[internal_positions[0]]
+    internal_axis = source.shape_mask.index(False)
+    axis_key = key_tuple[internal_axis]
     return (
         isinstance(axis_key, slice)
         and axis_key.start is None
