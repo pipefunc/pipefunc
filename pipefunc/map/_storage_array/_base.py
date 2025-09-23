@@ -177,10 +177,8 @@ class StorageBase(abc.ABC):
         if any(isinstance(x, slice) for x in (*internal_components, *external_components)):
             return False
 
-        internal_list = [x for x in internal_components if isinstance(x, int)]
-        external_list = [x for x in external_components if isinstance(x, int)]
-        internal_index = tuple(internal_list)
-        external_index = tuple(external_list)
+        internal_index = tuple(x for x in internal_components if isinstance(x, int))
+        external_index = tuple(x for x in external_components if isinstance(x, int))
 
         extent = self.irregular_extent(external_index)
         if extent is None:
