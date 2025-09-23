@@ -32,11 +32,10 @@ def try_getitem(
     """Return item at ``key`` or a masked sentinel when irregular."""
     try:
         return array[key], False
-    except IndexError as exc:
+    except IndexError:
         if irregular:
             return np.ma.masked, True
-        msg = f"Index {key} out of bounds for array with shape {array.shape}"
-        raise IndexError(msg) from exc
+        raise
 
 
 def iterate_shape_indices(shape: tuple[int, ...]) -> Iterator[tuple[int, ...]]:
