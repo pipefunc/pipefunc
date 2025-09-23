@@ -677,6 +677,14 @@ def test_file_array_raises_when_data_too_short(tmp_path: Path) -> None:
         arr.to_array()
 
 
+def test_file_array_irregular_returns_masked(tmp_path: Path) -> None:
+    arr = FileArray(tmp_path, (2,), (3,), shape_mask=(True, False), irregular=True)
+    arr.dump((0,), np.array([0]))
+
+    masked_value = arr[(0, 1)]
+    assert np.ma.is_masked(masked_value)
+
+
 def test_irregular_storage_pass_through_non_numpy() -> None:
     arr = DictArray(None, (1,), (), shape_mask=(True,), irregular=True)
     sentinel = {"value": 1}
