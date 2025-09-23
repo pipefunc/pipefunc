@@ -139,32 +139,11 @@ class StorageBase(abc.ABC):
 
     # ---- Irregular array helpers -------------------------------------------------
 
-    def _irregular_extent_cache(self) -> dict[tuple[int, ...], tuple[int, ...]]:
-        cache = getattr(self, "_irregular_extents", None)
-        if cache is None:
-            cache = {}
-            self._irregular_extents = cache
-        return cache
-
     def irregular_extent(self, external_index: tuple[int, ...]) -> tuple[int, ...] | None:
-        """Return cached extent along irregular axes for ``external_index``.
-
-        For now we only support single irregular axes (``len(internal_shape) <= 1``).
-        The extent is cached per external index to avoid repeatedly materialising
-        large irregular payloads during scheduling.
-        """
+        """Return the realised extent along irregular axes for ``external_index``."""
         if not self.irregular or not self.internal_shape:
             return None
-
-        cache = self._irregular_extent_cache()
-        if external_index in cache:
-            return cache[external_index]
-
-        extent = self._compute_irregular_extent(external_index)
-        if extent is None:
-            return None
-        cache[external_index] = extent
-        return extent
+        return self._compute_irregular_extent(external_index)
 
     def _compute_irregular_extent(
         self,

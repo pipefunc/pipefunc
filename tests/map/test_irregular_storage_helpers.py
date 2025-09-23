@@ -117,7 +117,7 @@ def test_storage_base_irregular_extent_defaults() -> None:
     assert cache_storage.irregular_extent((0,)) == (1,)
     assert cache_storage.calls == 1
     assert cache_storage.irregular_extent((0,)) == (1,)
-    assert cache_storage.calls == 1  # cached
+    assert cache_storage.calls == 2
     assert not cache_storage.is_element_masked((0, 0))
 
 
