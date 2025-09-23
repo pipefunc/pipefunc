@@ -102,13 +102,20 @@ print(words_array.mask)
 
 Because the storage keeps irregular elements in an object array, you will typically see `dtype=object` in these masked arrays. Regular (non-`*`) mapspec dimensions remain ordinary NumPy arrays.
 
+:::{admonition} Storage Support (Irregular Arrays)
+:class: warning
+
+Dict-backed and file-backed storages support irregular arrays. Zarr storage does not yet support irregular arrays; use `storage="dict"` (as in the examples) or file-backed storage for pipelines that produce or consume irregular outputs.
+
+:::
+
 ## Working with Downstream Functions
 
 Functions that receive irregular data (declared with a `*` in their mapspec) get MaskedArrays automatically; regular dimensions stay as plain NumPy arrays. Typing with `pipefunc.typing.Array` helps document the expectation but does not change the runtime behaviour.
 
 ```{code-cell} ipython3
 @pipefunc(output_name="sentence_length", mapspec="words[i, :] -> sentence_length[i]")
-def count_words(words: np.ndarray) -> int:
+def count_words(words: np.ma.MaskedArray | np.ndarray) -> int:
     """Count non-masked words in a sentence."""
     # Check if it's a MaskedArray
     if hasattr(words, "compressed"):
@@ -117,7 +124,7 @@ def count_words(words: np.ndarray) -> int:
     return len(words)
 
 @pipefunc(output_name="total_chars", mapspec="lengths[i, :] -> total_chars[i]")
-def sum_lengths(lengths: np.ndarray) -> int:
+def sum_lengths(lengths: np.ma.MaskedArray | np.ndarray) -> int:
     """Sum the lengths of all words."""
     if hasattr(lengths, "compressed"):
         return sum(lengths.compressed())
@@ -152,7 +159,7 @@ def find_factors(n: int) -> list[int]:
     return factors
 
 @pipefunc(output_name="factor_count", mapspec="factors[i, :] -> factor_count[i]")
-def count_factors(factors: np.ndarray) -> int:
+def count_factors(factors: np.ma.MaskedArray | np.ndarray) -> int:
     """Count the number of factors."""
     if hasattr(factors, "compressed"):
         return len(factors.compressed())
@@ -216,6 +223,10 @@ def double_value(values: int) -> int:
     if np.ma.is_masked(values):
         return np.ma.masked
     return values * 2
+    # Alternatively (cheap identity check):
+    # if values is np.ma.masked:
+    #     return np.ma.masked
+    # return values * 2
 ```
 
 ### 3. Handle MaskedArrays in Reductions
@@ -223,7 +234,7 @@ def double_value(values: int) -> int:
 When receiving entire rows/slices, check if your input is a MaskedArray:
 
 ```{code-cell} ipython3
-def process_irregular_data(data: np.ndarray) -> float:
+def process_irregular_data(data: np.ma.MaskedArray | np.ndarray) -> float:
     """Example of proper MaskedArray handling."""
     if hasattr(data, "compressed"):
         # It's a MaskedArray
@@ -327,18 +338,18 @@ for i, text in enumerate(texts["text"]):
 
 ## Performance Considerations
 
-MaskedArrays have minimal overhead:
-- Mask checking is vectorized and fast
-- `compressed()` is implemented in C and very efficient
-- Storage overhead is one boolean per element for the mask
+Masked operations in NumPy are efficient (mask checks are vectorized and `compressed()` is implemented in C). However, irregular arrays are stored with `dtype=object`, which can make numeric operations slower and increase overhead compared to native numeric dtypes. Practical tips:
+- Keep irregular spans as narrow as possible; reduce or aggregate early.
+- When feasible, convert masked slices to dense numeric arrays after reduction.
+- Prefer `np.ma` reductions (`np.ma.sum`, `np.ma.mean`) and `MaskedArray.count()` where they fit your workflow.
 
-For large-scale processing, irregular arrays can actually be more memory-efficient than padding with zeros or using lists of lists.
+Irregular arrays can still be more memory‑efficient than padding with zeros or maintaining lists of lists, especially when many positions are absent.
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **IndexError when internal_shape is too small**:
+1. **ValueError when internal_shape is too small**:
    ```python
    # This will fail if any text has >3 words
    internal_shapes={"words": (3,)}
@@ -351,6 +362,10 @@ For large-scale processing, irregular arrays can actually be more memory-efficie
    total = sum(masked_array)
 
    # Correct - only sums valid values
+   # Option A: np.ma reductions (recommended for masked data)
+   total = np.ma.sum(masked_array)
+   count = masked_array.count()
+   # Option B: use compressed() explicitly
    total = sum(masked_array.compressed())
    ```
 
