@@ -287,3 +287,46 @@ def test_irregular_skip_context_variants(tmp_path: Path) -> None:
     assert ctx_slice.enabled
     assert not ctx_slice.should_skip(0)
     assert slice_storage.received == []
+
+
+def test_dictarray_is_element_masked_guards() -> None:
+    arr_plain = DictArray(folder=None, shape=(2,), irregular=False)
+    assert not arr_plain.is_element_masked((0,))
+
+    arr_irregular = DictArray(
+        folder=None,
+        shape=(1,),
+        internal_shape=(3,),
+        shape_mask=(True, False),
+        irregular=True,
+    )
+    assert not arr_irregular.is_element_masked((0, slice(None)))
+
+
+def test_filearray_is_element_masked_guards(tmp_path: Path) -> None:
+    arr_plain = FileArray(tmp_path / "plain", shape=(1,), irregular=False)
+    assert not arr_plain.is_element_masked((0,))
+
+    arr_irregular = FileArray(
+        tmp_path / "irregular",
+        shape=(1,),
+        internal_shape=(4,),
+        shape_mask=(True, False),
+        irregular=True,
+    )
+    assert not arr_irregular.is_element_masked((0, slice(None)))
+
+
+def test_skip_context_disabled_cases() -> None:
+    storage = MinimalStorage(shape=(1,), irregular=True)
+    storage.internal_shape = (1,)
+    func_single = cast("PipeFunc", SimpleNamespace(mapspec=MapSpec.from_string("x[i*] -> y[i*]")))
+    ctx_unknown = _IrregularSkipContext(func_single, {"x": storage}, ("?",), (True,))
+    assert not ctx_unknown.enabled
+
+    func_multi = cast(
+        "PipeFunc",
+        SimpleNamespace(mapspec=MapSpec.from_string("x[i, j*] -> y[i, j*, k*]")),
+    )
+    ctx_multi = _IrregularSkipContext(func_multi, {"x": storage}, (5, 5), (True, True))
+    assert not ctx_multi.enabled
