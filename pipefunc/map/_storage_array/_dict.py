@@ -5,7 +5,7 @@ from __future__ import annotations
 import itertools
 import multiprocessing
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
@@ -13,6 +13,7 @@ from pipefunc._utils import dump, load
 
 from ._base import (
     StorageBase,
+    infer_irregular_length,
     iterate_shape_indices,
     normalize_key,
     register_storage,
@@ -238,6 +239,48 @@ class DictArray(StorageBase):
             return
 
         self._dict[key] = value  # type: ignore[index]
+
+    def _compute_irregular_extent(self, external_index: tuple[int, ...]) -> tuple[int, ...] | None:
+        if not self.irregular or not self.internal_shape or len(self.internal_shape) != 1:
+            return None
+
+        key: tuple[int, ...]
+        if len(external_index) == len(self.shape):
+            key = external_index
+        else:
+            key = external_index if isinstance(external_index, tuple) else (external_index,)
+
+        value = self._dict.get(key)
+        if value is None:
+            return (0,)
+
+        length = infer_irregular_length(value)
+        max_len = self.resolved_internal_shape[0]
+        return (min(length, max_len),)
+
+    def is_element_masked(self, key: tuple[int | slice, ...]) -> bool:
+        masked = False
+        if self.irregular and self.internal_shape and len(self.internal_shape) == 1:
+            normalized = normalize_key(
+                key,
+                self.resolved_shape,
+                self.resolved_internal_shape,
+                self.shape_mask,
+            )
+
+            internal_index_all = tuple(x for x, m in zip(normalized, self.shape_mask) if not m)
+            if internal_index_all and not any(isinstance(x, slice) for x in internal_index_all):
+                internal_index = tuple(cast("int", x) for x in internal_index_all)
+                external_index_all = tuple(x for x, m in zip(normalized, self.shape_mask) if m)
+                if all(isinstance(x, int) for x in external_index_all):
+                    external_index = tuple(cast("int", x) for x in external_index_all)
+                    extent = self.irregular_extent(external_index)
+                    if extent is not None:
+                        for idx, size in zip(internal_index, extent):
+                            if idx >= size:
+                                masked = True
+                                break
+        return masked
 
     def _path(self) -> Path:
         assert self.folder is not None

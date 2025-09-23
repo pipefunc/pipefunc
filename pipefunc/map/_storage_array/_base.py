@@ -46,6 +46,27 @@ def select_by_mask(
     return tuple(result)
 
 
+def infer_irregular_length(value: Any) -> int:
+    """Return the realised length for a single irregular axis."""
+    if value is None or value is np.ma.masked:
+        result = 0
+    elif isinstance(value, np.ma.MaskedArray):
+        if value.ndim == 0:
+            result = 0 if np.ma.is_masked(value) else 1
+        elif value.mask is np.ma.nomask:
+            result = int(value.shape[0])
+        else:
+            mask = np.atleast_1d(value.mask)
+            valid = np.nonzero(~mask)[0]
+            result = 0 if valid.size == 0 else int(valid[-1]) + 1
+    else:
+        try:
+            result = len(value)  # type: ignore[arg-type]
+        except TypeError:
+            result = 1
+    return result
+
+
 class StorageBase(abc.ABC):
     """Base class for file-based arrays."""
 
@@ -115,6 +136,59 @@ class StorageBase(abc.ABC):
     @abc.abstractmethod
     def dump_in_subprocess(self) -> bool:
         """Indicates if the storage can be dumped in a subprocess and read by the main process."""
+
+    # ---- Irregular array helpers -------------------------------------------------
+
+    def _irregular_extent_cache(self) -> dict[tuple[int, ...], tuple[int, ...]]:
+        cache = getattr(self, "_irregular_extents", None)
+        if cache is None:
+            cache = {}
+            self._irregular_extents = cache
+        return cache
+
+    def irregular_extent(self, external_index: tuple[int, ...]) -> tuple[int, ...] | None:
+        """Return cached extent along irregular axes for ``external_index``.
+
+        For now we only support single irregular axes (``len(internal_shape) <= 1``).
+        The extent is cached per external index to avoid repeatedly materialising
+        large irregular payloads during scheduling.
+        """
+        if not self.irregular or not self.internal_shape:
+            return None
+
+        cache = self._irregular_extent_cache()
+        if external_index in cache:
+            return cache[external_index]
+
+        extent = self._compute_irregular_extent(external_index)
+        if extent is None:
+            return None
+        cache[external_index] = extent
+        return extent
+
+    def _compute_irregular_extent(
+        self,
+        external_index: tuple[int, ...],  # noqa: ARG002
+    ) -> tuple[int, ...] | None:
+        """Compute the realised size for irregular axes.
+
+        Sub-classes should override this and return ``None`` when the extent
+        cannot be determined cheaply (e.g. multi-dimensional ragged data).
+        """
+        return None
+
+    def is_element_masked(
+        self,
+        key: tuple[int | slice, ...],  # noqa: ARG002
+    ) -> bool:
+        """Return ``True`` if the element requested by ``key`` is masked.
+
+        The default implementation only handles storages without irregular axes
+        (always returning ``False``). Subclasses dealing with irregular data
+        should override this to provide a mask-aware check that avoids loading
+        the full payload when possible.
+        """
+        return False
 
     @property
     def size(self) -> int:

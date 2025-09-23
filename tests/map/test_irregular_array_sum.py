@@ -40,6 +40,7 @@ def test_irregular_array_sum():
         inputs,
         internal_shapes={"x": ("?",)},
         cleanup=True,
+        parallel=False,
     )
 
     # Expected behavior:
@@ -87,6 +88,7 @@ def test_irregular_array_sum_with_proper_handling():
         inputs,
         internal_shapes={"x": ("?",)},
         cleanup=True,
+        parallel=False,
     )
 
     sum_output = results["sum"].output
@@ -116,6 +118,7 @@ def test_irregular_array_mask_is_set_correctly():
         inputs,
         internal_shapes={"x": ("?",)},
         cleanup=True,
+        parallel=False,
     )
 
     y_output = results["y"].output
