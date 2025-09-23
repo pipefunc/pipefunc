@@ -86,7 +86,7 @@ class DictArray(StorageBase):
             return np.ma.empty(self.internal_shape, dtype=object)
         return np.ma.masked
 
-    def __getitem__(self, key: tuple[int | slice, ...]) -> Any:  # noqa: PLR0912
+    def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
         """Return the data associated with the given key."""
         key = normalize_key(key, self.resolved_shape, self.resolved_internal_shape, self.shape_mask)
         assert len(key) == len(self.full_shape)
@@ -104,14 +104,7 @@ class DictArray(StorageBase):
                     internal_key = tuple(x for x, m in zip(index, self.shape_mask) if not m)
                     if external_key in self._dict:
                         arr = np.asarray(self._dict[external_key])
-                        try:
-                            value = arr[internal_key]
-                        except IndexError:
-                            # For irregular arrays, return masked value when out of bounds
-                            if self.irregular:
-                                value = np.ma.masked
-                            else:
-                                raise
+                        value, _ = try_getitem(arr, internal_key, irregular=self.irregular)
                     else:
                         value = self._internal_mask()[internal_key]
                 else:  # noqa: PLR5501
