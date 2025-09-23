@@ -13,12 +13,12 @@ from pipefunc._utils import dump, load
 
 from ._base import (
     StorageBase,
-    _safe_getitem,
     infer_irregular_length,
     iterate_shape_indices,
     normalize_key,
     register_storage,
     select_by_mask,
+    try_getitem,
 )
 
 if TYPE_CHECKING:
@@ -138,7 +138,7 @@ class DictArray(StorageBase):
             return self._internal_mask()
         if internal_key:
             arr = np.asarray(data)
-            value, _ = _safe_getitem(
+            value, _ = try_getitem(
                 arr,
                 internal_key,  # type: ignore[arg-type]
                 irregular=self.irregular,
@@ -189,7 +189,7 @@ class DictArray(StorageBase):
                 # Irregular case - shapes don't match
                 for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
-                    sel, masked = _safe_getitem(
+                    sel, masked = try_getitem(
                         value_array,
                         internal_index,
                         irregular=self.irregular,

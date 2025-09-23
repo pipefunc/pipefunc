@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 storage_registry = {}
 
 
-def _safe_getitem(
+def try_getitem(
     array: np.ndarray,
     key: tuple[int, ...],
     *,
