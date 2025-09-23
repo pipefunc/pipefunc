@@ -15,12 +15,12 @@ from pipefunc._utils import dump, load
 
 from ._base import (
     StorageBase,
-    _safe_getitem,
     infer_irregular_length,
     iterate_shape_indices,
     normalize_key,
     register_storage,
     select_by_mask,
+    try_getitem,
 )
 
 if TYPE_CHECKING:
@@ -152,7 +152,7 @@ class FileArray(StorageBase):
                     internal_index = tuple(i for i, m in zip(index, self.shape_mask) if not m)
                     if internal_index:
                         sub_array = np.asarray(sub_array)  # could be a list
-                        sliced_value, masked = _safe_getitem(
+                        sliced_value, masked = try_getitem(
                             sub_array,
                             internal_index,
                             irregular=self.irregular,
@@ -188,7 +188,7 @@ class FileArray(StorageBase):
         sub_array = load(file)
         if internal_indices:
             sub_array = np.asarray(sub_array)
-            value, _ = _safe_getitem(
+            value, _ = try_getitem(
                 sub_array,
                 internal_indices,  # type: ignore[arg-type]
                 irregular=self.irregular,
@@ -239,7 +239,7 @@ class FileArray(StorageBase):
                 sub_array = np.asarray(sub_array)  # could be a list
                 for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
-                    sel, masked = _safe_getitem(sub_array, internal_index, irregular=self.irregular)
+                    sel, masked = try_getitem(sub_array, internal_index, irregular=self.irregular)
                     arr[full_index] = sel
                     full_mask[full_index] = masked
             else:
