@@ -570,6 +570,8 @@ def _maybe_trim_irregular_slice(
 ) -> Any:
     if not isinstance(source, StorageBase):
         return value
+    if not isinstance(value, np.ma.MaskedArray):
+        return value
     if not source.irregular or not source.internal_shape or len(source.internal_shape) != 1:
         return value
     key_tuple = key if isinstance(key, tuple) else (key,)
@@ -582,7 +584,7 @@ def _maybe_trim_irregular_slice(
         and axis_key.step is None
     ):
         return value
-    if isinstance(value, np.ma.MaskedArray) and value.ndim == 1:
+    if value.ndim == 1:
         return value.compressed()
     return value
 
