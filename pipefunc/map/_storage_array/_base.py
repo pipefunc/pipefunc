@@ -148,7 +148,7 @@ class StorageBase(abc.ABC):
     def _compute_irregular_extent(
         self,
         external_index: tuple[int, ...],  # noqa: ARG002
-    ) -> tuple[int, ...] | None:
+    ) -> tuple[int, ...] | None:  # pragma: no cover
         """Compute the realised size for irregular axes.
 
         Sub-classes should override this and return ``None`` when the extent
