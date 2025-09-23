@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from functools import partial
 from types import MethodType, SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
@@ -8,13 +9,15 @@ import numpy as np
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc.map._mapspec import MapSpec
-from pipefunc.map._run import _IrregularSkipContext
+from pipefunc.map._run import _IrregularSkipContext, _MapSpecArgs, _output_from_mapspec_task
 from pipefunc.map._storage_array._base import StorageBase, infer_irregular_length
 from pipefunc.map._storage_array._dict import DictArray
 from pipefunc.map._storage_array._file import FileArray
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from pipefunc.map._run_info import RunInfo
 
 
 class MinimalStorage(StorageBase):
@@ -166,6 +169,11 @@ def test_dictarray_irregular_extent_and_mask_operations() -> None:
     assert not arr.is_element_masked((1, 1))
     assert arr.is_element_masked((2, 1))
     assert not arr.is_element_masked((0, slice(None)))
+    arr._dict[(0,)] = [0]
+    assert arr[(0, 2)] is np.ma.masked
+    arr_no_internal = DictArray(folder=None, shape=(1,), irregular=True)
+    assert arr_no_internal.irregular_extent((0,)) is None
+    assert arr_no_internal.irregular_extent((0, 1)) is None
 
 
 def test_filearray_irregular_extent_and_mask_operations(tmp_path: Path) -> None:
@@ -190,6 +198,10 @@ def test_filearray_irregular_extent_and_mask_operations(tmp_path: Path) -> None:
     assert not arr.is_element_masked((1, 1))
     assert arr.is_element_masked((2, 1))
     assert not arr.is_element_masked((0, slice(None)))
+    arr.dump((0,), [0])
+    assert arr[(0, 2)] is np.ma.masked
+    arr_no_internal = FileArray(tmp_path / "no_internal", shape=(1,), irregular=True)
+    assert arr_no_internal.irregular_extent((0,)) is None
 
 
 def test_irregular_skip_context_variants(tmp_path: Path) -> None:
@@ -326,9 +338,73 @@ def test_skip_context_disabled_cases() -> None:
     ctx_unknown = _IrregularSkipContext(func_single, {"x": storage}, ("?",), (True,))
     assert not ctx_unknown.enabled
 
+    storage_no_internal = MinimalStorage(shape=(1,), irregular=True)
+    ctx_no_internal = _IrregularSkipContext(func_single, {"x": storage_no_internal}, (5,), (True,))
+    assert not ctx_no_internal.enabled
+
     func_multi = cast(
         "PipeFunc",
         SimpleNamespace(mapspec=MapSpec.from_string("x[i, j*] -> y[i, j*, k*]")),
     )
     ctx_multi = _IrregularSkipContext(func_multi, {"x": storage}, (5, 5), (True, True))
     assert not ctx_multi.enabled
+
+    storage_irregular = MinimalStorage(shape=(1,), irregular=True)
+    storage_irregular.internal_shape = (1,)
+
+    def missing_input_keys(
+        self: MapSpec,
+        shape: tuple[int, ...],
+        index: int,
+    ) -> dict[str, tuple[int, ...]]:
+        return {}
+
+    func_missing_key = cast(
+        "PipeFunc",
+        SimpleNamespace(mapspec=MapSpec.from_string("x[i*] -> y[i*]")),
+    )
+    object.__setattr__(
+        func_missing_key.mapspec,
+        "input_keys",
+        MethodType(missing_input_keys, func_missing_key.mapspec),
+    )
+    ctx_missing = _IrregularSkipContext(func_missing_key, {"x": storage_irregular}, (5,), (True,))
+    assert ctx_missing.enabled
+    assert not ctx_missing.should_skip(0)
+
+
+def test_output_from_mapspec_task_skipped_only() -> None:
+    storage = DictArray(
+        folder=None,
+        shape=(1,),
+        internal_shape=(2,),
+        shape_mask=(True, False),
+        irregular=True,
+    )
+    func = pipefunc(output_name="y", mapspec="x[i, j*] -> y[i, j*]")(lambda x: x)
+    result_arrays = [np.empty(2, dtype=object)]
+    args = _MapSpecArgs(
+        process_index=partial(lambda *_args, **_kwargs: ()),
+        existing=[],
+        missing=[],
+        skipped=[0],
+        result_arrays=result_arrays,
+        mask=(True, False),
+        arrays=[storage],
+    )
+    run_info = cast(
+        "RunInfo",
+        SimpleNamespace(
+            resolve_downstream_shapes=lambda *_args, **_kwargs: None,
+        ),
+    )
+    _output_from_mapspec_task(
+        func,
+        {"y": storage},
+        args,
+        [],
+        run_info,
+        return_results=True,
+    )
+    reshaped = result_arrays[0].reshape(storage.full_shape)
+    assert reshaped[0, 0] is np.ma.masked
