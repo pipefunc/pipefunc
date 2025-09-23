@@ -176,9 +176,6 @@ class StorageBase(abc.ABC):
         )
 
         internal_components = tuple(x for x, m in zip(normalized, self.shape_mask) if not m)
-        if not internal_components:
-            return False
-
         external_components = tuple(x for x, m in zip(normalized, self.shape_mask) if m)
 
         if any(isinstance(x, slice) for x in (*internal_components, *external_components)):
@@ -186,10 +183,6 @@ class StorageBase(abc.ABC):
 
         internal_list = [x for x in internal_components if isinstance(x, int)]
         external_list = [x for x in external_components if isinstance(x, int)]
-        if len(internal_list) != len(internal_components) or len(external_list) != len(
-            external_components,
-        ):
-            return False
         internal_index = tuple(internal_list)
         external_index = tuple(external_list)
 
