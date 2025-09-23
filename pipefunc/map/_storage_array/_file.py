@@ -15,6 +15,7 @@ from pipefunc._utils import dump, load
 
 from ._base import (
     StorageBase,
+    _safe_getitem,
     infer_irregular_length,
     iterate_shape_indices,
     normalize_key,
@@ -151,19 +152,13 @@ class FileArray(StorageBase):
                     internal_index = tuple(i for i, m in zip(index, self.shape_mask) if not m)
                     if internal_index:
                         sub_array = np.asarray(sub_array)  # could be a list
-                        try:
-                            sliced_sub_array = sub_array[internal_index]
-                            sliced_data.append(sliced_sub_array)
-                            sliced_mask.append(False)
-                        except IndexError as e:
-                            if not self.irregular:
-                                msg = (
-                                    f"Index {internal_index} out of bounds for array "
-                                    f"with shape {sub_array.shape}"
-                                )
-                                raise IndexError(msg) from e
-                            sliced_data.append(np.ma.masked)
-                            sliced_mask.append(True)
+                        sliced_value, masked = _safe_getitem(
+                            sub_array,
+                            internal_index,
+                            irregular=self.irregular,
+                        )
+                        sliced_data.append(sliced_value)
+                        sliced_mask.append(masked)
                         continue
                     sliced_data.append(sub_array)
                     sliced_mask.append(False)
@@ -193,16 +188,12 @@ class FileArray(StorageBase):
         sub_array = load(file)
         if internal_indices:
             sub_array = np.asarray(sub_array)
-            try:
-                return sub_array[internal_indices]
-            except IndexError as e:
-                if not self.irregular:
-                    msg = (
-                        f"Index {internal_indices} out of bounds for array "
-                        f"with shape {sub_array.shape}"
-                    )
-                    raise IndexError(msg) from e
-                return np.ma.masked
+            value, _ = _safe_getitem(
+                sub_array,
+                internal_indices,  # type: ignore[arg-type]
+                irregular=self.irregular,
+            )
+            return value
         return sub_array
 
     def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray:
@@ -248,19 +239,9 @@ class FileArray(StorageBase):
                 sub_array = np.asarray(sub_array)  # could be a list
                 for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
-                    try:
-                        sel = sub_array[internal_index]
-                        arr[full_index] = sel
-                        full_mask[full_index] = False
-                    except IndexError as e:
-                        if not self.irregular:
-                            msg = (
-                                f"Index {internal_index} out of bounds for array "
-                                f"with shape {sub_array.shape}"
-                            )
-                            raise IndexError(msg) from e
-                        arr[full_index] = np.ma.masked
-                        full_mask[full_index] = True
+                    sel, masked = _safe_getitem(sub_array, internal_index, irregular=self.irregular)
+                    arr[full_index] = sel
+                    full_mask[full_index] = masked
             else:
                 for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)

@@ -23,6 +23,22 @@ if TYPE_CHECKING:
 storage_registry = {}
 
 
+def _safe_getitem(
+    array: np.ndarray,
+    key: tuple[int, ...],
+    *,
+    irregular: bool,
+) -> tuple[Any, bool]:
+    """Return item at ``key`` or a masked sentinel when irregular."""
+    try:
+        return array[key], False
+    except IndexError as exc:
+        if irregular:
+            return np.ma.masked, True
+        msg = f"Index {key} out of bounds for array with shape {array.shape}"
+        raise IndexError(msg) from exc
+
+
 def iterate_shape_indices(shape: tuple[int, ...]) -> Iterator[tuple[int, ...]]:
     """Iterate over all indices of a given shape."""
     return itertools.product(*map(range, shape))

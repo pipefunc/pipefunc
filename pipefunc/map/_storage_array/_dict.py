@@ -13,6 +13,7 @@ from pipefunc._utils import dump, load
 
 from ._base import (
     StorageBase,
+    _safe_getitem,
     infer_irregular_length,
     iterate_shape_indices,
     normalize_key,
@@ -137,13 +138,12 @@ class DictArray(StorageBase):
             return self._internal_mask()
         if internal_key:
             arr = np.asarray(data)
-            try:
-                return arr[internal_key]
-            except IndexError as e:
-                if not self.irregular:
-                    msg = f"Index {internal_key} out of bounds for array with shape {arr.shape}"
-                    raise IndexError(msg) from e
-                return np.ma.masked
+            value, _ = _safe_getitem(
+                arr,
+                internal_key,  # type: ignore[arg-type]
+                irregular=self.irregular,
+            )
+            return value
         return data
 
     def _slice_indices(self, key: tuple[int | slice, ...], shape: tuple[int, ...]) -> list[range]:
@@ -189,15 +189,14 @@ class DictArray(StorageBase):
                 # Irregular case - shapes don't match
                 for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
-                    try:
-                        data[full_index] = value_array[internal_index]
+                    sel, masked = _safe_getitem(
+                        value_array,
+                        internal_index,
+                        irregular=self.irregular,
+                    )
+                    if not masked:
+                        data[full_index] = sel
                         mask[full_index] = False
-                    except IndexError:
-                        # Out of bounds for irregular array - keep as masked
-                        if not self.irregular:
-                            raise
-                        # data[full_index] already contains np.ma.masked from _masked_empty
-                        # mask[full_index] is already True
         return np.ma.MaskedArray(data, mask=mask, dtype=object)
 
     @property
