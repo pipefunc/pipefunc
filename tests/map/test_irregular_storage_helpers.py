@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import multiprocessing
 from functools import partial
 from types import MethodType, SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
@@ -10,8 +11,13 @@ import numpy as np
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run import _IrregularSkipContext, _MapSpecArgs, _output_from_mapspec_task
-from pipefunc.map._storage_array._base import StorageBase, infer_irregular_length
-from pipefunc.map._storage_array._dict import DictArray
+from pipefunc.map._storage_array._base import (
+    StorageBase,
+    infer_irregular_length,
+    register_storage,
+    storage_registry,
+)
+from pipefunc.map._storage_array._dict import DictArray, SharedMemoryDictArray
 from pipefunc.map._storage_array._file import FileArray
 
 if TYPE_CHECKING:
@@ -115,6 +121,7 @@ def test_storage_base_irregular_extent_defaults() -> None:
 
     none_extent = NoneExtentStorage()
     assert none_extent.irregular_extent((0,)) is None
+    assert not none_extent.is_element_masked((0, 0))
 
     cache_storage = CacheStorage()
     assert cache_storage.irregular_extent((0,)) == (1,)
@@ -159,6 +166,7 @@ def test_dictarray_irregular_extent_and_mask_operations() -> None:
 
     assert arr.irregular_extent((0,)) == (2,)
     assert arr.irregular_extent((0,)) == (2,)
+    assert arr._compute_irregular_extent((0,)) == (2,)
     assert arr.irregular_extent((1,)) == (4,)
     assert arr.irregular_extent((2,)) == (1,)
     assert arr.irregular_extent((3,)) == (0,)
@@ -169,6 +177,7 @@ def test_dictarray_irregular_extent_and_mask_operations() -> None:
     assert not arr.is_element_masked((1, 1))
     assert arr.is_element_masked((2, 1))
     assert not arr.is_element_masked((0, slice(None)))
+    assert not arr.is_element_masked((slice(None), 0))
     arr._dict[(0,)] = [0]
     assert arr[(0, 2)] is np.ma.masked
     arr_no_internal = DictArray(folder=None, shape=(1,), irregular=True)
@@ -198,6 +207,7 @@ def test_filearray_irregular_extent_and_mask_operations(tmp_path: Path) -> None:
     assert not arr.is_element_masked((1, 1))
     assert arr.is_element_masked((2, 1))
     assert not arr.is_element_masked((0, slice(None)))
+    assert not arr.is_element_masked((slice(None), 0))
     arr.dump((0,), [0])
     assert arr[(0, 2)] is np.ma.masked
     arr_no_internal = FileArray(tmp_path / "no_internal", shape=(1,), irregular=True)
@@ -371,6 +381,35 @@ def test_skip_context_disabled_cases() -> None:
     ctx_missing = _IrregularSkipContext(func_missing_key, {"x": storage_irregular}, (5,), (True,))
     assert ctx_missing.enabled
     assert not ctx_missing.should_skip(0)
+
+
+def test_register_storage_explicit_identifier() -> None:
+    class TempStorage(MinimalStorage):
+        storage_id = "temp-storage"
+
+    explicit_id = "explicit-temp-storage"
+    register_storage(TempStorage, storage_id=explicit_id)
+    try:
+        assert storage_registry[explicit_id] is TempStorage
+    finally:
+        storage_registry.pop(explicit_id, None)
+
+
+def test_shared_memory_dict_array_custom_mapping() -> None:
+    manager = multiprocessing.Manager()
+    try:
+        shared = SharedMemoryDictArray(
+            folder=None,
+            shape=(1,),
+            internal_shape=(1,),
+            shape_mask=(True, False),
+            irregular=True,
+            mapping=manager.dict(),
+        )
+        shared.dump((0,), [1])
+        assert shared.get_from_index(0) == [1]
+    finally:
+        manager.shutdown()
 
 
 def test_output_from_mapspec_task_skipped_only() -> None:

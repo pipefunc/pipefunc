@@ -10,7 +10,7 @@ from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import numpy as np
 import numpy.typing as npt
@@ -834,10 +834,10 @@ class _IrregularSkipContext:
 
         self.axis = irregular_axes[0]
         external_shape = external_shape_from_mask(shape, shape_mask)
-        if not all(isinstance(dim, int) for dim in external_shape):
+        if not shape_is_resolved(external_shape):
             self.enabled = False
             return
-        self.external_shape = cast("tuple[int, ...]", external_shape)
+        self.external_shape = external_shape
         self.mapspec = mapspec
         self.probes: list[tuple[StorageBase, str, int]] = []
 
