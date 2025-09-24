@@ -847,7 +847,7 @@ class _IrregularSkipContext:
         shape: ShapeTuple,
         shape_mask: tuple[bool, ...],
     ) -> None:
-        mapspec = func.mapspec if isinstance(func.mapspec, MapSpec) else None
+        mapspec = func.mapspec
         if mapspec is None:
             self.enabled = False
             return
