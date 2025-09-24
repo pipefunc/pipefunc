@@ -7,6 +7,7 @@ from types import MethodType, SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
+import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc.map._mapspec import MapSpec
@@ -116,6 +117,7 @@ class CacheStorage(MinimalStorage):
 class NoneExtentStorage(MinimalStorage):
     def __init__(self) -> None:
         super().__init__(shape=(1,), internal_shape=(1,), shape_mask=(True, False), irregular=True)
+        self._store[0] = np.ma.array([np.ma.masked])
 
     def _compute_irregular_extent(self, external_index: tuple[int, ...]) -> tuple[int, ...] | None:  # noqa: ARG002
         return None
@@ -130,6 +132,20 @@ class RecordingStorage(CacheStorage):
     def is_element_masked(self, key: tuple[int | slice, ...]) -> bool:
         self.received.append(key)
         return self._masked
+
+
+class UnresolvedStorage(MinimalStorage):
+    def __init__(self) -> None:
+        super().__init__(
+            shape=("?",),  # type: ignore[arg-type]
+            internal_shape=(1,),
+            shape_mask=(True, False),
+            irregular=True,
+        )
+        self._store[0] = np.ma.array([1])
+
+    def full_shape_is_resolved(self) -> bool:  # pragma: no cover - trivial
+        return False
 
 
 def test_storage_base_irregular_extent_defaults() -> None:
@@ -370,8 +386,8 @@ def test_skip_context_disabled_cases() -> None:
     assert not ctx_unknown.enabled
 
     storage_no_internal = MinimalStorage(shape=(1,), irregular=True)
-    ctx_no_internal = _IrregularSkipContext(func_single, {"x": storage_no_internal}, (5,), (True,))
-    assert not ctx_no_internal.enabled
+    with pytest.raises(AssertionError, match="internal shape"):
+        _IrregularSkipContext(func_single, {"x": storage_no_internal}, (5,), (True,))
 
     func_multi = cast(
         "PipeFunc",
@@ -402,6 +418,10 @@ def test_skip_context_disabled_cases() -> None:
     ctx_missing = _IrregularSkipContext(func_missing_key, {"x": storage_irregular}, (5,), (True,))
     assert ctx_missing.enabled
     assert not ctx_missing.should_skip(0)
+
+    unresolved_storage = UnresolvedStorage()
+    with pytest.raises(AssertionError, match="resolved storage shapes"):
+        _IrregularSkipContext(func_single, {"x": unresolved_storage}, (5,), (True,))
 
 
 def test_maybe_trim_irregular_slice_masked_scalar() -> None:

@@ -179,23 +179,17 @@ class StorageBase(abc.ABC):
         if not (self.irregular and self.internal_shape):
             return False
 
-        try:
-            normalized = normalize_key(
-                key,
-                self.resolved_shape,
-                self.resolved_internal_shape,
-                self.shape_mask,
-            )
-        except (AssertionError, IndexError):  # pragma: no cover - defensive
-            return False
+        normalized = normalize_key(
+            key,
+            self.resolved_shape,
+            self.resolved_internal_shape,
+            self.shape_mask,
+        )
 
         if any(isinstance(component, slice) for component in normalized):
             return False
 
-        try:
-            value = self[normalized]
-        except IndexError:
-            return True
+        value = self[normalized]
 
         return np.ma.is_masked(value)
 
