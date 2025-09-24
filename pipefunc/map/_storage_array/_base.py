@@ -231,15 +231,12 @@ class StorageBase(abc.ABC):
         if not self.irregular:
             return data
 
-        # Only process numpy arrays
         if not isinstance(data, np.ndarray):
             return data
 
-        # Check if data contains any masked sentinels
         mask = create_mask_for_masked_values(data)
 
         if np.any(mask):
-            # Contains masked values - return MaskedArray
             return np.ma.MaskedArray(data, mask=mask, dtype=object)
 
         return data
