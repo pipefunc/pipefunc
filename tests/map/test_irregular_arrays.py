@@ -655,3 +655,35 @@ def test_irregular_slice_retains_multidimensional_mask() -> None:
     assert all(isinstance(arr, np.ma.MaskedArray) for arr in captured)
     assert all(arr.shape == (4, 2) for arr in captured)
     assert list(results["shapes"].output) == [(4, 2), (4, 2), (4, 2)]
+
+
+def test_multi_irregular_axes_invoke_padded_elements() -> None:
+    calls: list[int] = []
+
+    @pipefunc(output_name="values", mapspec="n[i] -> values[i, j*, k*]")
+    def make_values(n: int) -> np.ma.MaskedArray:
+        data = np.ma.masked_all((4, 4), dtype=int)
+        for j in range(n):
+            for k in range(j + 1):
+                data[j, k] = (j + 1) * 100 + (k + 1)
+        return data
+
+    @pipefunc(output_name="recorded", mapspec="values[i, j*, k*] -> recorded[i, j*, k*]")
+    def record(values: int) -> int:
+        calls.append(int(values))
+        return values
+
+    inputs = {"n": [0, 2, 3]}
+    pipeline = Pipeline([make_values, record])
+    pipeline.map(
+        inputs=inputs,
+        internal_shapes={"values": (4, 4)},
+        storage="dict",
+        parallel=False,
+    )
+
+    expected_real = sum(n * (n + 1) // 2 for n in inputs["n"])
+    assert expected_real == 9  # safeguard for the scenario under test
+    assert len(calls) == 48  # 3 (i) * 4 (j capacity) * 4 (k capacity)
+    padded_calls = [value for value in calls if value == 0]
+    assert len(padded_calls) == len(calls) - expected_real
