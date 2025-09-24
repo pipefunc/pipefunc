@@ -890,11 +890,9 @@ class _IrregularSkipContext:
         if not self.enabled:
             return False
 
-        full_index = _shape_to_key(self.full_shape, index)
-        internal_index = tuple(x for x, m in zip(full_index, self.shape_mask) if not m)
         input_keys = self.mapspec.input_keys(
-            self.external_shape,
-            index % prod(self.external_shape or (1,)),
+            shape=self.external_shape,
+            linear_index=index % prod(self.external_shape or (1,)),
         )
         for storage, name, axis_index in self.probes:
             key = input_keys.get(name)
@@ -903,17 +901,7 @@ class _IrregularSkipContext:
             if axis_index >= len(key):
                 continue
             axis_entry = key[axis_index]
-            if isinstance(axis_entry, slice):
-                if axis_entry != slice(None):
-                    return False
-                if not internal_index:
-                    return False
-                key = tuple(
-                    internal_index[0] if i == axis_index else component
-                    for i, component in enumerate(key)
-                )
-            elif not isinstance(axis_entry, int):
-                return False
+            assert isinstance(axis_entry, int)
             if storage.is_element_masked(key):
                 return True
         return False
