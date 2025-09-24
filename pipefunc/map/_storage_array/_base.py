@@ -176,30 +176,28 @@ class StorageBase(abc.ABC):
         key: tuple[int | slice, ...],
     ) -> bool:
         """Return ``True`` if the element requested by ``key`` is masked."""
-        if not (self.irregular and self.internal_shape and len(self.internal_shape) == 1):
+        if not (self.irregular and self.internal_shape):
             return False
 
-        normalized = normalize_key(
-            key,
-            self.resolved_shape,
-            self.resolved_internal_shape,
-            self.shape_mask,
-        )
-
-        internal_components = tuple(x for x, m in zip(normalized, self.shape_mask) if not m)
-        external_components = tuple(x for x, m in zip(normalized, self.shape_mask) if m)
-
-        if any(isinstance(x, slice) for x in (*internal_components, *external_components)):
+        try:
+            normalized = normalize_key(
+                key,
+                self.resolved_shape,
+                self.resolved_internal_shape,
+                self.shape_mask,
+            )
+        except (AssertionError, IndexError):  # pragma: no cover - defensive
             return False
 
-        internal_index = tuple(x for x in internal_components if isinstance(x, int))
-        external_index = tuple(x for x in external_components if isinstance(x, int))
-
-        extent = self.irregular_extent(external_index)
-        if extent is None:
+        if any(isinstance(component, slice) for component in normalized):
             return False
 
-        return any(idx >= size for idx, size in zip(internal_index, extent))
+        try:
+            value = self[normalized]
+        except IndexError:
+            return True
+
+        return np.ma.is_masked(value)
 
     @property
     def size(self) -> int:

@@ -103,7 +103,7 @@ class DictArray(StorageBase):
                 if self.internal_shape:
                     internal_key = tuple(x for x, m in zip(index, self.shape_mask) if not m)
                     if external_key in self._dict:
-                        arr = np.asarray(self._dict[external_key])
+                        arr = np.ma.array(self._dict[external_key], copy=False)
                         value, _ = try_getitem(arr, internal_key, irregular=self.irregular)
                     else:
                         value = self._internal_mask()[internal_key]
@@ -130,7 +130,7 @@ class DictArray(StorageBase):
         else:
             return self._internal_mask()
         if internal_key:
-            arr = np.asarray(data)
+            arr = np.ma.array(data, copy=False)
             value, _ = try_getitem(
                 arr,
                 internal_key,  # type: ignore[arg-type]
@@ -167,7 +167,7 @@ class DictArray(StorageBase):
         data = _masked_empty(self.full_shape)
         mask = np.full(self.full_shape, fill_value=True, dtype=bool)
         for external_index, value in self._dict.items():
-            value_array = np.asarray(value)
+            value_array = np.ma.array(value, copy=False)
 
             if value_array.shape == self.resolved_internal_shape:
                 # Normal case - shapes match
@@ -182,11 +182,7 @@ class DictArray(StorageBase):
                 # Irregular case - shapes don't match
                 for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
-                    sel, masked = try_getitem(
-                        value_array,
-                        internal_index,
-                        irregular=self.irregular,
-                    )
+                    sel, masked = try_getitem(value_array, internal_index, irregular=self.irregular)
                     if not masked:
                         data[full_index] = sel
                         mask[full_index] = False

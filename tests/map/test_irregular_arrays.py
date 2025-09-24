@@ -657,7 +657,8 @@ def test_irregular_slice_retains_multidimensional_mask() -> None:
     assert list(results["shapes"].output) == [(4, 2), (4, 2), (4, 2)]
 
 
-def test_multi_irregular_axes_invoke_padded_elements() -> None:
+@pytest.mark.parametrize("storage", ["dict", "file_array"])
+def test_multi_irregular_axes_invoke_padded_elements(tmp_path: Path, storage: str) -> None:
     calls: list[int] = []
 
     @pipefunc(output_name="values", mapspec="n[i] -> values[i, j*, k*]")
@@ -675,15 +676,17 @@ def test_multi_irregular_axes_invoke_padded_elements() -> None:
 
     inputs = {"n": [0, 2, 3]}
     pipeline = Pipeline([make_values, record])
-    pipeline.map(
-        inputs=inputs,
-        internal_shapes={"values": (4, 4)},
-        storage="dict",
-        parallel=False,
-    )
+    map_kwargs: dict[str, Any] = {
+        "inputs": inputs,
+        "internal_shapes": {"values": (4, 4)},
+        "storage": storage,
+        "parallel": False,
+    }
+    if storage == "file_array":
+        map_kwargs["run_folder"] = tmp_path
+    pipeline.map(**map_kwargs)
 
     expected_real = sum(n * (n + 1) // 2 for n in inputs["n"])
     assert expected_real == 9  # safeguard for the scenario under test
-    assert len(calls) == 48  # 3 (i) * 4 (j capacity) * 4 (k capacity)
-    padded_calls = [value for value in calls if value == 0]
-    assert len(padded_calls) == len(calls) - expected_real
+    assert len(calls) == expected_real
+    assert all(value != 0 for value in calls)
