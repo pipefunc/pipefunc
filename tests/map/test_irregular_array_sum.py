@@ -6,12 +6,8 @@ from pipefunc import Pipeline, pipefunc
 from pipefunc.typing import Array
 
 
-def test_irregular_array_sum():
-    """Test that irregular arrays are properly handled when summing.
-
-    This test demonstrates the issue that when irregular arrays (with masked values)
-    are passed to functions that don't understand masked arrays, the behavior is incorrect.
-    """
+def test_irregular_array_sum_regression():
+    """Regression test ensuring ragged sums skip masked padding."""
 
     @pipefunc(output_name="x")
     def generate_ints(n: int) -> list[int]:
@@ -43,20 +39,14 @@ def test_irregular_array_sum():
         parallel=False,
     )
 
-    # Expected behavior:
     # For n=4: x=[0,1,2,3], y=[0,2,4,6], sum=12
-    # For n=3: x=[0,1,2], y=[0,2,4], sum=6
-
-    # Actual behavior:
-    # The y array is correctly masked: [[0,2,4,6], [0,2,4,masked]]
-    # But sum() doesn't know how to handle masked arrays, so:
-    # - sum([0,2,4,6]) = 12 (correct)
-    # - sum([0,2,4,masked]) fails and returns masked
+    # For n=3: x=[0,1,2], y=[0,2,4], sum=6 (padding trimmed before calling take_sum)
     sum_output = results["sum"].output
     assert len(sum_output) == 2
     assert sum_output[0] == 12
-    # The second value is masked because sum() can't handle the masked sentinel
-    assert np.ma.is_masked(sum_output[1])
+    assert sum_output[1] == 6
+    assert not np.ma.is_masked(sum_output[0])
+    assert not np.ma.is_masked(sum_output[1])
 
 
 def test_irregular_array_sum_with_proper_handling():
