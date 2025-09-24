@@ -5,7 +5,7 @@ from __future__ import annotations
 import abc
 import functools
 import itertools
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
@@ -189,7 +189,33 @@ class StorageBase(abc.ABC):
         if any(isinstance(component, slice) for component in normalized):
             return False
 
-        value = self[normalized]
+        if len(self.internal_shape) == 1:
+            # Fast path for the common 1-D irregular case: using the realised extent
+            # avoids normalising into a masked array for every probe.
+            internal_components = tuple(
+                component
+                for component, is_external in zip(normalized, self.shape_mask)
+                if not is_external
+            )
+            if internal_components:
+                internal_index = internal_components[0]
+                if isinstance(internal_index, int):
+                    external_index = cast(
+                        "tuple[int, ...]",
+                        tuple(
+                            component
+                            for component, is_external in zip(normalized, self.shape_mask)
+                            if is_external
+                        ),
+                    )
+                    extent = self.irregular_extent(external_index)
+                    if extent is not None:
+                        return internal_index >= extent[0]
+
+        try:
+            value = self[normalized]
+        except IndexError:
+            return True
 
         return np.ma.is_masked(value)
 

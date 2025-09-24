@@ -879,7 +879,12 @@ class _IrregularSkipContext:
             value = kwargs.get(spec.name)
             if not isinstance(value, StorageBase) or not value.irregular:
                 continue
-            assert value.resolved_internal_shape
+            if not value.internal_shape:
+                msg = "Irregular storage must declare an internal shape"
+                raise AssertionError(msg)
+            if not value.full_shape_is_resolved():
+                msg = "Irregular storage requires resolved storage shapes"
+                raise AssertionError(msg)
             self.probes.append((spec.name, value))
 
         self.enabled = bool(self.probes)
