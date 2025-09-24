@@ -574,13 +574,12 @@ def _maybe_trim_irregular_slice(
         or not source.irregular
     ):
         return value
-    key_tuple = key if isinstance(key, tuple) else (key,)
     if not any(
         isinstance(axis_key, slice)
         and axis_key.start is None
         and axis_key.stop is None
         and axis_key.step is None
-        for axis_key in key_tuple
+        for axis_key in at_least_tuple(key)
     ):
         return value
     if value.ndim == 1:
