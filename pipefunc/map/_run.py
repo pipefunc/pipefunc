@@ -568,11 +568,13 @@ def _maybe_trim_irregular_slice(
     key: tuple[int | slice, ...] | int | slice,
     value: Any,
 ) -> Any:
-    if not isinstance(source, StorageBase):
-        return value
-    if not isinstance(value, np.ma.MaskedArray):
-        return value
-    if not source.irregular or not source.internal_shape or len(source.internal_shape) != 1:
+    if (
+        not isinstance(value, np.ma.MaskedArray)
+        or not isinstance(source, StorageBase)
+        or not source.irregular
+        or not source.internal_shape
+        or len(source.internal_shape) != 1
+    ):
         return value
     key_tuple = key if isinstance(key, tuple) else (key,)
     internal_axis = source.shape_mask.index(False)
