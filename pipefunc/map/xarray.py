@@ -99,7 +99,7 @@ def _data_loader(
     return load_outputs(output_name, run_folder=run_folder)
 
 
-def _xarray(
+def _xarray(  # noqa: PLR0912
     output_name: str,
     mapspecs: list[MapSpec],
     inputs: dict[str, Any],
@@ -146,7 +146,13 @@ def _xarray(
     mask = None
     if np.ma.isMaskedArray(data):
         mask = np.ma.getmaskarray(data)
-        data = data.filled(np.nan)
+        if np.issubdtype(data.dtype, np.floating):
+            data = data.filled(np.nan)
+        else:
+            obj = np.empty(data.shape, dtype=object)
+            obj[~mask] = data.data[~mask]
+            obj[mask] = None
+            data = obj
     data = _maybe_to_array(data)
     data = _reshape_if_needed(data, output_name, axes_mapping)
 
@@ -263,7 +269,8 @@ def xarray_dataset_to_dataframe(ds: xr.Dataset) -> pd.DataFrame:
 
     df = working.to_dataframe().reset_index(drop=True)
     if mask_columns:
-        df = df[~df[mask_columns].all(axis=1)]
+        mask_all = df[mask_columns].all(axis=1)
+        df = df[~mask_all].reset_index(drop=True)
         df = df.drop(columns=mask_columns)
     # Identify if a column is a DimensionlessArray
     for col in df.columns:

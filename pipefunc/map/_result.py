@@ -93,12 +93,17 @@ class ResultDict(dict[str, Result]):
         for output_name, annotation in self._pipeline.output_annotations.items():
             if output_name not in self._pipeline.mapspec_names:
                 continue  # not an array
+
+            array = result[output_name].output
+            if np.ma.isMaskedArray(array):
+                continue  # keep irregular outputs as object arrays
+
             if _is_np_subdtype(annotation):
                 if not inplace:  # avoid modifying the original if inplace=False
                     result[output_name] = copy.deepcopy(result[output_name])
 
                 try:
-                    casted_array = result[output_name].output.astype(annotation)
+                    casted_array = array.astype(annotation)
                 except (TypeError, ValueError) as e:
                     warnings.warn(
                         f"Could not cast output '{output_name}' to {annotation}"
