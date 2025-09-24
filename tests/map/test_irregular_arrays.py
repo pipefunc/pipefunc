@@ -628,3 +628,30 @@ def test_regular_output_index_error_propagates():
 
     with pytest.raises(IndexError, match="intentional index error"):
         _set_output(arr, output, 0, shape, shape_mask, func)
+
+
+def test_irregular_slice_retains_multidimensional_mask() -> None:
+    captured: list[np.ma.MaskedArray] = []
+
+    @pipefunc(output_name="tensor", mapspec="count[i] -> tensor[i, j*, k]")
+    def make_tensor(count: int) -> list[list[float]]:
+        return [[float(row), float(row + 10)] for row in range(count)]
+
+    @pipefunc(output_name="shapes", mapspec="tensor[i, :, :] -> shapes[i]")
+    def collect(tensor: np.ndarray) -> tuple[int, ...]:
+        assert isinstance(tensor, np.ma.MaskedArray)
+        captured.append(tensor)
+        return tensor.shape
+
+    pipeline = Pipeline([make_tensor, collect])
+    results = pipeline.map(
+        inputs={"count": [0, 2, 3]},
+        internal_shapes={"tensor": (4, 2)},
+        storage="dict",
+        parallel=False,
+    )
+
+    assert [arr.ndim for arr in captured] == [2, 2, 2]
+    assert all(isinstance(arr, np.ma.MaskedArray) for arr in captured)
+    assert all(arr.shape == (4, 2) for arr in captured)
+    assert list(results["shapes"].output) == [(4, 2), (4, 2), (4, 2)]

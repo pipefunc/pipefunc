@@ -7,10 +7,16 @@ from types import MethodType, SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
+import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc.map._mapspec import MapSpec
-from pipefunc.map._run import _IrregularSkipContext, _MapSpecArgs, _output_from_mapspec_task
+from pipefunc.map._run import (
+    _IrregularSkipContext,
+    _MapSpecArgs,
+    _maybe_trim_irregular_slice,
+    _output_from_mapspec_task,
+)
 from pipefunc.map._storage_array._base import (
     StorageBase,
     infer_irregular_length,
@@ -276,7 +282,7 @@ def test_irregular_skip_context_variants(tmp_path: Path) -> None:
     def short_input_keys(
         self: MapSpec,
         shape: tuple[int, ...],
-        index: int,
+        linear_index: int,
     ) -> dict[str, tuple[int, ...]]:
         return {"x": (0,)}
 
@@ -296,7 +302,7 @@ def test_irregular_skip_context_variants(tmp_path: Path) -> None:
     def slice_input_keys(
         self: MapSpec,
         shape: tuple[int, ...],
-        index: int,
+        linear_index: int,
     ) -> dict[str, tuple[int | slice, ...]]:
         return {"x": (slice(None),)}
 
@@ -309,7 +315,8 @@ def test_irregular_skip_context_variants(tmp_path: Path) -> None:
         (True,),
     )
     assert ctx_slice.enabled
-    assert not ctx_slice.should_skip(0)
+    with pytest.raises(AssertionError):
+        ctx_slice.should_skip(0)
     assert slice_storage.received == []
 
 
@@ -365,7 +372,7 @@ def test_skip_context_disabled_cases() -> None:
     def missing_input_keys(
         self: MapSpec,
         shape: tuple[int, ...],
-        index: int,
+        linear_index: int,
     ) -> dict[str, tuple[int, ...]]:
         return {}
 
@@ -381,6 +388,42 @@ def test_skip_context_disabled_cases() -> None:
     ctx_missing = _IrregularSkipContext(func_missing_key, {"x": storage_irregular}, (5,), (True,))
     assert ctx_missing.enabled
     assert not ctx_missing.should_skip(0)
+
+
+def test_maybe_trim_irregular_slice_masked_scalar() -> None:
+    arr = DictArray(
+        folder=None,
+        shape=(1,),
+        internal_shape=(4,),
+        shape_mask=(True, False),
+        irregular=True,
+    )
+    arr._dict[(0,)] = [0]
+
+    masked_value = arr[(0, 3)]
+    assert np.ma.isMaskedArray(masked_value)
+    assert masked_value is np.ma.masked
+
+    result = _maybe_trim_irregular_slice(arr, (0, 3), masked_value)
+    assert result is np.ma.masked
+
+
+def test_maybe_trim_irregular_slice_multidimensional() -> None:
+    arr = DictArray(
+        folder=None,
+        shape=(1,),
+        internal_shape=(4,),
+        shape_mask=(True, False),
+        irregular=True,
+    )
+
+    masked_matrix = np.ma.array(
+        [[1, 2], [3, 4], [5, 6], [7, 8]],
+        mask=[[False, False], [False, False], [True, True], [True, True]],
+    )
+
+    result = _maybe_trim_irregular_slice(arr, (0, slice(None)), masked_matrix)
+    assert result is masked_matrix
 
 
 def test_register_storage_explicit_identifier() -> None:
