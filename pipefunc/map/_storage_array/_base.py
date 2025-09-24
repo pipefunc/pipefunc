@@ -205,11 +205,7 @@ class StorageBase(abc.ABC):
                     if extent is not None:
                         return internal_index >= extent[0]
 
-        try:
-            value = self[normalized]
-        except IndexError:
-            return True
-
+        value = self[normalized]
         return np.ma.is_masked(value)
 
     @property
