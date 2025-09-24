@@ -5,13 +5,17 @@ from __future__ import annotations
 import abc
 import functools
 import itertools
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from pipefunc._utils import create_mask_for_masked_values, prod
 from pipefunc.map._mapspec import shape_to_strides
-from pipefunc.map._shapes import shape_is_resolved
+from pipefunc.map._shapes import (
+    external_shape_from_mask,
+    internal_shape_from_mask,
+    shape_is_resolved,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -192,23 +196,12 @@ class StorageBase(abc.ABC):
         if len(self.internal_shape) == 1:
             # Fast path for the common 1-D irregular case: using the realised extent
             # avoids normalising into a masked array for every probe.
-            internal_components = tuple(
-                component
-                for component, is_external in zip(normalized, self.shape_mask)
-                if not is_external
-            )
+            internal_components = internal_shape_from_mask(normalized, self.shape_mask)
             if internal_components:
                 internal_index = internal_components[0]
                 if isinstance(internal_index, int):
-                    external_index = cast(
-                        "tuple[int, ...]",
-                        tuple(
-                            component
-                            for component, is_external in zip(normalized, self.shape_mask)
-                            if is_external
-                        ),
-                    )
-                    extent = self.irregular_extent(external_index)
+                    external_index = external_shape_from_mask(normalized, self.shape_mask)
+                    extent = self.irregular_extent(external_index)  # type: ignore[arg-type]
                     if extent is not None:
                         return internal_index >= extent[0]
 
