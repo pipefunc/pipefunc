@@ -906,6 +906,8 @@ class _IrregularSkipContext:
             if isinstance(axis_entry, slice):
                 if axis_entry != slice(None):
                     return False
+                if not internal_index:
+                    return False
                 key = tuple(
                     internal_index[0] if i == axis_index else component
                     for i, component in enumerate(key)
