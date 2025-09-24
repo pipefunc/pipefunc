@@ -59,6 +59,7 @@ class DictArray(StorageBase):
         if mapping is None:
             mapping = {}
         self._dict: dict[tuple[int, ...], Any] = mapping  # type: ignore[assignment]
+        self._irregular_extent_cache: dict[tuple[int, ...], tuple[int, ...] | None] = {}
         self.load()
 
     def __repr__(self) -> str:

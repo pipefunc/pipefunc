@@ -51,6 +51,7 @@ class MinimalStorage(StorageBase):
         self.shape_mask = tuple(shape_mask)
         self.irregular = irregular
         self._store: dict[int, Any] = {}
+        self._irregular_extent_cache: dict[tuple[int, ...], tuple[int, ...] | None] = {}
 
     def get_from_index(self, index: int) -> Any:
         return self._store[index]
@@ -164,7 +165,8 @@ def test_storage_base_irregular_extent_defaults() -> None:
     assert cache_storage.irregular_extent((0,)) == (1,)
     assert cache_storage.calls == 1
     assert cache_storage.irregular_extent((0,)) == (1,)
-    assert cache_storage.calls == 2
+    # Cached result avoids recomputing the extent
+    assert cache_storage.calls == 1
     assert not cache_storage.is_element_masked((0, 0))
 
 

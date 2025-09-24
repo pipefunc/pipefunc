@@ -65,6 +65,7 @@ class FileArray(StorageBase):
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
         self.irregular = irregular
+        self._irregular_extent_cache: dict[tuple[int, ...], tuple[int, ...] | None] = {}
 
     def __repr__(self) -> str:
         return (
