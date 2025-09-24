@@ -10,6 +10,7 @@ from pipefunc import Pipeline, pipefunc
 from pipefunc.map import load_outputs
 from pipefunc.map._run import _set_output
 from pipefunc.map._storage_array._base import StorageBase
+from pipefunc.map.xarray import xarray_dataset_from_results, xarray_dataset_to_dataframe
 from pipefunc.typing import Array
 
 
@@ -580,6 +581,32 @@ def test_irregular_file_storage_slice_reducer(tmp_path: Path) -> None:
 
     totals = results["totals"].output
     np.testing.assert_array_equal(totals, [0, 3, 0])
+
+
+def test_irregular_dataframe_drops_padding() -> None:
+    @pipefunc(output_name="words", mapspec="text[i] -> words[i, j*]")
+    def split_text(text: str) -> list[str]:
+        return text.split()
+
+    @pipefunc(output_name="lengths", mapspec="words[i, j*] -> lengths[i, j*]")
+    def word_lengths(words: str) -> int:
+        return len(words)
+
+    pipeline = Pipeline([split_text, word_lengths])
+    inputs = {"text": ["Hello world", "Python is great", "A"]}
+    results = pipeline.map(
+        inputs=inputs,
+        internal_shapes={"words": (3,), "lengths": (3,)},
+        storage="dict",
+        parallel=False,
+        show_progress=False,
+    )
+
+    ds = xarray_dataset_from_results(inputs, results, pipeline, load_intermediate=False)
+    df = xarray_dataset_to_dataframe(ds)
+    # Only six real entries should remain (2 + 3 + 1)
+    assert len(df) == 6
+    assert not df["lengths"].isna().any()
 
 
 def test_regular_output_index_error_propagates():
