@@ -209,6 +209,7 @@ class DictArray(StorageBase):
         >>> arr.dump((2, 1, 5), dict(a=1, b=2))
 
         """
+        self._clear_irregular_extent_cache()
         key = normalize_key(
             key,
             self.resolved_shape,

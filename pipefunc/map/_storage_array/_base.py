@@ -162,7 +162,15 @@ class StorageBase(abc.ABC):
         """Return the realised extent along irregular axes for ``external_index``."""
         if not self.irregular or not self.internal_shape:
             return None
-        return self._compute_irregular_extent(external_index)
+        cache = getattr(self, "_irregular_extent_cache", None)
+        if cache is None:
+            cache = {}
+            self._irregular_extent_cache = cache
+        if external_index in cache:
+            return cache[external_index]
+        extent = self._compute_irregular_extent(external_index)
+        cache[external_index] = extent
+        return extent
 
     def _compute_irregular_extent(
         self,
@@ -207,6 +215,11 @@ class StorageBase(abc.ABC):
 
         value = self[normalized]
         return np.ma.is_masked(value)
+
+    def _clear_irregular_extent_cache(self) -> None:
+        cache = getattr(self, "_irregular_extent_cache", None)
+        if cache is not None:
+            cache.clear()
 
     @property
     def size(self) -> int:

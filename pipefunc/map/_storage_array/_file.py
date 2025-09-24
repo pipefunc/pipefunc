@@ -275,6 +275,7 @@ class FileArray(StorageBase):
         >>> arr.dump((2, 1, 5), dict(a=1, b=2))
 
         """
+        self._clear_irregular_extent_cache()
         key = self._normalize_key(key, for_dump=True)
         if not any(isinstance(k, slice) for k in key):
             dump(value, self._key_to_file(key))  # type: ignore[arg-type]
