@@ -151,7 +151,7 @@ class FileArray(StorageBase):
                     sub_array = load(file)
                     internal_index = tuple(i for i, m in zip(index, self.shape_mask) if not m)
                     if internal_index:
-                        sub_array = np.asarray(sub_array)  # could be a list
+                        sub_array = np.ma.array(sub_array, copy=False)  # could be a list
                         sliced_value, masked = try_getitem(
                             sub_array,
                             internal_index,
@@ -187,7 +187,7 @@ class FileArray(StorageBase):
 
         sub_array = load(file)
         if internal_indices:
-            sub_array = np.asarray(sub_array)
+            sub_array = np.ma.array(sub_array, copy=False)
             value, _ = try_getitem(
                 sub_array,
                 internal_indices,  # type: ignore[arg-type]

@@ -7,7 +7,6 @@ from types import MethodType, SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
-import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc.map._mapspec import MapSpec
@@ -59,7 +58,22 @@ class MinimalStorage(StorageBase):
         return index in self._store
 
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any:  # pragma: no cover - not needed
-        raise NotImplementedError
+        if not isinstance(key, tuple):
+            key = (key,)
+        if len(key) == 0:
+            return np.ma.masked
+        external = int(key[0])  # type: ignore[arg-type]
+        value = self._store.get(external)
+        if value is None:
+            return np.ma.masked
+        if len(key) == 1:
+            return value
+        internal_key = tuple(int(k) for k in key[1:])  # type: ignore[arg-type]
+        array = np.ma.array(value, copy=False)
+        try:
+            return array[internal_key]
+        except IndexError:
+            return np.ma.masked
 
     def to_array(
         self,
@@ -92,6 +106,7 @@ class CacheStorage(MinimalStorage):
     def __init__(self) -> None:
         super().__init__(shape=(1,), internal_shape=(1,), shape_mask=(True, False), irregular=True)
         self.calls = 0
+        self._store[0] = np.ma.array([1])
 
     def _compute_irregular_extent(self, external_index: tuple[int, ...]) -> tuple[int, ...] | None:  # noqa: ARG002
         self.calls += 1
@@ -127,7 +142,7 @@ def test_storage_base_irregular_extent_defaults() -> None:
 
     none_extent = NoneExtentStorage()
     assert none_extent.irregular_extent((0,)) is None
-    assert not none_extent.is_element_masked((0, 0))
+    assert none_extent.is_element_masked((0, 0))
 
     cache_storage = CacheStorage()
     assert cache_storage.irregular_extent((0,)) == (1,)
@@ -315,8 +330,7 @@ def test_irregular_skip_context_variants(tmp_path: Path) -> None:
         (True,),
     )
     assert ctx_slice.enabled
-    with pytest.raises(AssertionError):
-        ctx_slice.should_skip(0)
+    assert not ctx_slice.should_skip(0)
     assert slice_storage.received == []
 
 
@@ -364,7 +378,7 @@ def test_skip_context_disabled_cases() -> None:
         SimpleNamespace(mapspec=MapSpec.from_string("x[i, j*] -> y[i, j*, k*]")),
     )
     ctx_multi = _IrregularSkipContext(func_multi, {"x": storage}, (5, 5), (True, True))
-    assert not ctx_multi.enabled
+    assert ctx_multi.enabled
 
     storage_irregular = MinimalStorage(shape=(1,), irregular=True)
     storage_irregular.internal_shape = (1,)

@@ -857,13 +857,11 @@ class _IrregularSkipContext:
             return
 
         irregular_axes = [axis for axis in mapspec.output_indices if axis.endswith("*")]
-        if len(irregular_axes) != 1:
-            # Multiple ragged axes require hierarchical metadata; fall back to
-            # the previous behaviour until we can represent those safely.
+        if not irregular_axes:
             self.enabled = False
             return
 
-        self.axis = irregular_axes[0]
+        self.irregular_axes = irregular_axes
         external_shape = external_shape_from_mask(shape, shape_mask)
         if not shape_is_resolved(external_shape):
             self.enabled = False
@@ -873,18 +871,21 @@ class _IrregularSkipContext:
         self.shape_mask = shape_mask
         self.full_shape = select_by_mask(shape_mask, external_shape, self.internal_shape)
         self.mapspec = mapspec
-        self.probes: list[tuple[StorageBase, str, int]] = []
+        self.probes: list[tuple[str, StorageBase]] = []
 
         for spec in mapspec.inputs:
-            if self.axis not in spec.axes:
+            if not any(axis in spec.axes for axis in self.irregular_axes):
                 continue
             value = kwargs.get(spec.name)
             if not isinstance(value, StorageBase) or not value.irregular:
                 continue
-            if not value.internal_shape or len(value.internal_shape) != 1:
-                continue
-            axis_index = spec.axes.index(self.axis)
-            self.probes.append((value, spec.name, axis_index))
+            if not value.internal_shape:
+                self.enabled = False
+                return
+            if not value.full_shape_is_resolved():  # TODO: should be an assert?
+                self.enabled = False
+                return
+            self.probes.append((spec.name, value))
 
         self.enabled = bool(self.probes)
 
@@ -896,17 +897,17 @@ class _IrregularSkipContext:
             shape=self.external_shape,
             linear_index=index % prod(self.external_shape or (1,)),
         )
-        for storage, name, axis_index in self.probes:
+        checked = False
+        for name, storage in self.probes:
             key = input_keys.get(name)
             if key is None:
                 continue
-            if axis_index >= len(key):
-                continue
-            axis_entry = key[axis_index]
-            assert isinstance(axis_entry, int)
-            if storage.is_element_masked(key):
-                return True
-        return False
+            if any(isinstance(component, slice) for component in key):
+                return False
+            if not storage.is_element_masked(key):
+                return False
+            checked = True
+        return checked
 
 
 def _existing_and_missing_indices(
