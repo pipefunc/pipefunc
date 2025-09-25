@@ -177,3 +177,86 @@ def test_irregular_pipeline_without_inputs(
 
     output = results["z"].output
     assert list(output) == [0, 6, 8, 6]  # Sums per ragged column
+
+
+@pytest.mark.parametrize("scheduling_strategy", ["generation", "eager"])
+def test_irregular_multi_axis_reductions(
+    scheduling_strategy: Literal["generation", "eager"],
+) -> None:
+    samples = 4
+    max_channels = samples  # longest channel list we will emit
+    max_times = samples + 1  # longest time list we will emit
+
+    @pipefunc(output_name="samples")
+    def sample_indices() -> list[int]:
+        return list(range(samples))
+
+    @pipefunc(output_name="channels", mapspec="samples[i] -> channels[i, j*]")
+    def build_channels(samples: int) -> list[int]:
+        return list(range(samples + 1))
+
+    @pipefunc(output_name="values", mapspec="channels[i, j*] -> values[i, j*, k*]")
+    def build_values(channels: int) -> list[int]:
+        return list(range(channels + 1))
+
+    @pipefunc(output_name="channel_sums", mapspec="values[i, j*, :] -> channel_sums[i, j*]")
+    def channel_sum(values: Array[int]) -> int:
+        arr = np.ma.masked_equal(np.array(values, dtype=object), None)
+        total = np.ma.sum(arr)
+        if np.ma.is_masked(total):
+            return np.ma.masked  # type: ignore[return-value]
+        return int(total)
+
+    @pipefunc(output_name="time_sums", mapspec="values[i, :, k*] -> time_sums[i, k*]")
+    def time_sum(values: Array[int]) -> int:
+        arr = np.ma.MaskedArray(values, copy=False)
+        total = np.ma.sum(arr)
+        if np.ma.is_masked(total):
+            return np.ma.masked  # type: ignore[return-value]
+        return int(total)
+
+    @pipefunc(output_name="sample_totals", mapspec="values[i, :, :] -> sample_totals[i]")
+    def sample_total(values: Array[int]) -> int:
+        arr = np.ma.MaskedArray(values, copy=False)
+        total = np.ma.sum(arr)
+        if np.ma.is_masked(total):
+            return np.ma.masked  # type: ignore[return-value]
+        return int(total)
+
+    pipeline = Pipeline(
+        [sample_indices, build_channels, build_values, channel_sum, time_sum, sample_total],
+    )
+
+    results = pipeline.map(
+        inputs={},
+        storage="dict",
+        internal_shapes={
+            "channels": (max_channels,),
+            "values": (max_channels, max_times),
+            "channel_sums": (max_channels,),
+            "time_sums": (max_times,),
+        },
+        cleanup=True,
+        parallel=False,
+        scheduling_strategy=scheduling_strategy,
+    )
+
+    for sample_index in range(samples):
+        expected_channel_sums = [c * (c + 1) // 2 for c in range(sample_index + 1)]
+        masked_channels = results["channel_sums"].output[sample_index]
+        assert masked_channels.count() == len(expected_channel_sums)
+        assert list(masked_channels.compressed()) == expected_channel_sums
+
+        longest = sample_index + 1
+        expected_time_sums = [k * (sample_index - k + 1) for k in range(longest)]
+        masked_times = results["time_sums"].output[sample_index]
+        assert masked_times.count() == longest
+        assert list(masked_times.compressed()) == expected_time_sums
+
+        expected_sample_total = sum(expected_channel_sums)
+        assert results["sample_totals"].output[sample_index] == expected_sample_total
+
+    total_expected = sum(
+        sum(range(channel + 1)) for sample in range(samples) for channel in range(sample + 1)
+    )
+    assert sum(results["sample_totals"].output) == total_expected
