@@ -114,7 +114,10 @@ Functions that receive irregular data (declared with a `*` in their mapspec) beh
 
 - Element-wise maps (`values[i, j*] -> …`) still receive scalar elements and never see padded sentinels—the scheduler skips masked coordinates entirely.
 - Reducers that take the full span of a single irregular axis (`values[i, :] -> …`) now receive a 1‑D NumPy array where the masked tail has already been trimmed.
+- Column-wise reducers (`values[:, j*] -> …`) get the entire irregular column as a list-of-lists. Each list is already trimmed to its realised extent, so you decide how to align or pad when aggregating.
 - Higher-dimensional slices continue to arrive as `numpy.ma.MaskedArray` objects so you can preserve structure.
+
+Put another way: although the storages keep padded `np.ma.masked` sentinels internally, the values handed to your `pipefunc` implementations are already trimmed when the mapspec declares an irregular axis.
 
 Typing with `pipefunc.typing.Array` helps document the expectation but does not change the runtime behaviour.
 
@@ -141,6 +144,46 @@ results2 = pipeline2.map(
 
 print("Word counts:", results2["sentence_length"].output)
 print("Total characters:", results2["total_chars"].output)
+```
+
+Irregular data can also be generated entirely inside the pipeline. The first stage below has no inputs—it returns an object array of lists, and downstream stages operate on the trimmed values they receive:
+
+```{code-cell} ipython3
+arr = np.empty(5, dtype=object)
+arr[0] = [0, 1]
+arr[1] = [0, 1, 2]
+arr[2] = [0]
+arr[3] = [0, 1, 2, 3]
+arr[4] = []
+
+@pipefunc(output_name="x")
+def produce() -> np.ndarray:
+    return arr
+
+@pipefunc(output_name="y", mapspec="x[i] -> y[i, j*]")
+def double(row: list[int]) -> list[int]:
+    return [value * 2 for value in row]
+
+@pipefunc(output_name="row_totals", mapspec="y[i, j*] -> row_totals[i]")
+def row_totals(row: list[int]) -> int:
+    return sum(row)
+
+@pipefunc(output_name="column_totals", mapspec="y[:, j*] -> column_totals[j*]")
+def column_totals(values: list[list[int]]) -> list[int]:
+    longest = max(len(v) for v in values)
+    return [sum(v[j] if j < len(v) else 0 for v in values) for j in range(longest)]
+
+pipeline_generated = Pipeline([produce, double, row_totals, column_totals])
+
+results_generated = pipeline_generated.map(
+    inputs={},
+    internal_shapes={"x": (5,), "y": (4,), "column_totals": (4,)},
+    storage="dict",
+    parallel=False,
+)
+
+print("Row totals:", results_generated["row_totals"].output)
+print("Column totals:", results_generated["column_totals"].output)
 ```
 
 ## Generating Irregular Output
