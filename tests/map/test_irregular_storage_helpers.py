@@ -4,7 +4,7 @@ import math
 import multiprocessing
 from functools import partial
 from types import MethodType, SimpleNamespace
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 import pytest
@@ -253,7 +253,11 @@ def test_filearray_irregular_extent_and_mask_operations(tmp_path: Path) -> None:
     assert arr_no_internal.irregular_extent((0,)) is None
 
 
-def test_irregular_skip_context_variants(tmp_path: Path) -> None:
+@pytest.mark.parametrize("scheduling_strategy", ["generation", "eager"])
+def test_irregular_skip_context_variants(
+    tmp_path: Path,
+    scheduling_strategy: Literal["generation", "eager"],
+) -> None:
     @pipefunc(output_name="x", mapspec="n[i] -> x[i, j*]")
     def generate_values(n: int) -> list[int]:
         return list(range(n))
@@ -269,6 +273,7 @@ def test_irregular_skip_context_variants(tmp_path: Path) -> None:
         run_folder=tmp_path,
         parallel=False,
         storage="dict",
+        scheduling_strategy=scheduling_strategy,
     )
 
     x_store = results["x"].store

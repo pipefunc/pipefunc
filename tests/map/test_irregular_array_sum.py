@@ -1,12 +1,18 @@
 """Test for irregular array handling with sum operation."""
 
+from typing import Literal
+
 import numpy as np
+import pytest
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.typing import Array
 
 
-def test_irregular_array_sum_regression():
+@pytest.mark.parametrize("scheduling_strategy", ["generation", "eager"])
+def test_irregular_array_sum_regression(
+    scheduling_strategy: Literal["generation", "eager"],
+) -> None:
     """Regression test ensuring ragged sums skip masked padding."""
 
     @pipefunc(output_name="x")
@@ -37,6 +43,7 @@ def test_irregular_array_sum_regression():
         internal_shapes={"x": ("?",)},
         cleanup=True,
         parallel=False,
+        scheduling_strategy=scheduling_strategy,
     )
 
     # For n=4: x=[0,1,2,3], y=[0,2,4,6], sum=12
@@ -49,7 +56,10 @@ def test_irregular_array_sum_regression():
     assert not np.ma.is_masked(sum_output[1])
 
 
-def test_irregular_array_sum_with_proper_handling():
+@pytest.mark.parametrize("scheduling_strategy", ["generation", "eager"])
+def test_irregular_array_sum_with_proper_handling(
+    scheduling_strategy: Literal["generation", "eager"],
+) -> None:
     """Test the correct way to handle irregular arrays when summing."""
 
     @pipefunc(output_name="x")
@@ -79,6 +89,7 @@ def test_irregular_array_sum_with_proper_handling():
         internal_shapes={"x": ("?",)},
         cleanup=True,
         parallel=False,
+        scheduling_strategy=scheduling_strategy,
     )
 
     sum_output = results["sum"].output
@@ -87,7 +98,10 @@ def test_irregular_array_sum_with_proper_handling():
     assert sum_output[1] == 6  # Now correctly sums [0,2,4] = 6
 
 
-def test_irregular_array_mask_is_set_correctly():
+@pytest.mark.parametrize("scheduling_strategy", ["generation", "eager"])
+def test_irregular_array_mask_is_set_correctly(
+    scheduling_strategy: Literal["generation", "eager"],
+) -> None:
     """Test that the mask is properly set for irregular arrays."""
 
     @pipefunc(output_name="x")
@@ -109,6 +123,7 @@ def test_irregular_array_mask_is_set_correctly():
         internal_shapes={"x": ("?",)},
         cleanup=True,
         parallel=False,
+        scheduling_strategy=scheduling_strategy,
     )
 
     y_output = results["y"].output
@@ -117,10 +132,48 @@ def test_irregular_array_mask_is_set_correctly():
     assert y_output.shape == (4, 2)
 
     # Check the first column (n=4): should have no masked values
-    assert not np.any(y_output.mask[:, 0])
+    assert not np.any(y_output.mask[:, 0])  # type: ignore[index]
     assert list(y_output[:, 0]) == [0, 2, 4, 6]
 
     # Check the second column (n=3): should have last element masked
-    assert y_output.mask[3, 1]
+    assert y_output.mask[3, 1]  # type: ignore[index]
     # compressed() correctly removes masked values
     assert list(y_output[:, 1].compressed()) == [0, 2, 4]
+
+
+@pytest.mark.parametrize("scheduling_strategy", ["generation", "eager"])
+def test_irregular_pipeline_without_inputs(
+    scheduling_strategy: Literal["generation", "eager"],
+) -> None:
+    arr = np.empty(5, dtype=object)
+    arr[0] = [0, 1]
+    arr[1] = [0, 1, 2]
+    arr[2] = [0]
+    arr[3] = [0, 1, 2, 3]
+    arr[4] = []
+
+    @pipefunc(output_name="x")
+    def produce() -> np.ndarray:
+        return arr
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i, j*]")
+    def expand(x: Array[int]) -> list[int]:
+        return [value * 2 for value in x]
+
+    @pipefunc(output_name="z", mapspec="y[:, j*] -> z[j*]")
+    def sums(y: Array[int]) -> int:
+        return sum(y)
+
+    pipeline = Pipeline([produce, expand, sums])
+
+    results = pipeline.map(
+        {},
+        storage="dict",
+        internal_shapes={"x": (5,), "y": (4,), "z": (4,)},
+        cleanup=True,
+        parallel=False,
+        scheduling_strategy=scheduling_strategy,
+    )
+
+    output = results["z"].output
+    assert list(output) == [0, 6, 8, 6]  # Sums per ragged column

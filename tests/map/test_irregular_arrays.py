@@ -452,7 +452,7 @@ def test_empty_irregular_arrays():
     assert not any(data_mask[3, :])  # Fourth row not masked
 
 
-def test_irregular_masks_skip_function_calls():
+def test_irregular_masks_skip_function_calls() -> None:
     """Element-wise maps should not execute for padded masked entries."""
 
     call_order: list[Any] = []
