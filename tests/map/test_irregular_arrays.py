@@ -7,11 +7,13 @@ import numpy as np
 import pytest
 
 from pipefunc import Pipeline, pipefunc
+from pipefunc._utils import is_installed
 from pipefunc.map import load_outputs
 from pipefunc.map._run import _set_output
 from pipefunc.map._storage_array._base import StorageBase
-from pipefunc.map.xarray import xarray_dataset_from_results, xarray_dataset_to_dataframe
 from pipefunc.typing import Array
+
+has_xarray = is_installed("xarray")
 
 
 def test_basic_irregular_dimension():
@@ -601,12 +603,14 @@ def test_irregular_dataframe_drops_padding() -> None:
         parallel=False,
         show_progress=False,
     )
+    if has_xarray:
+        from pipefunc.map.xarray import xarray_dataset_from_results, xarray_dataset_to_dataframe
 
-    ds = xarray_dataset_from_results(inputs, results, pipeline, load_intermediate=False)
-    df = xarray_dataset_to_dataframe(ds)
-    # Only six real entries should remain (2 + 3 + 1)
-    assert len(df) == 6
-    assert not df["lengths"].isna().any()
+        ds = xarray_dataset_from_results(inputs, results, pipeline, load_intermediate=False)
+        df = xarray_dataset_to_dataframe(ds)
+        # Only six real entries should remain (2 + 3 + 1)
+        assert len(df) == 6
+        assert not df["lengths"].isna().any()
 
 
 def test_regular_output_index_error_propagates():
