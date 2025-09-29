@@ -135,6 +135,17 @@ class RecordingStorage(CacheStorage):
         return self._masked
 
 
+class ZeroExtentStorage(MinimalStorage):
+    def __init__(self) -> None:
+        super().__init__(shape=(1,), internal_shape=(5,), shape_mask=(True, False), irregular=True)
+        self.calls = 0
+        self._store[0] = np.ma.masked_all(5, dtype=int)
+
+    def _compute_irregular_extent(self, external_index: tuple[int, ...]) -> tuple[int, ...] | None:  # noqa: ARG002
+        self.calls += 1
+        return (0,)
+
+
 class UnresolvedStorage(MinimalStorage):
     def __init__(self) -> None:
         super().__init__(
@@ -168,6 +179,16 @@ def test_storage_base_irregular_extent_defaults() -> None:
     # Cached result avoids recomputing the extent
     assert cache_storage.calls == 1
     assert not cache_storage.is_element_masked((0, 0))
+
+
+def test_is_slice_masked_fast_path_uses_extent() -> None:
+    storage = ZeroExtentStorage()
+    assert storage.is_element_masked((0, slice(None)))
+    assert storage.calls == 1
+
+    cache = CacheStorage()
+    assert not cache.is_element_masked((0, slice(None)))
+    assert cache.calls == 1
 
 
 def test_infer_length_variants() -> None:
@@ -354,7 +375,7 @@ def test_irregular_skip_context_variants(
     )
     assert ctx_slice.enabled
     assert not ctx_slice.should_skip(0)
-    assert slice_storage.received == []
+    assert slice_storage.received == [(slice(None),)]
 
 
 def test_dictarray_is_element_masked_guards() -> None:
@@ -368,7 +389,7 @@ def test_dictarray_is_element_masked_guards() -> None:
         shape_mask=(True, False),
         irregular=True,
     )
-    assert not arr_irregular.is_element_masked((0, slice(None)))
+    assert arr_irregular.is_element_masked((0, slice(None)))
 
 
 def test_filearray_is_element_masked_guards(tmp_path: Path) -> None:
@@ -382,7 +403,7 @@ def test_filearray_is_element_masked_guards(tmp_path: Path) -> None:
         shape_mask=(True, False),
         irregular=True,
     )
-    assert not arr_irregular.is_element_masked((0, slice(None)))
+    assert arr_irregular.is_element_masked((0, slice(None)))
 
 
 def test_skip_context_disabled_cases() -> None:

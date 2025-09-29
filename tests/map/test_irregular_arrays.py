@@ -694,3 +694,23 @@ def test_multi_irregular_axes_invoke_padded_elements(tmp_path: Path, storage: st
     assert expected_real == 9  # safeguard for the scenario under test
     assert len(calls) == expected_real
     assert all(value != 0 for value in calls)
+
+
+@pytest.mark.xfail(
+    reason="Nested Python lists for multi-axis irregular outputs currently raise",
+    strict=True,
+)
+def test_multi_axis_irregular_python_lists(tmp_path: Path) -> None:
+    @pipefunc(output_name="values", mapspec="n[i] -> values[i, j*, k*]")
+    def make_values(n: int) -> list[list[int]]:
+        return [[10 * j + k for k in range(j + 1)] for j in range(n)]
+
+    pipeline = Pipeline([make_values])
+
+    pipeline.map(
+        {"n": [3]},
+        internal_shapes={"values": (4, 4)},
+        storage="dict",
+        parallel=False,
+        run_folder=tmp_path,
+    )

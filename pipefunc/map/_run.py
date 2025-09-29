@@ -898,8 +898,6 @@ class _IrregularSkipContext:
             key = input_keys.get(name)
             if key is None:
                 continue
-            if any(isinstance(component, slice) for component in key):
-                return False
             if not storage.is_element_masked(key):
                 return False
             checked = True

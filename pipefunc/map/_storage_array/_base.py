@@ -26,6 +26,8 @@ if TYPE_CHECKING:
 
 storage_registry = {}
 
+_NONE_SLICE = slice(None)
+
 
 def try_getitem(
     array: np.ndarray,
@@ -199,7 +201,7 @@ class StorageBase(abc.ABC):
         )
 
         if any(isinstance(component, slice) for component in normalized):
-            return False
+            return self._is_slice_masked(normalized)
 
         if len(self.internal_shape) == 1:
             # Fast path for the common 1-D irregular case: using the realised extent
@@ -215,6 +217,72 @@ class StorageBase(abc.ABC):
 
         value = self[normalized]
         return np.ma.is_masked(value)
+
+    def _is_slice_masked(self, key: tuple[int | slice, ...]) -> bool:
+        """Return ``True`` when all elements referenced by ``key`` are masked."""
+        assert self.irregular, "_is_slice_masked is only valid for irregular storage"
+
+        extent_result = self._irregular_slice_extent_mask(key)
+        if extent_result is not None:
+            return extent_result
+        return self._iter_slice_mask(key)
+
+    def _irregular_slice_extent_mask(self, key: tuple[int | slice, ...]) -> bool | None:
+        """Return ``True``/``False`` using extent metadata where possible."""
+        full_internal_slice = True
+        external_index_components: list[int] = []
+        has_internal_slice = False
+
+        for component, mask in zip(key, self.shape_mask, strict=True):
+            if mask:
+                if isinstance(component, slice):
+                    full_internal_slice = False
+                    break
+                external_index_components.append(component)
+            elif isinstance(component, slice):
+                if component != _NONE_SLICE:
+                    full_internal_slice = False
+                    break
+                has_internal_slice = True
+            else:
+                full_internal_slice = False
+                break
+
+        if full_internal_slice and has_internal_slice and external_index_components:
+            extent = self.irregular_extent(tuple(external_index_components))
+            if extent is not None:
+                return all(length == 0 for length in extent)
+        return None
+
+    def _iter_slice_mask(self, key: tuple[int | slice, ...]) -> bool:
+        """Fallback that iterates through referenced coordinates."""
+        iterables: list[tuple[int, ...]] = []
+        shape_index = 0
+        internal_index = 0
+
+        for component, mask in zip(key, self.shape_mask, strict=True):
+            if mask:
+                axis_size = self.resolved_shape[shape_index]
+                shape_index += 1
+            else:
+                axis_size = self.resolved_internal_shape[internal_index]
+                internal_index += 1
+
+            if isinstance(component, slice):
+                rng = range(*component.indices(axis_size))
+                iterables.append(tuple(rng))
+            else:
+                iterables.append((component,))
+
+        for coords in itertools.product(*iterables):
+            try:
+                value = self[coords]
+            except IndexError:
+                # Treat missing entries as masked.
+                continue
+            if not np.ma.is_masked(value):
+                return False
+        return True
 
     def _clear_irregular_extent_cache(self) -> None:
         cache = getattr(self, "_irregular_extent_cache", None)
