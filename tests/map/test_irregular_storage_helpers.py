@@ -191,6 +191,40 @@ def test_is_slice_masked_fast_path_uses_extent() -> None:
     assert cache.calls == 1
 
 
+def test_irregular_extent_initializes_cache() -> None:
+    storage = CacheStorage()
+    del storage._irregular_extent_cache
+    assert storage.irregular_extent((0,)) == (1,)
+    assert hasattr(storage, "_irregular_extent_cache")
+
+
+def test_irregular_slice_extent_rejects_partial_slice() -> None:
+    storage = CacheStorage()
+    result = storage._irregular_slice_extent_mask((0, slice(0, 1)))
+    assert result is None
+
+
+def test_irregular_slice_extent_external_slice_sets_flag() -> None:
+    storage = CacheStorage()
+    result = storage._irregular_slice_extent_mask((slice(None), 0))
+    assert result is None
+
+
+class IndexErrorStorage(MinimalStorage):
+    def __init__(self) -> None:
+        super().__init__(shape=(1,), internal_shape=(3,), shape_mask=(True, False), irregular=True)
+        self._store[0] = np.zeros(3)
+
+    def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
+        msg = "simulated"
+        raise IndexError(msg)
+
+
+def test_iter_slice_mask_handles_index_error() -> None:
+    storage = IndexErrorStorage()
+    assert storage._iter_slice_mask((0, slice(None)))
+
+
 def test_infer_length_variants() -> None:
     masked_constant = np.ma.masked
     masked_scalar = np.ma.array(1, mask=True)

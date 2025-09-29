@@ -1,19 +1,24 @@
 """Tests for irregular/jagged arrays support."""
 
 from pathlib import Path
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, cast
 
 import numpy as np
 import pytest
 
-from pipefunc import Pipeline, pipefunc
+from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import is_installed
 from pipefunc.map import load_outputs
-from pipefunc.map._run import _set_output
+from pipefunc.map._run import _coerce_irregular_output, _set_output
 from pipefunc.map._storage_array._base import StorageBase
 from pipefunc.typing import Array
 
 has_xarray = is_installed("xarray")
+
+
+def _dummy_pipefunc() -> PipeFunc[Any]:
+    return cast("PipeFunc[Any]", SimpleNamespace(__name__="dummy", output_name="out"))
 
 
 def test_basic_irregular_dimension():
@@ -322,7 +327,7 @@ def test_irregular_dimension_errors():
 
     # Without internal_shape, the first result fixes the capacity. Larger
     # subsequent outputs must now raise instead of being truncated.
-    with pytest.raises(ValueError, match="exceeds the configured internal shape"):
+    with pytest.raises(ValueError, match="exceeds internal_shape at axis"):
         pipeline.map(
             inputs={"n": [2, 3]},
             parallel=False,
@@ -337,7 +342,7 @@ def test_irregular_dimension_errors():
     pipeline2 = Pipeline([make_too_much_data])
 
     # This should work but data will be truncated
-    with pytest.raises(ValueError, match="exceeds the configured internal shape"):
+    with pytest.raises(ValueError, match="exceeds internal_shape at axis"):
         pipeline2.map(
             inputs={"n": [2, 3]},
             internal_shapes={"data2": (3,)},  # Max 3, but n=3 will produce 6 elements
@@ -696,21 +701,131 @@ def test_multi_irregular_axes_invoke_padded_elements(tmp_path: Path, storage: st
     assert all(value != 0 for value in calls)
 
 
-@pytest.mark.xfail(
-    reason="Nested Python lists for multi-axis irregular outputs currently raise",
-    strict=True,
-)
 def test_multi_axis_irregular_python_lists(tmp_path: Path) -> None:
+    """Test that raw nested Python lists are normalized correctly."""
+
     @pipefunc(output_name="values", mapspec="n[i] -> values[i, j*, k*]")
     def make_values(n: int) -> list[list[int]]:
+        # Return raw nested Python lists (not wrapped in np.array)
         return [[10 * j + k for k in range(j + 1)] for j in range(n)]
 
     pipeline = Pipeline([make_values])
 
-    pipeline.map(
+    result = pipeline.map(
         {"n": [3]},
         internal_shapes={"values": (4, 4)},
         storage="dict",
         parallel=False,
         run_folder=tmp_path,
     )
+    arr = result["values"].output
+    assert isinstance(arr, np.ma.MaskedArray)
+    assert arr.shape == (1, 4, 4)
+    assert arr[0, 0, 0] == 0
+    assert arr[0, 1, 1] == 11
+    assert arr[0, 2, 2] == 22
+    assert arr[0, 3].mask.all()
+
+
+def test_multi_axis_irregular_object_arrays(tmp_path: Path) -> None:
+    """Test that object-dtype arrays with ragged structure are normalized correctly."""
+
+    @pipefunc(output_name="values", mapspec="n[i] -> values[i, j*, k*]")
+    def make_values(n: int) -> np.ndarray:
+        # Return np.array with dtype=object containing ragged structure
+        return np.array([[10 * j + k for k in range(j + 1)] for j in range(n)], dtype=object)
+
+    pipeline = Pipeline([make_values])
+
+    result = pipeline.map(
+        {"n": [3]},
+        internal_shapes={"values": (4, 4)},
+        storage="dict",
+        parallel=False,
+        run_folder=tmp_path,
+    )
+    arr = result["values"].output
+    assert isinstance(arr, np.ma.MaskedArray)
+    assert arr.shape == (1, 4, 4)
+    assert arr[0, 0, 0] == 0
+    assert arr[0, 1, 1] == 11
+    assert arr[0, 2, 2] == 22
+    assert arr[0, 3].mask.all()
+
+
+def test_irregular_with_masked_sentinels() -> None:
+    """Test that masked sentinels in irregular data are preserved."""
+
+    @pipefunc(output_name="data", mapspec="n[i] -> data[i, j*]")
+    def make_data_with_masked(n: int) -> list:
+        # Return lists with masked sentinels
+        if n == 0:
+            return [np.ma.masked]
+        if n == 1:
+            return [np.ma.masked, 1]
+        return [0, 1, np.ma.masked]
+
+    pipeline = Pipeline([make_data_with_masked])
+
+    result = pipeline.map(
+        {"n": [0, 1, 2]},
+        internal_shapes={"data": (3,)},
+        storage="dict",
+        parallel=False,
+    )
+    arr = result["data"].output
+    assert isinstance(arr, np.ma.MaskedArray)
+    assert arr.shape == (3, 3)
+    mask = np.ma.getmaskarray(arr)
+
+    # First row: [masked, masked, masked] (n=0 returns [np.ma.masked])
+    assert mask[0, 0]  # First element is masked
+    assert mask[0, 1]  # Padding is masked
+    assert mask[0, 2]  # Padding is masked
+
+    # Second row: [masked, 1, masked] (n=1 returns [np.ma.masked, 1])
+    assert mask[1, 0]  # First element is masked
+    assert arr[1, 1] == 1  # Second element is 1
+    assert not mask[1, 1]  # Second element is not masked
+    assert mask[1, 2]  # Padding is masked
+
+    # Third row: [0, 1, masked] (n=2 returns [0, 1, np.ma.masked])
+    assert arr[2, 0] == 0
+    assert not mask[2, 0]
+    assert arr[2, 1] == 1
+    assert not mask[2, 1]
+    assert mask[2, 2]  # Third element is masked sentinel
+
+
+def test_coerce_irregular_requires_internal_shape() -> None:
+    with pytest.raises(ValueError, match="requires a non-empty internal_shape"):
+        _coerce_irregular_output([[1]], (), func=_dummy_pipefunc())
+
+
+def test_coerce_irregular_numpy_scalar() -> None:
+    result = _coerce_irregular_output([np.array(5)], (1,), func=_dummy_pipefunc())
+    assert isinstance(result, np.ma.MaskedArray)
+    assert result.shape == (1,)
+    assert result[0] == 5
+
+
+def test_coerce_irregular_exceeds_internal_shape() -> None:
+    with pytest.raises(ValueError, match="exceeds internal_shape at axis 1"):
+        _coerce_irregular_output([[0, [1, 2]]], (2, 1), func=_dummy_pipefunc())
+
+
+def test_coerce_irregular_masked_array_branch() -> None:
+    masked_row = np.ma.array([1, np.ma.masked, 3], dtype=object)
+    result = _coerce_irregular_output([masked_row], (1, 3), func=_dummy_pipefunc())
+    assert isinstance(result, np.ma.MaskedArray)
+    mask = np.ma.getmaskarray(result)
+    assert result[0, 0] == 1
+    assert result[0, 2] == 3
+    assert mask[0, 1]
+
+
+def test_coerce_irregular_exceeds_at_first_axis() -> None:
+    """Test that exceeding internal_shape at axis 0 raises clear error."""
+    with pytest.raises(ValueError, match="exceeds internal_shape at axis 0"):
+        # Two elements at root level, but internal_shape[0] = 1
+        _coerce_irregular_output([1, 2], (1, 2), func=_dummy_pipefunc())

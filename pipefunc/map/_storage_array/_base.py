@@ -239,14 +239,12 @@ class StorageBase(abc.ABC):
                     full_internal_slice = False
                     break
                 external_index_components.append(component)
-            elif isinstance(component, slice):
+            else:
+                assert isinstance(component, slice)
                 if component != _NONE_SLICE:
                     full_internal_slice = False
                     break
                 has_internal_slice = True
-            else:
-                full_internal_slice = False
-                break
 
         if full_internal_slice and has_internal_slice and external_index_components:
             extent = self.irregular_extent(tuple(external_index_components))

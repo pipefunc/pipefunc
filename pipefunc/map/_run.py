@@ -678,6 +678,87 @@ def _try_shape(x: Any) -> tuple[int, ...]:
         return ()
 
 
+def _coerce_irregular_output(
+    value: Any,
+    internal_shape: tuple[int, ...],
+    *,
+    func: PipeFunc,
+) -> np.ma.MaskedArray:
+    """Coerce ragged nested structures into a masked array with ``internal_shape``.
+
+    Creates a fully-masked result array, then recursively walks the input structure,
+    validating lengths and filling values. Preserves ``np.ma.masked`` sentinels.
+    """
+    if len(internal_shape) == 0:
+        msg = (
+            f"Irregular output of function '{func.__name__}' (output '{func.output_name}') "
+            "requires a non-empty internal_shape."
+        )
+        raise ValueError(msg)
+
+    result = np.ma.masked_all(internal_shape, dtype=object)
+    data = result.data
+    mask = result.mask
+
+    def fill_sequence(seq: list[Any], prefix: tuple[int, ...], axis: int) -> None:
+        """Validate sequence length and recursively fill each element."""
+        expected = internal_shape[axis]
+        if len(seq) > expected:
+            raise ValueError(_irregular_exceeds_msg(func, axis, len(seq), expected))
+        for index, item in enumerate(seq):
+            fill(item, (*prefix, index))
+
+    def fill(src: Any, prefix: tuple[int, ...]) -> None:
+        """Recursively fill from nested structure (src) into result array."""
+        axis = len(prefix)
+
+        # Leaf position: store scalar and unmask
+        if axis == len(internal_shape):
+            if not np.ma.is_masked(src):
+                data[prefix] = src
+                mask[prefix] = False
+            return
+
+        if isinstance(src, np.ma.MaskedArray):
+            if src.ndim == 0:
+                if not np.ma.is_masked(src):
+                    fill(src.item(), prefix)
+                return
+            # Use indexing to preserve masked sentinels (list() would convert them)
+            fill_sequence([src[index] for index in range(src.shape[0])], prefix, axis)
+            return
+
+        if isinstance(src, np.ndarray):
+            if src.ndim == 0:
+                fill(src.item(), prefix)
+                return
+            fill_sequence(list(src), prefix, axis)
+            return
+
+        if isinstance(src, (list, tuple)):
+            fill_sequence(list(src), prefix, axis)
+            return
+
+        # Fallback: treat other types (e.g., bare scalars) as single-element sequences
+        if not np.ma.is_masked(src):
+            fill_sequence([src], prefix, axis)
+
+    fill(value, ())
+    return result
+
+
+def _irregular_exceeds_msg(
+    func: PipeFunc,
+    axis: int,
+    actual: int,
+    expected: int,
+) -> str:
+    return (
+        f"Irregular output of function '{func.__name__}' (output '{func.output_name}') "
+        f"exceeds internal_shape at axis {axis}: actual extent {actual} > configured {expected}."
+    )
+
+
 @dataclass
 class _InternalShape:
     shape: tuple[int, ...]
@@ -792,19 +873,6 @@ def _validate_internal_shape(
 ) -> None:
     shape = np.shape(output)[: len(internal_shape)]
     if func._irregular_output:
-        # Permit irregular outputs to be shorter than the declared internal
-        # shape, but never allow them to exceed the allocated capacity - that
-        # would silently drop data when we later write into the result array.
-        for actual, expected in zip(shape, internal_shape):
-            if isinstance(expected, int) and isinstance(actual, int) and actual > expected:
-                msg = (
-                    f"Irregular output shape {shape} of function '{func.__name__}'"
-                    f" (output '{func.output_name}') exceeds the configured"
-                    f" internal shape {internal_shape} used in the `mapspec`"
-                    f" '{func.mapspec}'. Increase the internal shape or reduce"
-                    " the emitted data."
-                )
-                raise ValueError(msg)
         return
     if shape != internal_shape:
         msg = (
@@ -829,9 +897,16 @@ def _update_result_array(
 ) -> None:
     if result_arrays is None:
         return
+
+    internal_shape = internal_shape_from_mask(shape, mask)
+
     for result_array, _output in zip(result_arrays, output):
         if not all(mask):
-            _output = np.asarray(_output)  # In case _output is a list
+            # Normalize irregular outputs to properly shaped MaskedArrays
+            if func._irregular_output:
+                _output = _coerce_irregular_output(_output, internal_shape, func=func)
+            else:
+                _output = np.asarray(_output)  # In case _output is a list
             _set_output(result_array, _output, index, shape, mask, func)
         else:
             result_array[index] = _output
