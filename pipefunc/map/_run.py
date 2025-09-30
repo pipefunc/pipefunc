@@ -1440,7 +1440,7 @@ def _update_status_if_needed(
     missing: list[int],
 ) -> None:
     if status is not None and status.n_total is None:
-        status.n_total = len(missing)
+        status.n_total = len(missing) + len(existing)
         status.n_completed += len(existing)
 
 

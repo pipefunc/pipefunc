@@ -6,6 +6,7 @@ import numpy as np
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map._progress import Status
+from pipefunc.map._run import _update_status_if_needed
 
 if TYPE_CHECKING:
     import pytest
@@ -61,3 +62,50 @@ def test_progress_counts_only_real_irregular_entries(monkeypatch: pytest.MonkeyP
     assert lengths_status.n_total == 6
     assert lengths_status.n_completed == 6
     assert lengths_status.progress == 1.0
+
+
+def test_update_status_counts_existing_in_total() -> None:
+    status = Status(n_total=None)
+
+    _update_status_if_needed(status, existing=[0, 1], missing=[2])
+    status.mark_complete()
+
+    assert status.n_total == 3
+    assert status.progress == 1.0
+
+
+def test_progress_overcounts_existing_entries(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    captured = _capture_headless_tracker(monkeypatch)
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def double(x: int) -> int:
+        return 2 * x
+
+    pipeline = Pipeline([double])
+    inputs = {"x": [1, 2, 3]}
+
+    pipeline.map(
+        inputs=inputs,
+        storage="file_array",
+        parallel=False,
+        run_folder=tmp_path,
+    )
+
+    missing_path = tmp_path / "outputs" / "y" / "__1__.pickle"
+    missing_path.unlink()
+
+    pipeline.map(
+        inputs=inputs,
+        storage="file_array",
+        parallel=False,
+        run_folder=tmp_path,
+        show_progress=True,
+    )
+
+    tracker = captured.get("tracker")
+    assert tracker is not None
+
+    status = tracker.progress_dict["y"]
+    assert isinstance(status, Status)
+    assert status.n_total == len(inputs["x"])  # expected total tasks
+    assert status.progress <= 1.0
