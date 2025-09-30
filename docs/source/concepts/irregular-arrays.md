@@ -217,9 +217,10 @@ results3 = pipeline3.map(
     parallel=False,
 )
 
-print("Factors of 6:", results3["factors"].output[0].compressed())
-print("Factors of 7:", results3["factors"].output[1].compressed())
-print("Factors of 12:", results3["factors"].output[2].compressed())
+factors = results3["factors"].output
+print("Factors of 6:", factors[0][~np.ma.getmaskarray(factors[0])])
+print("Factors of 7:", factors[1][~np.ma.getmaskarray(factors[1])])
+print("Factors of 12:", factors[2][~np.ma.getmaskarray(factors[2])])
 print("\nFactor counts:", results3["factor_count"].output)
 ```
 
@@ -245,7 +246,7 @@ results = pipeline3.map(
 :::{admonition} What if I forget `internal_shapes`?
 :class: warning
 
-If `internal_shapes` is omitted (or uses a plain `?` placeholder), `pipefunc` fixes the capacity to the very first shape it encounters. Any later output that needs more space raises an error such as: `ValueError: Irregular output shape (2,) of function '...' (output '...') exceeds the configured internal shape (1,) used in the `mapspec` '...'`
+If `internal_shapes` is omitted (or uses a plain `?` placeholder), `pipefunc` fixes the capacity to the very first shape it encounters. Any later output that needs more space raises an error such as: `ValueError: Irregular output of function '...' (output '...') exceeds internal_shape at axis 0: actual extent ... > configured ...`
 
 To avoid that crash, estimate the maximum size up front or pre-compute the results you plan to map over and size `internal_shapes` from their lengths.
 :::
@@ -278,50 +279,46 @@ def totals(values: np.ndarray) -> float:
     return float(np.sum(values))
 ```
 
-If you slice across multiple irregular axes, the result is still a `MaskedArray`, so it remains good practice to be defensive when you expect higher-rank data:
+If you slice across multiple irregular axes, the result is still a `MaskedArray`. In that case, rely on NumPy’s masked operations (for example `np.ma.sum`, `np.ma.mean`) or explicitly inspect the mask when you need to iterate:
 
 ```{code-cell} ipython3
 def process_irregular_data(data: np.ma.MaskedArray | np.ndarray) -> float:
     """Example of proper MaskedArray handling."""
-    if hasattr(data, "compressed"):
-        # It's a MaskedArray
-        valid_values = data.compressed()
-        if len(valid_values) == 0:
+    if isinstance(data, np.ma.MaskedArray):
+        if data.mask is np.ma.nomask:
+            return float(np.mean(data)) if data.size else 0.0
+        mask = np.ma.getmaskarray(data)
+        if mask.all():
             return 0.0
-        return np.mean(valid_values)
-    else:
-        # Regular array
-        return np.mean(data)
+        return float(np.mean(data[~mask]))
+    return float(np.mean(data)) if data.size else 0.0
 
 # Test with masked array
 test_masked = np.ma.array([1, 2, 3, 4], mask=[False, False, True, True])
 print("Mean of [1, 2, masked, masked]:", process_irregular_data(test_masked))
 ```
 
-### 4. Use compressed() for Simple Operations
+### 4. Inspect and reuse masks directly
 
-The `compressed()` method is efficient for getting valid values:
+`np.ma.MaskedArray` exposes a `mask` attribute you can use for filtering while preserving shape information:
 
 ```{code-cell} ipython3
 # Create a masked array
-data = np.ma.array([[1, 2, 3], [4, 5, 6]],
-                   mask=[[False, False, True], [False, True, True]])
+data = np.ma.array(
+    [[1, 2, 3], [4, 5, 6]],
+    mask=[[False, False, True], [False, True, True]],
+)
+
+mask = np.ma.getmaskarray(data)
 
 print("Original shape:", data.shape)
-print("Compressed (1D):", data.compressed())
-print("Sum of valid:", sum(data.compressed()))
-print("Mean of valid:", np.mean(data.compressed()))
-```
+print("Mask:\n", mask)
+print("Valid entries flattened:", data[~mask])
 
-### 5. Preserve Structure When Needed
-
-Note that `compressed()` returns a 1D array. If you need structure:
-
-```{code-cell} ipython3
-# If you need to preserve row structure
-for i, row in enumerate(data):
-    valid_in_row = row.compressed()
-    print(f"Row {i} valid values: {valid_in_row}")
+# Preserve row structure while skipping masked values
+valid_rows = [[value for value, masked in zip(row, row_mask) if not masked]
+              for row, row_mask in zip(data, mask)]
+print("Row-wise valid entries:", valid_rows)
 ```
 
 ## Advanced Example: Text Analysis
@@ -352,8 +349,10 @@ def average_words(words_per_sentence: Array[int]) -> float:
     if isinstance(words_per_sentence, np.ndarray):
         return float(np.mean(words_per_sentence)) if words_per_sentence.size else 0.0
     # Higher-dimensional slices still arrive as MaskedArrays; fall back to masked semantics.
-    valid = words_per_sentence.compressed()
-    return float(np.mean(valid)) if len(valid) > 0 else 0.0
+    mask = np.ma.getmaskarray(words_per_sentence)
+    if mask.all():
+        return 0.0
+    return float(np.mean(words_per_sentence[~mask]))
 
 # Create pipeline
 text_pipeline = Pipeline([split_sentences, count_words_in_sentence, average_words])
@@ -378,15 +377,26 @@ results = text_pipeline.map(
 )
 
 for i, text in enumerate(texts["text"]):
+    sentences = results["sentences"].output[i]
+    sentence_mask = np.ma.getmaskarray(sentences)
+    words_per_sentence = results["words_per_sentence"].output[i]
+    words_mask = np.ma.getmaskarray(words_per_sentence)
+
     print(f"\nText {i}: '{text[:30]}...'")
-    print(f"  Sentences: {results['sentences'].output[i].compressed()}")
-    print(f"  Words per sentence: {results['words_per_sentence'].output[i].compressed()}")
+    print(
+        "  Sentences:",
+        [value for value, masked in zip(sentences, sentence_mask) if not masked],
+    )
+    print(
+        "  Words per sentence:",
+        [value for value, masked in zip(words_per_sentence, words_mask) if not masked],
+    )
     print(f"  Average words: {results['avg_words'].output[i]:.1f}")
 ```
 
 ## Performance Considerations
 
-Masked operations in NumPy are efficient (mask checks are vectorized and `compressed()` is implemented in C). However, irregular arrays are stored with `dtype=object`, which can make numeric operations slower and increase overhead compared to native numeric dtypes. Practical tips:
+Masked operations in NumPy are efficient and vectorized, but irregular arrays are stored with `dtype=object`, which can make numeric work slower than dense numeric arrays. Practical tips:
 - Keep irregular spans as narrow as possible; reduce or aggregate early.
 - When feasible, convert masked slices to dense numeric arrays after reduction.
 - Prefer `np.ma` reductions (`np.ma.sum`, `np.ma.mean`) and `MaskedArray.count()` where they fit your workflow.
@@ -409,19 +419,21 @@ Irregular arrays can still be more memory‑efficient than padding with zeros or
    # Wrong - includes masked values
    total = sum(masked_array)
 
-   # Correct - only sums valid values
-   # Option A: np.ma reductions (recommended for masked data)
+   # Correct - rely on masked-array aware reductions
    total = np.ma.sum(masked_array)
    count = masked_array.count()
-   # Option B: use compressed() explicitly
-   total = sum(masked_array.compressed())
+
+   # or work with the mask explicitly
+   mask = np.ma.getmaskarray(masked_array)
+   total = sum(masked_array[~mask])
    ```
 
 3. **Forgetting to check for MaskedArray**:
    ```python
    # Better to be defensive
-   if hasattr(data, "compressed"):
-       values = data.compressed()
+   if isinstance(data, np.ma.MaskedArray):
+       mask = np.ma.getmaskarray(data)
+       values = data[~mask]
    else:
        values = data
    ```
@@ -430,6 +442,5 @@ Irregular arrays can still be more memory‑efficient than padding with zeros or
 
 - Use `*` in mapspec to denote irregular dimensions (e.g., `j*`)
 - Always provide `internal_shapes` for the maximum capacity needed
-- Functions automatically receive MaskedArrays for irregular data
-- Use `compressed()` to get valid values efficiently
-- Check with `hasattr(data, "compressed")` to handle both regular and masked arrays
+- Rely on `np.ma` reductions (or the explicit mask) when you work with multi-axis irregular slices
+- Irregular storages return `MaskedArray`s only when multiple irregular axes remain; 1-D reducers receive trimmed NumPy arrays
