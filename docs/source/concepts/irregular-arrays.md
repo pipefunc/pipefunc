@@ -22,7 +22,10 @@ kernelspec:
 ```
 
 Irregular (or jagged) arrays are arrays where different elements have different lengths.
-`pipefunc` provides built-in support for irregular arrays through special `mapspec` syntax. Whenever an output axis uses the `*` suffix, the runtime allocates space for the maximum length you configure, fills unused slots with `np.ma.masked`, and—starting with the irregular-array scheduler improvements described here—skips calling your mapped function for those padded positions. The produced arrays still arrive as `numpy.ma.MaskedArray` instances with masks that mark the gaps.
+The core architecture of `pipefunc` all assumes regular, rectangular arrays, so we can leverage NumPy's fast, vectorized operations.
+However, `pipefunc` still provides built-in support for irregular arrays through special `mapspec` syntax, but it comes with some limitations.
+Whenever an output axis uses the `*` suffix, the runtime allocates space for the maximum length you configure, fills unused slots with `np.ma.masked`, and—starting with the irregular-array scheduler improvements described here—skips calling your mapped function for those padded positions.
+The produced arrays still arrive as `numpy.ma.MaskedArray` instances with masks that mark the gaps.
 
 :::{admonition} Prerequisites
 :class: info
@@ -112,10 +115,10 @@ Dict-backed and file-backed storages support irregular arrays. Zarr storage does
 
 Functions that receive irregular data (declared with a `*` in their mapspec) behave slightly differently depending on how you access that axis:
 
-- Element-wise maps (`values[i, j*] -> …`) still receive scalar elements and never see padded sentinels—the scheduler skips masked coordinates entirely.
-- Reducers that take the full span of a single irregular axis (`values[i, :] -> …`) now receive a 1‑D NumPy array where the masked tail has already been trimmed.
-- Column-wise reducers (`values[:, j*] -> …`) get the entire irregular column as a list-of-lists. Each list is already trimmed to its realised extent, so you decide how to align or pad when aggregating.
-- Higher-dimensional slices continue to arrive as `numpy.ma.MaskedArray` objects so you can preserve structure.
+- **Element-wise maps** (`values[i, j*] -> …`): Receive scalar elements and never see padded sentinels—the scheduler skips masked coordinates entirely.
+- **Row reductions** (`values[i, :] -> …`): Receive a 1‑D NumPy array where the masked tail has already been trimmed for that specific row.
+- **Column reductions** (`values[:, j*] -> result[j*]`): The function is called **once per column index** `j`, receiving a 1‑D trimmed array containing all row values for that column. The output dimension retains the `*` marker because you're mapping over irregular indices.
+- **Higher-dimensional slices**: Continue to arrive as `numpy.ma.MaskedArray` objects so you can preserve structure.
 
 Put another way: although the storages keep padded `np.ma.masked` sentinels internally, the values handed to your `pipefunc` implementations are already trimmed when the mapspec declares an irregular axis.
 
@@ -161,17 +164,17 @@ def produce() -> np.ndarray:
     return arr
 
 @pipefunc(output_name="y", mapspec="x[i] -> y[i, j*]")
-def double(row: list[int]) -> list[int]:
-    return [value * 2 for value in row]
+def double(x: list[int]) -> list[int]:
+    return [value * 2 for value in x]
 
-@pipefunc(output_name="row_totals", mapspec="y[i, j*] -> row_totals[i]")
-def row_totals(row: list[int]) -> int:
-    return sum(row)
+@pipefunc(output_name="row_totals", mapspec="y[i, :] -> row_totals[i]")
+def row_totals(y: np.ndarray) -> int:
+    return int(np.sum(y))
 
 @pipefunc(output_name="column_totals", mapspec="y[:, j*] -> column_totals[j*]")
-def column_totals(values: list[list[int]]) -> list[int]:
-    longest = max(len(v) for v in values)
-    return [sum(v[j] if j < len(v) else 0 for v in values) for j in range(longest)]
+def column_totals(y: np.ndarray) -> int:
+    """Sum all values in a specific column across all rows."""
+    return int(np.sum(y))
 
 pipeline_generated = Pipeline([produce, double, row_totals, column_totals])
 
@@ -239,17 +242,14 @@ results = pipeline3.map(
 )
 ```
 
-````{admonition} What if I forget `internal_shapes`?
+:::{admonition} What if I forget `internal_shapes`?
 :class: warning
 
-If `internal_shapes` is omitted (or uses a plain `?` placeholder), `pipefunc` fixes the capacity to the very first shape it encounters. Any later output that needs more space raises an error such as:
-
-```text
-ValueError: Irregular output shape (2,) of function '...' (output '...') exceeds the configured internal shape (1,) used in the `mapspec` '...'
-```
+If `internal_shapes` is omitted (or uses a plain `?` placeholder), `pipefunc` fixes the capacity to the very first shape it encounters. Any later output that needs more space raises an error such as: `ValueError: Irregular output shape (2,) of function '...' (output '...') exceeds the configured internal shape (1,) used in the `mapspec` '...'`
 
 To avoid that crash, estimate the maximum size up front or pre-compute the results you plan to map over and size `internal_shapes` from their lengths.
-````
+:::
+
 
 ### 2. Automatic Skipping of Padded Entries
 
