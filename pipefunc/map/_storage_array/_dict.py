@@ -83,12 +83,18 @@ class DictArray(StorageBase):
         return np_index in self._dict
 
     def _internal_mask(self) -> np.ma.MaskedArray:
-        if self.internal_shape:
-            shape = self.resolved_internal_shape
-            data = np.empty(shape, dtype=object)
-            mask = np.ones(shape, dtype=bool)
-            return np.ma.MaskedArray(data, mask=mask, dtype=object)
-        return np.ma.masked
+        if not self.internal_shape:
+            return np.ma.masked
+
+        shape = self.resolved_internal_shape
+        if not self.irregular:
+            # Regular arrays only need an uninitialised masked container; NumPy fills
+            # the mask lazily when values are written, avoiding per-call allocations.
+            return np.ma.empty(shape, dtype=object)
+
+        data = np.empty(shape, dtype=object)
+        mask = np.ones(shape, dtype=bool)
+        return np.ma.MaskedArray(data, mask=mask, dtype=object)
 
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
         """Return the data associated with the given key."""
@@ -104,18 +110,12 @@ class DictArray(StorageBase):
                 itertools.product(*self._slice_indices(key, self.full_shape)),
             ):
                 external_key = tuple(x for x, m in zip(index, self.shape_mask) if m)
-                if self.internal_shape:
-                    internal_key = tuple(x for x, m in zip(index, self.shape_mask) if not m)
-                    if external_key in self._dict:
-                        arr = np.ma.array(self._dict[external_key], copy=False)
-                        value, _ = try_getitem(arr, internal_key, irregular=self.irregular)
-                    else:
-                        value = self._internal_mask()[internal_key]
-                else:  # noqa: PLR5501
-                    if external_key in self._dict:
-                        value = self._dict[external_key]
-                    else:
-                        value = self._internal_mask()
+                internal_key = (
+                    tuple(x for x, m in zip(index, self.shape_mask) if not m)
+                    if self.internal_shape
+                    else None
+                )
+                value = self._value_for_dict_entry(external_key, internal_key)
                 j = np.unravel_index(i, shape)
                 data[j] = value
             new_shape = tuple(
@@ -128,20 +128,32 @@ class DictArray(StorageBase):
 
         external_key = tuple(x for x, m in zip(key, self.shape_mask) if m)  # type: ignore[misc]
         internal_key = tuple(x for x, m in zip(key, self.shape_mask) if not m)  # type: ignore[misc]
+        return self._value_for_dict_entry(external_key, internal_key or None)
 
-        if external_key in self._dict:
-            data = self._dict[external_key]
-        else:
-            return self._internal_mask()
-        if internal_key:
-            arr = np.ma.array(data, copy=False)
-            value, _ = try_getitem(
-                arr,
-                internal_key,  # type: ignore[arg-type]
-                irregular=self.irregular,
-            )
+    def _value_from_store(
+        self,
+        stored: Any,
+        internal_key: tuple[int, ...],
+    ) -> Any:
+        if self.irregular:
+            arr = np.ma.array(stored, copy=False)
+            value, _ = try_getitem(arr, internal_key, irregular=True)
             return value
-        return data
+        return np.asarray(stored)[internal_key]
+
+    def _value_for_dict_entry(
+        self,
+        external_key: tuple[int, ...],
+        internal_key: tuple[int, ...] | None,
+    ) -> Any:
+        if external_key not in self._dict:
+            mask = self._internal_mask()
+            return mask[internal_key] if internal_key else mask
+
+        stored = self._dict[external_key]
+        if internal_key:
+            return self._value_from_store(stored, internal_key)
+        return stored
 
     def _slice_indices(self, key: tuple[int | slice, ...], shape: tuple[int, ...]) -> list[range]:
         assert len(key) == len(shape)
