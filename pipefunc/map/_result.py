@@ -163,7 +163,7 @@ class ResultDict(dict[str, Result]):
         load_intermediate: bool = True,
         type_cast: bool = True,
         backend: Literal["pandas", "polars"] = "pandas",
-    ) -> pd.DataFrame | "pl.DataFrame":
+    ) -> pd.DataFrame | pl.DataFrame:
         """Convert the results to a DataFrame.
 
         Parameters
@@ -174,6 +174,7 @@ class ResultDict(dict[str, Result]):
             If ``True``, apply dtype casting based on annotations.
         backend
             DataFrame library to use. Defaults to ``"pandas"``.
+
         """
         ds = self.to_xarray(  # ensures xarray is installed
             load_intermediate=load_intermediate,
