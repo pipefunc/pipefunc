@@ -997,6 +997,20 @@ def _existing_and_missing_indices(
     existing_indices: list[int] = []
     missing_indices: list[int] = []
     skipped_indices: list[int] = []
+
+    # Fast-path for regular storage: avoid instantiating the irregular skip
+    # context when none of the storages are irregular. This matches the
+    # pre-irregular behaviour and saves the extra per-iteration bookkeeping.
+    if not any(arr.irregular for arr in arrays):
+        for i, (*mask_values, select) in enumerate(zip(*masks, fixed_mask)):  # type: ignore[arg-type]
+            if not select:
+                continue
+            if any(mask_values):
+                missing_indices.append(i)
+            else:
+                existing_indices.append(i)
+        return existing_indices, missing_indices, skipped_indices
+
     skip_context = _IrregularSkipContext(func, kwargs, shape, shape_mask)
     for i, (*mask_values, select) in enumerate(zip(*masks, fixed_mask)):  # type: ignore[arg-type]
         if not select:
