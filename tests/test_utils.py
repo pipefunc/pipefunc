@@ -24,6 +24,7 @@ from pipefunc._utils import (
 )
 
 has_pydantic = importlib.util.find_spec("pydantic") is not None
+has_polars = importlib.util.find_spec("polars") is not None
 
 
 @pytest.fixture(autouse=True)  # Automatically use in all tests
@@ -228,6 +229,21 @@ def test_equal_dicts_with_pandas() -> None:
     df1 = pd.DataFrame({"x": [1, 2], "y": [3, 4]})
     df2 = pd.DataFrame({"x": [1, 2], "y": [3, 4]})
     df3 = pd.DataFrame({"x": [1, 2], "y": [3, 5]})
+    d1 = {"a": df1}
+    d2 = {"a": df2}
+    d3 = {"a": df3}
+    assert equal_dicts(d1, d2)
+    assert not equal_dicts(d1, d3)
+
+
+@pytest.mark.skipif(not has_polars, reason="polars not installed")
+def test_equal_dicts_with_polars() -> None:
+    """Test equal_dicts with polars DataFrames."""
+    import polars as pl
+
+    df1 = pl.DataFrame({"x": [1, 2], "y": [3, 4]})
+    df2 = pl.DataFrame({"x": [1, 2], "y": [3, 4]})
+    df3 = pl.DataFrame({"x": [1, 2], "y": [3, 5]})
     d1 = {"a": df1}
     d2 = {"a": df2}
     d3 = {"a": df3}

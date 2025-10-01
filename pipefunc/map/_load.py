@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 from pipefunc._utils import (
     at_least_tuple,
@@ -113,8 +113,9 @@ def load_dataframe(
     *output_name: str,
     run_folder: str | Path,
     load_intermediate: bool = True,
+    backend: Literal["pandas", "polars"] = "pandas",
 ) -> Any:
-    """Load the output(s) of a `pipeline.map` as a `pandas.DataFrame`.
+    """Load the output(s) of a `pipeline.map` as a DataFrame.
 
     Parameters
     ----------
@@ -124,10 +125,12 @@ def load_dataframe(
         The folder where the pipeline run was stored.
     load_intermediate
         Whether to load intermediate outputs.
+    backend
+        DataFrame library to use when constructing the result. Defaults to ``"pandas"``.
 
     Returns
     -------
-        A `pandas.DataFrame` containing the outputs of the pipeline run.
+        A DataFrame from the selected backend containing the outputs of the pipeline run.
 
     """
     from .xarray import xarray_dataset_to_dataframe
@@ -137,7 +140,16 @@ def load_dataframe(
         run_folder=run_folder,
         load_intermediate=load_intermediate,
     )
-    return xarray_dataset_to_dataframe(ds)
+    df = xarray_dataset_to_dataframe(ds)
+    if backend == "pandas":
+        return df
+    if backend == "polars":
+        requires("polars", reason="load_dataframe with backend='polars'", extras="polars")
+        import polars as pl
+
+        return pl.DataFrame({col: df[col].tolist() for col in df.columns})
+    msg = f"Unknown backend '{backend}'. Expected 'pandas' or 'polars'."
+    raise ValueError(msg)
 
 
 def maybe_load_data(x: Any) -> Any:

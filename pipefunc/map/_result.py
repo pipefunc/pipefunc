@@ -4,7 +4,7 @@ import copy
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
 import numpy as np
 
@@ -14,6 +14,7 @@ from ._storage_array._base import StorageBase
 
 if TYPE_CHECKING:
     import pandas as pd
+    import polars as pl
     import xarray as xr
 
     from pipefunc import Pipeline
@@ -161,15 +162,35 @@ class ResultDict(dict[str, Result]):
         *,
         load_intermediate: bool = True,
         type_cast: bool = True,
-    ) -> pd.DataFrame:
-        """Convert the results to a `pandas.DataFrame`."""
+        backend: Literal["pandas", "polars"] = "pandas",
+    ) -> pd.DataFrame | "pl.DataFrame":
+        """Convert the results to a DataFrame.
+
+        Parameters
+        ----------
+        load_intermediate
+            Whether to load intermediate outputs.
+        type_cast
+            If ``True``, apply dtype casting based on annotations.
+        backend
+            DataFrame library to use. Defaults to ``"pandas"``.
+        """
         ds = self.to_xarray(  # ensures xarray is installed
             load_intermediate=load_intermediate,
             type_cast=type_cast,
         )
         from .xarray import xarray_dataset_to_dataframe
 
-        return xarray_dataset_to_dataframe(ds)
+        df = xarray_dataset_to_dataframe(ds)
+        if backend == "pandas":
+            return df
+        if backend == "polars":
+            requires("polars", reason="ResultDict.to_dataframe backend='polars'", extras="polars")
+            import polars as pl
+
+            return pl.DataFrame({col: df[col].tolist() for col in df.columns})
+        msg = f"Unknown backend '{backend}'. Expected 'pandas' or 'polars'."
+        raise ValueError(msg)
 
 
 def _is_np_subdtype(annotation: Any) -> bool:
