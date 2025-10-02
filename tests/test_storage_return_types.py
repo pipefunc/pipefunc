@@ -34,6 +34,32 @@ def test_dictarray_irregular_returns_masked_array() -> None:
     assert isinstance(out, np.ma.MaskedArray)
 
 
+def test_dictarray_irregular_getitem_returns_masked_array() -> None:
+    arr = DictArray(
+        folder=None,
+        shape=(1,),
+        irregular=True,
+    )
+    arr.dump((0,), [1, 2])
+    result = arr[(0,)]
+    assert isinstance(result, np.ma.MaskedArray)
+    np.testing.assert_array_equal(result.data, np.array([1, 2], dtype=object))
+
+
+def test_dictarray_irregular_to_array_skips_missing_entries() -> None:
+    arr = DictArray(
+        folder=None,
+        shape=(1,),
+        internal_shape=(3,),
+        shape_mask=(True, False),
+        irregular=True,
+    )
+    arr.dump((0,), [42])
+    array = arr.to_array(splat_internal=True)
+    assert np.ma.is_masked(array[0, 1])
+    assert np.ma.is_masked(array[0, 2])
+
+
 def test_filearray_regular_returns_plain_sequence(tmp_path: Path) -> None:
     arr = FileArray(folder=tmp_path, shape=(1,), irregular=False)
     arr.dump((0,), [1, 2])

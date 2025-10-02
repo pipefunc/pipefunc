@@ -17,6 +17,21 @@ from pipefunc.map._shapes import (
     shape_is_resolved,
 )
 
+from ._irregular_helpers import (
+    clear_irregular_extent_cache,
+    ensure_masked_array_for_irregular,
+    irregular_extent,
+)
+from ._irregular_helpers import (
+    infer_irregular_length as _infer_irregular_length,
+)
+from ._irregular_helpers import (
+    try_getitem as _try_getitem,
+)
+
+infer_irregular_length = _infer_irregular_length
+try_getitem = _try_getitem
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
@@ -27,21 +42,6 @@ if TYPE_CHECKING:
 storage_registry = {}
 
 _NONE_SLICE = slice(None)
-
-
-def try_getitem(
-    array: np.ndarray,
-    key: tuple[int, ...],
-    *,
-    irregular: bool,
-) -> tuple[Any, bool]:
-    """Return item at ``key`` or a masked sentinel when irregular."""
-    try:
-        return array[key], False
-    except IndexError:
-        if irregular:
-            return np.ma.masked, True
-        raise
 
 
 def iterate_shape_indices(shape: tuple[int, ...]) -> Iterator[tuple[int, ...]]:
@@ -65,24 +65,6 @@ def select_by_mask(
             result.append(tuple2[index2])
             index2 += 1
     return tuple(result)
-
-
-def infer_irregular_length(value: Any) -> int:
-    """Return the realised length for a single irregular axis."""
-    if value is None or value is np.ma.masked:
-        return 0
-    if isinstance(value, np.ma.MaskedArray):
-        if value.ndim == 0:
-            return 0 if np.ma.is_masked(value) else 1
-        if value.mask is np.ma.nomask:
-            return int(value.shape[0])
-        mask = np.atleast_1d(value.mask)
-        valid = np.nonzero(~mask)[0]
-        return 0 if valid.size == 0 else int(valid[-1]) + 1
-    try:
-        return len(value)  # type: ignore[arg-type]
-    except TypeError:
-        return 1
 
 
 class StorageBase(abc.ABC):
@@ -159,17 +141,14 @@ class StorageBase(abc.ABC):
 
     def irregular_extent(self, external_index: tuple[int, ...]) -> tuple[int, ...] | None:
         """Return the realised extent along irregular axes for ``external_index``."""
-        if not self.irregular or not self.internal_shape:
-            return None
-        cache = getattr(self, "_irregular_extent_cache", None)
-        if cache is None:
-            cache = {}
-            self._irregular_extent_cache = cache
-        if external_index in cache:
-            return cache[external_index]
-        extent = self._compute_irregular_extent(external_index)
-        cache[external_index] = extent
-        return extent
+        return irregular_extent(
+            self.irregular,
+            self.internal_shape,
+            getattr(self, "_irregular_extent_cache", None),
+            lambda cache: setattr(self, "_irregular_extent_cache", cache),
+            external_index,
+            self._compute_irregular_extent,
+        )
 
     def _compute_irregular_extent(
         self,
@@ -201,8 +180,6 @@ class StorageBase(abc.ABC):
             return self._is_slice_masked(normalized)
 
         if len(self.internal_shape) == 1:
-            # Fast path for the common 1-D irregular case: using the realised extent
-            # avoids normalising into a masked array for every probe.
             internal_components = internal_shape_from_mask(normalized, self.shape_mask)
             if internal_components:
                 internal_index = internal_components[0]
@@ -218,7 +195,6 @@ class StorageBase(abc.ABC):
     def _is_slice_masked(self, key: tuple[int | slice, ...]) -> bool:
         """Return ``True`` when all elements referenced by ``key`` are masked."""
         assert self.irregular, "_is_slice_masked is only valid for irregular storage"
-
         extent_result = self._irregular_slice_extent_mask(key)
         if extent_result is not None:
             return extent_result
@@ -280,9 +256,7 @@ class StorageBase(abc.ABC):
         return True
 
     def _clear_irregular_extent_cache(self) -> None:
-        cache = getattr(self, "_irregular_extent_cache", None)
-        if cache is not None:
-            cache.clear()
+        clear_irregular_extent_cache(getattr(self, "_irregular_extent_cache", None))
 
     @property
     def size(self) -> int:
@@ -300,18 +274,11 @@ class StorageBase(abc.ABC):
         This should be called at the end of __getitem__ implementations
         to ensure consistent behavior across all storage types.
         """
-        if not self.irregular:
-            return data
-
-        if not isinstance(data, np.ndarray):
-            return data
-
-        mask = create_mask_for_masked_values(data)
-
-        if np.any(mask):
-            return np.ma.MaskedArray(data, mask=mask, dtype=object)
-
-        return data
+        return ensure_masked_array_for_irregular(
+            data,
+            irregular=self.irregular,
+            mask_factory=create_mask_for_masked_values,
+        )
 
     @functools.cached_property
     def full_shape(self) -> tuple[int, ...]:
