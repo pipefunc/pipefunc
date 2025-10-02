@@ -176,7 +176,10 @@ class FileArray(StorageBase):
                 for k, range_ in zip(normalized_key, slice_indices)
                 if isinstance(k, slice)
             )
-            return sliced_array.reshape(new_shape)
+            result = sliced_array.reshape(new_shape)
+            if self.irregular:
+                return self._ensure_masked_array_for_irregular(result)
+            return result
 
         external_indices = tuple(i for i, m in zip(normalized_key, self.shape_mask) if m)
         internal_indices = tuple(i for i, m in zip(normalized_key, self.shape_mask) if not m)
@@ -194,6 +197,8 @@ class FileArray(StorageBase):
                 irregular=self.irregular,
             )
             return value
+        if self.irregular:
+            return np.ma.array(sub_array, copy=False)
         return sub_array
 
     def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray:

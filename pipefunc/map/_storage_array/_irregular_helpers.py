@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
 
 
 def try_getitem(
@@ -41,18 +38,3 @@ def infer_irregular_length(value: Any) -> int:
         return len(value)  # type: ignore[arg-type]
     except TypeError:
         return 1
-
-
-def ensure_masked_array_for_irregular(
-    data: Any,
-    *,
-    irregular: bool,
-    mask_factory: Callable[[np.ndarray], np.ndarray],
-) -> Any:
-    """Wrap ``data`` in a MaskedArray when irregular storage tracks masked sentinels."""
-    if not irregular or not isinstance(data, np.ndarray):
-        return data
-    mask = mask_factory(data)
-    if np.any(mask):
-        return np.ma.MaskedArray(data, mask=mask, dtype=object)
-    return data

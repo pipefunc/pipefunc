@@ -17,10 +17,6 @@ from pipefunc.map._shapes import (
     shape_is_resolved,
 )
 
-from ._irregular_helpers import (
-    ensure_masked_array_for_irregular,
-)
-
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
@@ -138,18 +134,6 @@ class StorageBase(abc.ABC):
         """Return the rank of the array."""
         return len(self.resolved_shape)
 
-    def _ensure_masked_array_for_irregular(self, data: Any) -> Any:
-        """Convert arrays with masked sentinels to MaskedArrays if irregular=True.
-
-        This should be called at the end of __getitem__ implementations
-        to ensure consistent behavior across all storage types.
-        """
-        return ensure_masked_array_for_irregular(
-            data,
-            irregular=self.irregular,
-            mask_factory=create_mask_for_masked_values,
-        )
-
     @functools.cached_property
     def full_shape(self) -> tuple[int, ...]:
         """Return the full shape of the array."""
@@ -170,11 +154,24 @@ class StorageBase(abc.ABC):
         """Save a memory-based storage to disk."""
 
     # -- Irregular array helpers --
+    def _ensure_masked_array_for_irregular(self, data: Any) -> Any:
+        """Convert arrays with masked sentinels to MaskedArrays if irregular=True.
+
+        This should be called at the end of __getitem__ implementations
+        to ensure consistent behavior across all storage types.
+        """
+        assert self.irregular
+        if not isinstance(data, np.ndarray):
+            return data
+        mask = create_mask_for_masked_values(data)
+        if np.any(mask):
+            return np.ma.MaskedArray(data, mask=mask, dtype=object)
+        return data
 
     def irregular_extent(self, external_index: tuple[int, ...]) -> tuple[int, ...] | None:
         """Return the realised extent along irregular axes for ``external_index``."""
         if not self.irregular or not self.internal_shape or self._irregular_extent_cache is None:
-            # This *should* not never happen in normal pipeline.map use.
+            # This *should* not happen in normal pipeline.map use.
             return None
 
         if external_index in self._irregular_extent_cache:
