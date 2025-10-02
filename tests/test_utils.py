@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
+import types
 
 import cloudpickle
 import numpy as np
@@ -12,6 +14,7 @@ from pipefunc._utils import (
     format_args,
     format_function_call,
     format_kwargs,
+    get_ncores,
     handle_error,
     infer_shape,
     is_classmethod,
@@ -103,6 +106,18 @@ def test_cache_invalidation_on_file_size_change(tmp_path, modify_size):
     assert result1 != result2
     # Check cache was invalidated (i.e., miss occurred)
     assert _cached_load.cache_info().misses == 2
+
+
+def test_get_ncores_slurm_executor(monkeypatch):
+    fake_module = types.ModuleType("adaptive_scheduler")
+
+    class FakeSlurmExecutor:
+        """Minimal stand-in for adaptive_scheduler.SlurmExecutor."""
+
+    fake_module.SlurmExecutor = FakeSlurmExecutor
+    monkeypatch.setitem(sys.modules, "adaptive_scheduler", fake_module)
+
+    assert get_ncores(FakeSlurmExecutor()) == 1
 
 
 def test_format_args_empty() -> None:
