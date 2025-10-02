@@ -702,7 +702,11 @@ def _coerce_irregular_output(
         """Validate sequence length and recursively fill each element."""
         expected = internal_shape[axis]
         if len(seq) > expected:
-            raise ValueError(_irregular_exceeds_msg(func, axis, len(seq), expected))
+            msg = (
+                f"Irregular output of function '{func.__name__}' (output '{func.output_name}') "
+                f"exceeds internal_shape at axis {axis}: actual extent {len(seq)} > configured {expected}."
+            )
+            raise ValueError(msg)
         for index, item in enumerate(seq):
             fill(item, (*prefix, index))
 
@@ -743,18 +747,6 @@ def _coerce_irregular_output(
 
     fill(value, ())
     return result
-
-
-def _irregular_exceeds_msg(
-    func: PipeFunc,
-    axis: int,
-    actual: int,
-    expected: int,
-) -> str:
-    return (
-        f"Irregular output of function '{func.__name__}' (output '{func.output_name}') "
-        f"exceeds internal_shape at axis {axis}: actual extent {actual} > configured {expected}."
-    )
 
 
 @dataclass
