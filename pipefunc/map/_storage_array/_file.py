@@ -136,56 +136,11 @@ class FileArray(StorageBase):
 
         return slice_indices
 
-    def __getitem__(self, key: tuple[int | slice, ...]) -> Any:  # noqa: PLR0912
+    def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
         normalized_key = self._normalize_key(key)
 
         if any(isinstance(k, slice) for k in normalized_key):
-            slice_indices = self._slice_indices(key)
-            sliced_data = []
-            sliced_mask = []
-
-            for index in itertools.product(*slice_indices):
-                file_key = tuple(i for i, m in zip(index, self.shape_mask) if m)
-                file = self._key_to_file(file_key)
-                if file.is_file():
-                    sub_array = load(file)
-                    internal_index = tuple(i for i, m in zip(index, self.shape_mask) if not m)
-                    if self.irregular:
-                        sub_array = np.ma.array(sub_array, copy=False)
-                        if internal_index:
-                            sliced_value, masked = try_getitem(
-                                sub_array,
-                                internal_index,
-                                irregular=True,
-                            )
-                            sliced_data.append(sliced_value)
-                            sliced_mask.append(masked)
-                            continue
-                        sliced_data.append(sub_array)
-                        sliced_mask.append(False)
-                    else:
-                        if internal_index:
-                            sub_array = np.asarray(sub_array)
-                            sliced_data.append(sub_array[internal_index])
-                        else:
-                            sliced_data.append(sub_array)
-                        sliced_mask.append(False)
-                else:
-                    sliced_data.append(np.ma.masked)
-                    sliced_mask.append(True)
-
-            sliced_array: np.ndarray = np.empty(len(sliced_data), dtype=object)
-            sliced_array[:] = sliced_data
-            mask: np.ndarray = np.array(sliced_mask, dtype=bool)
-            sliced_array = np.ma.masked_array(sliced_array, mask=mask)
-
-            new_shape = tuple(
-                len(range_)
-                for k, range_ in zip(normalized_key, slice_indices)
-                if isinstance(k, slice)
-            )
-            result = sliced_array.reshape(new_shape)
-            return self._ensure_masked_array_for_irregular(result) if self.irregular else result
+            return self._get_item_sliced(key, normalized_key)
 
         external_indices = tuple(i for i, m in zip(normalized_key, self.shape_mask) if m)
         internal_indices = tuple(i for i, m in zip(normalized_key, self.shape_mask) if not m)
@@ -209,6 +164,57 @@ class FileArray(StorageBase):
             return sub_array
         arr = np.asarray(sub_array)
         return arr[internal_indices]
+
+    def _get_item_sliced(
+        self,
+        key: tuple[int | slice, ...],
+        normalized_key: tuple[int | slice, ...],
+    ) -> np.ma.core.MaskedArray:
+        """Return a sliced view of the array as a masked array."""
+        slice_indices = self._slice_indices(key)
+        sliced_data = []
+        sliced_mask = []
+
+        for index in itertools.product(*slice_indices):
+            file_key = tuple(i for i, m in zip(index, self.shape_mask) if m)
+            file = self._key_to_file(file_key)
+            if file.is_file():
+                sub_array = load(file)
+                internal_index = tuple(i for i, m in zip(index, self.shape_mask) if not m)
+                if self.irregular:
+                    sub_array = np.ma.array(sub_array, copy=False)
+                    if internal_index:
+                        sliced_value, masked = try_getitem(
+                            sub_array,
+                            internal_index,
+                            irregular=True,
+                        )
+                        sliced_data.append(sliced_value)
+                        sliced_mask.append(masked)
+                        continue
+                    sliced_data.append(sub_array)
+                    sliced_mask.append(False)
+                else:
+                    if internal_index:
+                        sub_array = np.asarray(sub_array)
+                        sliced_data.append(sub_array[internal_index])
+                    else:
+                        sliced_data.append(sub_array)
+                    sliced_mask.append(False)
+            else:
+                sliced_data.append(np.ma.masked)
+                sliced_mask.append(True)
+
+        sliced_array: np.ndarray = np.empty(len(sliced_data), dtype=object)
+        sliced_array[:] = sliced_data
+        mask: np.ndarray = np.array(sliced_mask, dtype=bool)
+        sliced_array = np.ma.masked_array(sliced_array, mask=mask)
+
+        new_shape = tuple(
+            len(range_) for k, range_ in zip(normalized_key, slice_indices) if isinstance(k, slice)
+        )
+        result = sliced_array.reshape(new_shape)
+        return self._ensure_masked_array_for_irregular(result) if self.irregular else result
 
     def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray:
         """Return a masked numpy array containing all the data.
