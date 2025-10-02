@@ -144,14 +144,14 @@ class DictArray(StorageBase):
             stored = self._dict[external_key]
         else:
             return self._internal_mask()
-        if not internal_key:
-            if self.irregular:
-                return np.ma.array(stored, copy=False)
-            return stored
         if self.irregular:
             arr = np.ma.array(stored, copy=False)
+            if not internal_key:
+                return arr
             value, _ = try_getitem(arr, internal_key, irregular=True)
             return value
+        if not internal_key:
+            return stored
         arr = np.asarray(stored)
         return arr[internal_key]
 
