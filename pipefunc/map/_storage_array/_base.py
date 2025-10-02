@@ -67,8 +67,9 @@ class StorageBase(abc.ABC):
     irregular: bool
     storage_id: str
     requires_serialization: bool
+    # NOTE: These class variables become instance attributes when changed!
     _is_resolved: bool = False
-    _irregular_extent_cache: dict[tuple[int, ...], tuple[int, ...] | None] | None
+    _irregular_extent_cache: dict[tuple[int, ...], tuple[int, ...] | None] | None = None
 
     @abc.abstractmethod
     def __init__(

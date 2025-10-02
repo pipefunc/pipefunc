@@ -61,14 +61,12 @@ def ensure_masked_array_for_irregular(
 def irregular_extent(
     irregular: bool,
     internal_shape: Sequence[Any],
-    cache: dict[tuple[int, ...], tuple[int, ...] | None] | None,
+    cache: dict[tuple[int, ...], tuple[int, ...] | None],
     external_index: tuple[int, ...],
     compute_extent: Callable[[tuple[int, ...]], tuple[int, ...] | None],
 ) -> tuple[int, ...] | None:
     """Return the realised extent along irregular axes for ``external_index``."""
     if not irregular or not internal_shape:
-        return None
-    if cache is None:
         return None
     if external_index in cache:
         return cache[external_index]
