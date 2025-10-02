@@ -136,7 +136,6 @@ class StorageBase(abc.ABC):
             self.irregular,
             self.internal_shape,
             getattr(self, "_irregular_extent_cache", None),
-            lambda cache: setattr(self, "_irregular_extent_cache", cache),
             external_index,
             self._compute_irregular_extent,
         )

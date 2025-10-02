@@ -62,7 +62,6 @@ def irregular_extent(
     irregular: bool,
     internal_shape: Sequence[Any],
     cache: dict[tuple[int, ...], tuple[int, ...] | None] | None,
-    set_cache: Callable[[dict[tuple[int, ...], tuple[int, ...] | None]], None],
     external_index: tuple[int, ...],
     compute_extent: Callable[[tuple[int, ...]], tuple[int, ...] | None],
 ) -> tuple[int, ...] | None:
@@ -70,8 +69,7 @@ def irregular_extent(
     if not irregular or not internal_shape:
         return None
     if cache is None:
-        cache = {}
-        set_cache(cache)
+        return None
     if external_index in cache:
         return cache[external_index]
     extent = compute_extent(external_index)
