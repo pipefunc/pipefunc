@@ -123,3 +123,40 @@ def test_irregular_slice_returns_masked_array(storage_factory: str, tmp_path: Pa
     mask = np.ma.getmaskarray(result)
     assert mask.shape == (1, 3)
     assert mask[0, 2]
+
+
+@pytest.mark.parametrize(
+    "storage_factory",
+    [
+        pytest.param("dict", id="dict"),
+        pytest.param("file", id="file"),
+    ],
+)
+def test_irregular_slice_preserves_mask_on_existing_entries(
+    storage_factory: str,
+    tmp_path: Path,
+) -> None:
+    if storage_factory == "dict":
+        arr: DictArray | FileArray = DictArray(
+            folder=None,
+            shape=(1,),
+            internal_shape=(2,),
+            shape_mask=(True, False),
+            irregular=True,
+        )
+    else:
+        arr = FileArray(
+            folder=tmp_path,
+            shape=(1,),
+            internal_shape=(2,),
+            shape_mask=(True, False),
+            irregular=True,
+        )
+
+    arr.dump((0,), [np.ma.masked, 1])
+    result = arr[(slice(None), slice(None))]
+    assert isinstance(result, np.ma.MaskedArray)
+    mask = np.ma.getmaskarray(result)
+    assert mask.shape == (1, 2)
+    assert mask[0, 0]
+    assert not mask[0, 1]

@@ -136,7 +136,7 @@ class FileArray(StorageBase):
 
         return slice_indices
 
-    def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
+    def __getitem__(self, key: tuple[int | slice, ...]) -> Any:  # noqa: PLR0912
         normalized_key = self._normalize_key(key)
 
         if any(isinstance(k, slice) for k in normalized_key):
@@ -150,18 +150,26 @@ class FileArray(StorageBase):
                 if file.is_file():
                     sub_array = load(file)
                     internal_index = tuple(i for i, m in zip(index, self.shape_mask) if not m)
-                    if internal_index:
-                        sub_array = np.ma.array(sub_array, copy=False)  # could be a list
-                        sliced_value, masked = try_getitem(
-                            sub_array,
-                            internal_index,
-                            irregular=self.irregular,
-                        )
-                        sliced_data.append(sliced_value)
-                        sliced_mask.append(masked)
-                        continue
-                    sliced_data.append(sub_array)
-                    sliced_mask.append(False)
+                    if self.irregular:
+                        sub_array = np.ma.array(sub_array, copy=False)
+                        if internal_index:
+                            sliced_value, masked = try_getitem(
+                                sub_array,
+                                internal_index,
+                                irregular=True,
+                            )
+                            sliced_data.append(sliced_value)
+                            sliced_mask.append(masked)
+                            continue
+                        sliced_data.append(sub_array)
+                        sliced_mask.append(False)
+                    else:
+                        if internal_index:
+                            sub_array = np.asarray(sub_array)
+                            sliced_data.append(sub_array[internal_index])
+                        else:
+                            sliced_data.append(sub_array)
+                        sliced_mask.append(False)
                 else:
                     sliced_data.append(np.ma.masked)
                     sliced_mask.append(True)
@@ -177,9 +185,7 @@ class FileArray(StorageBase):
                 if isinstance(k, slice)
             )
             result = sliced_array.reshape(new_shape)
-            if self.irregular:
-                return self._ensure_masked_array_for_irregular(result)
-            return result
+            return self._ensure_masked_array_for_irregular(result) if self.irregular else result
 
         external_indices = tuple(i for i, m in zip(normalized_key, self.shape_mask) if m)
         internal_indices = tuple(i for i, m in zip(normalized_key, self.shape_mask) if not m)
@@ -189,17 +195,20 @@ class FileArray(StorageBase):
             return np.ma.masked
 
         sub_array = load(file)
-        if internal_indices:
-            sub_array = np.ma.array(sub_array, copy=False)
+        if self.irregular:
+            arr = np.ma.array(sub_array, copy=False)
+            if not internal_indices:
+                return arr
             value, _ = try_getitem(
-                sub_array,
+                arr,
                 internal_indices,  # type: ignore[arg-type]
-                irregular=self.irregular,
+                irregular=True,
             )
             return value
-        if self.irregular:
-            return np.ma.array(sub_array, copy=False)
-        return sub_array
+        if not internal_indices:
+            return sub_array
+        arr = np.asarray(sub_array)
+        return arr[internal_indices]
 
     def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray:
         """Return a masked numpy array containing all the data.
