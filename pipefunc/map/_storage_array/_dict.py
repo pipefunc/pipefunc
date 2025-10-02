@@ -130,17 +130,6 @@ class DictArray(StorageBase):
         internal_key = tuple(x for x, m in zip(key, self.shape_mask) if not m)  # type: ignore[misc]
         return self._value_for_dict_entry(external_key, internal_key or None)
 
-    def _value_from_store(
-        self,
-        stored: Any,
-        internal_key: tuple[int, ...],
-    ) -> Any:
-        if self.irregular:
-            arr = np.ma.array(stored, copy=False)
-            value, _ = try_getitem(arr, internal_key, irregular=True)
-            return value
-        return np.asarray(stored)[internal_key]
-
     def _value_for_dict_entry(
         self,
         external_key: tuple[int, ...],
@@ -151,9 +140,13 @@ class DictArray(StorageBase):
             return mask[internal_key] if internal_key else mask
 
         stored = self._dict[external_key]
-        if internal_key:
-            return self._value_from_store(stored, internal_key)
-        return stored
+        if not internal_key:
+            return stored
+        if self.irregular:
+            arr = np.ma.array(stored, copy=False)
+            value, _ = try_getitem(arr, internal_key, irregular=True)
+            return value
+        return np.asarray(stored)[internal_key]
 
     def _slice_indices(self, key: tuple[int | slice, ...], shape: tuple[int, ...]) -> list[range]:
         assert len(key) == len(shape)
