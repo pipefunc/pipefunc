@@ -7,20 +7,26 @@ import functools
 import itertools
 from typing import TYPE_CHECKING, Any
 
-from pipefunc._utils import prod
+import numpy as np
+
+from pipefunc._utils import create_mask_for_masked_values, prod
 from pipefunc.map._mapspec import shape_to_strides
-from pipefunc.map._shapes import shape_is_resolved
+from pipefunc.map._shapes import (
+    external_shape_from_mask,
+    internal_shape_from_mask,
+    shape_is_resolved,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
-    import numpy as np
-
     from pipefunc.map._types import ShapeTuple
 
 
 storage_registry = {}
+
+_NONE_SLICE = slice(None)
 
 
 def iterate_shape_indices(shape: tuple[int, ...]) -> Iterator[tuple[int, ...]]:
@@ -52,9 +58,12 @@ class StorageBase(abc.ABC):
     shape: ShapeTuple
     internal_shape: ShapeTuple
     shape_mask: tuple[bool, ...]
+    irregular: bool
     storage_id: str
     requires_serialization: bool
+    # NOTE: These class variables become instance attributes when changed!
     _is_resolved: bool = False
+    _irregular_extent_cache: dict[tuple[int, ...], tuple[int, ...] | None] | None = None
 
     @abc.abstractmethod
     def __init__(
@@ -63,6 +72,7 @@ class StorageBase(abc.ABC):
         shape: ShapeTuple,
         internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
+        irregular: bool = False,  # noqa: FBT002
     ) -> None: ...
 
     @functools.cached_property
@@ -142,6 +152,142 @@ class StorageBase(abc.ABC):
 
     def persist(self) -> None:  # noqa: B027
         """Save a memory-based storage to disk."""
+
+    # -- Irregular array helpers --
+    def _ensure_masked_array_for_irregular(self, data: Any) -> Any:
+        """Convert arrays with masked sentinels to MaskedArrays if irregular=True.
+
+        This should be called at the end of __getitem__ implementations
+        to ensure consistent behavior across all storage types.
+        """
+        assert self.irregular
+        if not isinstance(data, np.ndarray):
+            return data
+        mask = create_mask_for_masked_values(data)
+        if np.any(mask):
+            return np.ma.MaskedArray(data, mask=mask, dtype=object)
+        return data
+
+    def irregular_extent(self, external_index: tuple[int, ...]) -> tuple[int, ...] | None:
+        """Return the realised extent along irregular axes for ``external_index``."""
+        if not self.irregular or not self.internal_shape or self._irregular_extent_cache is None:
+            # This *should* not happen in normal pipeline.map use.
+            return None
+
+        if external_index in self._irregular_extent_cache:
+            return self._irregular_extent_cache[external_index]
+        extent = self._compute_irregular_extent(external_index)
+        self._irregular_extent_cache[external_index] = extent
+        return extent
+
+    def _compute_irregular_extent(
+        self,
+        external_index: tuple[int, ...],  # noqa: ARG002
+    ) -> tuple[int, ...] | None:  # pragma: no cover
+        """Compute the realised size for irregular axes.
+
+        Sub-classes should override this and return ``None`` when the extent
+        cannot be determined cheaply (e.g. multi-dimensional ragged data).
+        """
+        return None
+
+    def is_element_masked(
+        self,
+        key: tuple[int | slice, ...],
+    ) -> bool:
+        """Return ``True`` if the element requested by ``key`` is masked."""
+        if not (self.irregular and self.internal_shape):
+            return False
+
+        normalized = normalize_key(
+            key,
+            self.resolved_shape,
+            self.resolved_internal_shape,
+            self.shape_mask,
+        )
+
+        if any(isinstance(component, slice) for component in normalized):
+            return self._is_slice_masked(normalized)
+
+        if len(self.internal_shape) == 1:
+            internal_components = internal_shape_from_mask(normalized, self.shape_mask)
+            if internal_components:
+                internal_index = internal_components[0]
+                if isinstance(internal_index, int):
+                    external_index = external_shape_from_mask(normalized, self.shape_mask)
+                    extent = self.irregular_extent(external_index)  # type: ignore[arg-type]
+                    if extent is not None:
+                        return internal_index >= extent[0]
+
+        value = self[normalized]
+        return np.ma.is_masked(value)
+
+    def _is_slice_masked(self, key: tuple[int | slice, ...]) -> bool:
+        """Return ``True`` when all elements referenced by ``key`` are masked."""
+        assert self.irregular, "_is_slice_masked is only valid for irregular storage"
+        extent_result = self._irregular_slice_extent_mask(key)
+        if extent_result is not None:
+            return extent_result
+        return self._iter_slice_mask(key)
+
+    def _irregular_slice_extent_mask(self, key: tuple[int | slice, ...]) -> bool | None:
+        """Return ``True``/``False`` using extent metadata where possible."""
+        full_internal_slice = True
+        external_index_components: list[int] = []
+        has_internal_slice = False
+
+        for component, mask in zip(key, self.shape_mask, strict=True):
+            if mask:
+                if isinstance(component, slice):
+                    full_internal_slice = False
+                    break
+                external_index_components.append(component)
+            else:
+                assert isinstance(component, slice)
+                if component != _NONE_SLICE:
+                    full_internal_slice = False
+                    break
+                has_internal_slice = True
+
+        if full_internal_slice and has_internal_slice and external_index_components:
+            extent = self.irregular_extent(tuple(external_index_components))
+            if extent is not None:
+                return all(length == 0 for length in extent)
+        return None
+
+    def _iter_slice_mask(self, key: tuple[int | slice, ...]) -> bool:
+        """Fallback that iterates through referenced coordinates."""
+        iterables: list[tuple[int, ...]] = []
+        shape_index = 0
+        internal_index = 0
+
+        for component, mask in zip(key, self.shape_mask, strict=True):
+            if mask:
+                axis_size = self.resolved_shape[shape_index]
+                shape_index += 1
+            else:
+                axis_size = self.resolved_internal_shape[internal_index]
+                internal_index += 1
+
+            if isinstance(component, slice):
+                rng = range(*component.indices(axis_size))
+                iterables.append(tuple(rng))
+            else:
+                iterables.append((component,))
+
+        for coords in itertools.product(*iterables):
+            try:
+                value = self[coords]
+            except IndexError:
+                # Treat missing entries as masked.
+                continue
+            if not np.ma.is_masked(value):
+                return False
+        return True
+
+    def _clear_irregular_extent_cache(self) -> None:
+        if self._irregular_extent_cache is not None:
+            self._irregular_extent_cache.clear()
 
 
 def register_storage(cls: type[StorageBase], storage_id: str | None = None) -> None:

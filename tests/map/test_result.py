@@ -89,3 +89,30 @@ def test_type_cast_with_incorrect_annotation() -> None:
     with pytest.warns(UserWarning, match="Could not cast output 'y' to <class 'int'> due to error"):
         result = result.type_cast()
     assert result["y"].output.dtype == object
+
+
+def test_type_cast_skips_masked_irregular_arrays() -> None:
+    @pipefunc(output_name="words", mapspec="text[i] -> words[i, j*]")
+    def split(text: str) -> list[str]:
+        return text.split()
+
+    @pipefunc(output_name="lengths", mapspec="words[i, j*] -> lengths[i, j*]")
+    def lengths(words: str) -> int:
+        return len(words)
+
+    pipeline = Pipeline([split, lengths])
+    result = pipeline.map(
+        {"text": ["two words", "three more words", ""]},
+        parallel=False,
+        storage="dict",
+        internal_shapes={"words": (4,), "lengths": (4,)},
+    )
+
+    masked = result["lengths"].output
+    assert isinstance(masked, np.ma.MaskedArray)
+    assert masked.dtype == object
+
+    new = result.type_cast(inplace=False)
+    assert new is not result
+    assert new["lengths"].output.dtype == object
+    assert new["lengths"].output is masked

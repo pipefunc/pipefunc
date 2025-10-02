@@ -5,6 +5,7 @@
 
 Function Inputs and Outputs <function-io>
 Understanding mapspec <mapspec>
+Working with Irregular Arrays <irregular-arrays>
 Parallelism and Execution <execution-and-parallelism>
 Parameter Scopes <parameter-scopes>
 Error Handling <error-handling>
@@ -39,6 +40,7 @@ Below are the key concepts discussed in this section. Click on any topic to lear
 
 - **[Function Inputs and Outputs](./function-io):** Manage inputs, outputs, defaults, renaming, and multiple returns. Use with `dataclasses` and `pydantic`.
 - **[Understanding `mapspec`](mapspec.md):** Define data mappings with `mapspec` for element-wise operations, reductions, and parallelization.
+- **[Working with Irregular Arrays](./irregular-arrays):** Handle jagged arrays with varying lengths using `*` notation in mapspec and MaskedArrays.
 - **[Execution and Parallelism](./execution-and-parallelism):** Control pipeline execution: sequential and parallel, with mixed executors and storage. Includes post-execution hooks.
 - **[Parameter Scopes](./parameter-scopes):** Organize pipelines and avoid naming conflicts using parameter scopes.
 - **[Error Handling](./error-handling):** Capture detailed error information with `ErrorSnapshot` for debugging.

@@ -33,6 +33,24 @@ def at_least_tuple(x: Any) -> tuple[Any, ...]:
     return x if isinstance(x, tuple) else (x,)
 
 
+def create_mask_for_masked_values(arr: np.ndarray) -> np.ndarray:
+    """Create a boolean mask for np.ma.masked sentinel values in an array.
+
+    Parameters
+    ----------
+    arr
+        Array that may contain np.ma.masked sentinel values.
+
+    Returns
+    -------
+    mask
+        Boolean array where True indicates the presence of np.ma.masked.
+
+    """
+    is_masked = np.frompyfunc(lambda x: x is np.ma.masked, 1, 1)
+    return is_masked(arr).astype(bool)
+
+
 def load(path: Path, *, cache: bool = False) -> Any:
     """Load a cloudpickled object from a path.
 

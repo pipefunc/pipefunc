@@ -100,6 +100,24 @@ def test_to_xarray_1_dim_2_funcs(tmp_path: Path):
     assert da.to_numpy().tolist() == [3, 5, 7]
 
 
+def test_to_xarray_preserves_float_mask_dtype() -> None:
+    @pipefunc(output_name="floats", mapspec="vals[i] -> floats[i]")
+    def identity(vals: float) -> float:
+        return vals
+
+    pipeline = Pipeline([identity])
+    results = pipeline.map(inputs={"vals": [0.0, 1.0]}, storage="dict", parallel=False)
+
+    masked = np.ma.MaskedArray([1.5, 2.5], mask=[False, True], dtype=float)
+    results["floats"].output = masked
+
+    ds = results.to_xarray(type_cast=False)
+    da = ds["floats"]
+    assert da.dtype == np.float64
+    np.testing.assert_array_equal(np.isnan(da.values), masked.mask)
+    np.testing.assert_array_equal(da.attrs["_mask"], masked.mask)
+
+
 def test_to_xarray_from_step(tmp_path: Path):
     @pipefunc(output_name="x")
     def generate_ints(n: int) -> list[int]:

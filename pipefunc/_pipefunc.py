@@ -34,7 +34,7 @@ from pipefunc._utils import (
 )
 from pipefunc.exceptions import ErrorSnapshot
 from pipefunc.lazy import evaluate_lazy
-from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
+from pipefunc.map._mapspec import ArraySpec, MapSpec, is_irregular, mapspec_axes
 from pipefunc.map._run import _EVALUATED_RESOURCES
 from pipefunc.resources import Resources
 from pipefunc.typing import NoAnnotation, safe_get_type_hints
@@ -970,6 +970,10 @@ class PipeFunc(Generic[T]):
             pipefunc_hash = self.func.__pipefunc_hash__()
             return f"{name}-{pipefunc_hash}"
         return name
+
+    @functools.cached_property
+    def _irregular_output(self) -> bool:
+        return is_irregular(self.mapspec)
 
 
 def pipefunc(

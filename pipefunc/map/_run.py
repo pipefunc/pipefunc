@@ -18,6 +18,7 @@ import numpy.typing as npt
 from pipefunc._pipefunc_utils import handle_pipefunc_error
 from pipefunc._utils import (
     at_least_tuple,
+    create_mask_for_masked_values,
     dump,
     get_ncores,
     is_running_in_ipynb,
@@ -39,6 +40,7 @@ from ._prepare import prepare_run
 from ._result import DirectValue, Result, ResultDict
 from ._shapes import external_shape_from_mask, internal_shape_from_mask, shape_is_resolved
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
+from ._storage_array._irregular_helpers import try_getitem
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine, Generator, Iterable, Sequence
@@ -549,9 +551,38 @@ def _select_kwargs(
     external_shape = external_shape_from_mask(shape, shape_mask)
     input_keys = func.mapspec.input_keys(external_shape, index)  # type: ignore[arg-type]
     normalized_keys = {k: v[0] if len(v) == 1 else v for k, v in input_keys.items()}
-    selected = {k: v[normalized_keys[k]] if k in normalized_keys else v for k, v in kwargs.items()}
+
+    selected: dict[str, Any] = {}
+    for name, source in kwargs.items():
+        if name in normalized_keys:
+            key = normalized_keys[name]
+            value = source[key]
+            selected[name] = _maybe_trim_irregular_slice(source, key, value)
+        else:
+            selected[name] = source
     _load_data(selected)
     return selected
+
+
+_NONE_SLICE = slice(None)
+
+
+def _maybe_trim_irregular_slice(
+    source: Any,
+    key: tuple[int | slice, ...] | int | slice,
+    value: Any,
+) -> Any:
+    if (
+        not isinstance(value, np.ma.MaskedArray)
+        or not isinstance(source, StorageBase)
+        or not source.irregular
+    ):
+        return value
+    if not any(axis_key == _NONE_SLICE for axis_key in at_least_tuple(key)):
+        return value
+    if value.ndim == 1:
+        return value.compressed()
+    return value
 
 
 def _maybe_eval_resources_in_selected(
@@ -643,6 +674,79 @@ def _try_shape(x: Any) -> tuple[int, ...]:
     except ValueError:
         # e.g., when inhomogeneous lists are passed
         return ()
+
+
+def _coerce_irregular_output(
+    value: Any,
+    internal_shape: tuple[int, ...],
+    *,
+    func: PipeFunc,
+) -> np.ma.MaskedArray:
+    """Coerce ragged nested structures into a masked array with ``internal_shape``.
+
+    Creates a fully-masked result array, then recursively walks the input structure,
+    validating lengths and filling values. Preserves ``np.ma.masked`` sentinels.
+    """
+    if len(internal_shape) == 0:
+        msg = (
+            f"Irregular output of function '{func.__name__}' (output '{func.output_name}') "
+            "requires a non-empty internal_shape."
+        )
+        raise ValueError(msg)
+
+    result = np.ma.masked_all(internal_shape, dtype=object)
+    data = result.data
+    mask = result.mask
+
+    def fill_sequence(seq: list[Any], prefix: tuple[int, ...], axis: int) -> None:
+        """Validate sequence length and recursively fill each element."""
+        expected = internal_shape[axis]
+        if len(seq) > expected:
+            msg = (
+                f"Irregular output of function '{func.__name__}' (output '{func.output_name}') "
+                f"exceeds internal_shape at axis {axis}: actual extent {len(seq)} > configured {expected}."
+            )
+            raise ValueError(msg)
+        for index, item in enumerate(seq):
+            fill(item, (*prefix, index))
+
+    def fill(src: Any, prefix: tuple[int, ...]) -> None:
+        """Recursively fill from nested structure (src) into result array."""
+        axis = len(prefix)
+
+        # Leaf position: store scalar and unmask
+        if axis == len(internal_shape):
+            if not np.ma.is_masked(src):
+                data[prefix] = src
+                mask[prefix] = False
+            return
+
+        if isinstance(src, np.ma.MaskedArray):
+            if src.ndim == 0:
+                if not np.ma.is_masked(src):
+                    fill(src.item(), prefix)
+                return
+            # Use indexing to preserve masked sentinels (list() would convert them)
+            fill_sequence([src[index] for index in range(src.shape[0])], prefix, axis)
+            return
+
+        if isinstance(src, np.ndarray):
+            if src.ndim == 0:
+                fill(src.item(), prefix)
+                return
+            fill_sequence(list(src), prefix, axis)
+            return
+
+        if isinstance(src, (list, tuple)):
+            fill_sequence(list(src), prefix, axis)
+            return
+
+        # Fallback: treat other types (e.g., bare scalars) as single-element sequences
+        if not np.ma.is_masked(src):
+            fill_sequence([src], prefix, axis)
+
+    fill(value, ())
+    return result
 
 
 @dataclass
@@ -748,7 +852,11 @@ def _set_output(
             external_index,
             internal_index,
         )
-        arr[flat_index] = output[internal_index]
+        if func._irregular_output:
+            _output, _masked = try_getitem(output, internal_index)
+        else:
+            _output = output[internal_index]
+        arr[flat_index] = _output
 
 
 def _validate_internal_shape(
@@ -757,6 +865,8 @@ def _validate_internal_shape(
     func: PipeFunc,
 ) -> None:
     shape = np.shape(output)[: len(internal_shape)]
+    if func._irregular_output:
+        return
     if shape != internal_shape:
         msg = (
             f"Output shape {shape} of function '{func.__name__}'"
@@ -780,34 +890,118 @@ def _update_result_array(
 ) -> None:
     if result_arrays is None:
         return
+
+    internal_shape = internal_shape_from_mask(shape, mask)
+
     for result_array, _output in zip(result_arrays, output):
         if not all(mask):
-            _output = np.asarray(_output)  # In case _output is a list
+            # Normalize irregular outputs to properly shaped MaskedArrays
+            if func._irregular_output:
+                _output = _coerce_irregular_output(_output, internal_shape, func=func)
+            else:
+                _output = np.asarray(_output)  # In case _output is a list
             _set_output(result_array, _output, index, shape, mask, func)
         else:
             result_array[index] = _output
 
 
+class _IrregularSkipContext:
+    """Derives mask information for irregular element-wise maps."""
+
+    def __init__(
+        self,
+        func: PipeFunc,
+        kwargs: dict[str, Any],
+        shape: ShapeTuple,
+        shape_mask: tuple[bool, ...],
+    ) -> None:
+        mapspec = func.mapspec
+        if mapspec is None:
+            self.enabled = False
+            return
+
+        irregular_axes = [axis for axis in mapspec.output_indices if axis.endswith("*")]
+        if not irregular_axes:
+            self.enabled = False
+            return
+
+        self.irregular_axes = irregular_axes
+        external_shape = external_shape_from_mask(shape, shape_mask)
+        if not shape_is_resolved(external_shape):
+            self.enabled = False
+            return
+        self.external_shape = external_shape
+        self.internal_shape = internal_shape_from_mask(shape, shape_mask)
+        self.shape_mask = shape_mask
+        self.full_shape = select_by_mask(shape_mask, external_shape, self.internal_shape)
+        self.mapspec = mapspec
+        self.probes: list[tuple[str, StorageBase]] = []
+
+        for spec in mapspec.inputs:
+            if not any(axis in spec.axes for axis in self.irregular_axes):
+                continue
+            value = kwargs.get(spec.name)
+            if not isinstance(value, StorageBase) or not value.irregular:
+                continue
+            if not value.internal_shape:
+                msg = "Irregular storage must declare an internal shape"
+                raise AssertionError(msg)
+            if not value.full_shape_is_resolved():
+                msg = "Irregular storage requires resolved storage shapes"
+                raise AssertionError(msg)
+            self.probes.append((spec.name, value))
+
+        self.enabled = bool(self.probes)
+
+    def should_skip(self, index: int) -> bool:
+        if not self.enabled:
+            return False
+
+        input_keys = self.mapspec.input_keys(
+            shape=self.external_shape,
+            linear_index=index % prod(self.external_shape or (1,)),
+        )
+        checked = False
+        for name, storage in self.probes:
+            key = input_keys.get(name)
+            if key is None:
+                continue
+            if not storage.is_element_masked(key):
+                return False
+            checked = True
+        return checked
+
+
 def _existing_and_missing_indices(
     arrays: list[StorageBase],
     fixed_mask: np.flatiter[npt.NDArray[np.bool_]] | None,
-) -> tuple[list[int], list[int]]:
+    *,
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    shape: ShapeTuple,
+    shape_mask: tuple[bool, ...],
+) -> tuple[list[int], list[int], list[int]]:
     # TODO: when `fixed_indices` are used we could be more efficient by not
     # computing the full mask.
     masks = (arr.mask_linear() for arr in arrays)
     if fixed_mask is None:
         fixed_mask = itertools.repeat(object=True)  # type: ignore[assignment]
 
-    existing_indices = []
-    missing_indices = []
+    existing_indices: list[int] = []
+    missing_indices: list[int] = []
+    skipped_indices: list[int] = []
+    skip_context = _IrregularSkipContext(func, kwargs, shape, shape_mask)
     for i, (*mask_values, select) in enumerate(zip(*masks, fixed_mask)):  # type: ignore[arg-type]
         if not select:
             continue
         if any(mask_values):  # rerun if any of the outputs are missing
+            if skip_context.should_skip(i):
+                skipped_indices.append(i)
+                continue
             missing_indices.append(i)
         else:
             existing_indices.append(i)
-    return existing_indices, missing_indices
+    return existing_indices, missing_indices, skipped_indices
 
 
 @contextmanager
@@ -827,6 +1021,7 @@ class _MapSpecArgs:
     process_index: functools.partial[tuple[Any, ...]]
     existing: list[int]
     missing: list[int]
+    skipped: list[int]
     result_arrays: list[np.ndarray] | None
     mask: tuple[bool, ...]
     arrays: list[StorageBase]
@@ -860,9 +1055,16 @@ def _prepare_submit_map_spec(
         return_results=return_results,
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
-    existing, missing = _existing_and_missing_indices(arrays, fixed_mask)  # type: ignore[arg-type]
+    existing, missing, skipped = _existing_and_missing_indices(
+        arrays,
+        fixed_mask,
+        func=func,
+        kwargs=kwargs,
+        shape=shape,
+        shape_mask=mask,
+    )
     _update_status_if_needed(status, existing, missing)
-    return _MapSpecArgs(process_index, existing, missing, result_arrays, mask, arrays)
+    return _MapSpecArgs(process_index, existing, missing, skipped, result_arrays, mask, arrays)
 
 
 def _mask_fixed_axes(
@@ -1232,6 +1434,7 @@ def _update_status_if_needed(
 ) -> None:
     if status is not None and status.n_total is None:
         status.n_total = len(missing) + len(existing)
+        status.n_completed += len(existing)
 
 
 def _executor_for_func(
@@ -1280,7 +1483,7 @@ def _submit_generation(
     }
 
 
-def _output_from_mapspec_task(
+def _output_from_mapspec_task(  # noqa: PLR0912
     func: PipeFunc,
     store: dict[str, StoreType],
     args: _MapSpecArgs,
@@ -1309,6 +1512,22 @@ def _output_from_mapspec_task(
             first = False
         _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
 
+    if args.skipped:
+        if first and not args.missing and not args.existing:
+            shape = args.arrays[0].full_shape
+        assert "shape" in locals()
+        if args.result_arrays is not None:
+            masked_outputs = [np.ma.masked for _ in at_least_tuple(func.output_name)]
+            for index in args.skipped:
+                _update_result_array(
+                    args.result_arrays,
+                    index,
+                    masked_outputs,
+                    shape,
+                    args.mask,
+                    func,
+                )
+
     if not args.missing and not args.existing:  # shape variable does not exist
         shape = args.arrays[0].full_shape
 
@@ -1317,7 +1536,21 @@ def _output_from_mapspec_task(
 
     if args.result_arrays is None:
         return None
-    return tuple(x.reshape(shape) for x in args.result_arrays)  # type: ignore[union-attr]
+
+    # Reshape the result arrays
+    reshaped = tuple(x.reshape(shape) for x in args.result_arrays)  # type: ignore[union-attr]
+
+    # For irregular outputs, ensure we return MaskedArrays
+    # The arrays contain np.ma.masked sentinels that need to be converted to proper masks
+    if func._irregular_output:
+        masked_arrays = []
+        for arr in reshaped:
+            # Use helper to efficiently check for np.ma.masked sentinels
+            mask = create_mask_for_masked_values(arr)
+            masked_arrays.append(np.ma.MaskedArray(arr, mask=mask))
+        return tuple(masked_arrays)
+
+    return reshaped
 
 
 def _internal_shape(output: Any, storage: StorageBase) -> tuple[int, ...]:

@@ -134,10 +134,7 @@ def init_tracker(
         name, *_ = at_least_tuple(func.output_name)  # if multiple, the have equal size
         s = store[name]
         if isinstance(s, StorageBase):
-            if shape_is_resolved(s.shape):  # noqa: SIM108
-                size = s.size
-            else:
-                size = None  # Defer size calculation until shape is resolved
+            size = None if s.irregular or not shape_is_resolved(s.shape) else s.size
         else:
             size = 1
         progress[func.output_name] = Status(n_total=size)
