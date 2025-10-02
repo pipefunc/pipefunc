@@ -109,6 +109,7 @@ class CacheStorage(MinimalStorage):
         super().__init__(shape=(1,), internal_shape=(1,), shape_mask=(True, False), irregular=True)
         self.calls = 0
         self._store[0] = np.ma.array([1])
+        self._irregular_extent_cache = {}
 
     def _compute_irregular_extent(self, external_index: tuple[int, ...]) -> tuple[int, ...] | None:  # noqa: ARG002
         self.calls += 1
@@ -189,13 +190,6 @@ def test_is_slice_masked_fast_path_uses_extent() -> None:
     cache = CacheStorage()
     assert not cache.is_element_masked((0, slice(None)))
     assert cache.calls == 1
-
-
-def test_irregular_extent_initializes_cache() -> None:
-    storage = CacheStorage()
-    del storage._irregular_extent_cache
-    assert storage.irregular_extent((0,)) == (1,)
-    assert hasattr(storage, "_irregular_extent_cache")
 
 
 def test_irregular_slice_extent_rejects_partial_slice() -> None:

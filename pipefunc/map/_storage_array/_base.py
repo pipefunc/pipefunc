@@ -68,6 +68,7 @@ class StorageBase(abc.ABC):
     storage_id: str
     requires_serialization: bool
     _is_resolved: bool = False
+    _irregular_extent_cache: dict[tuple[int, ...], tuple[int, ...] | None] | None
 
     @abc.abstractmethod
     def __init__(
@@ -132,10 +133,12 @@ class StorageBase(abc.ABC):
 
     def irregular_extent(self, external_index: tuple[int, ...]) -> tuple[int, ...] | None:
         """Return the realised extent along irregular axes for ``external_index``."""
+        cache = getattr(self, "_irregular_extent_cache", None)
+        assert cache is not None
         return irregular_extent(
             self.irregular,
             self.internal_shape,
-            getattr(self, "_irregular_extent_cache", None),
+            cache,
             external_index,
             self._compute_irregular_extent,
         )
@@ -246,7 +249,7 @@ class StorageBase(abc.ABC):
         return True
 
     def _clear_irregular_extent_cache(self) -> None:
-        clear_irregular_extent_cache(getattr(self, "_irregular_extent_cache", None))
+        clear_irregular_extent_cache(self._irregular_extent_cache)
 
     @property
     def size(self) -> int:
