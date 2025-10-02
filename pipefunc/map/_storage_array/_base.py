@@ -22,15 +22,6 @@ from ._irregular_helpers import (
     ensure_masked_array_for_irregular,
     irregular_extent,
 )
-from ._irregular_helpers import (
-    infer_irregular_length as _infer_irregular_length,
-)
-from ._irregular_helpers import (
-    try_getitem as _try_getitem,
-)
-
-infer_irregular_length = _infer_irregular_length
-try_getitem = _try_getitem
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

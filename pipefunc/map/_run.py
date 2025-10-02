@@ -39,7 +39,8 @@ from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
 from ._result import DirectValue, Result, ResultDict
 from ._shapes import external_shape_from_mask, internal_shape_from_mask, shape_is_resolved
-from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask, try_getitem
+from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
+from ._storage_array._irregular_helpers import try_getitem
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine, Generator, Iterable, Sequence

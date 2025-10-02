@@ -19,12 +19,12 @@ from pipefunc.map._run import (
 )
 from pipefunc.map._storage_array._base import (
     StorageBase,
-    infer_irregular_length,
     register_storage,
     storage_registry,
 )
 from pipefunc.map._storage_array._dict import DictArray, SharedMemoryDictArray
 from pipefunc.map._storage_array._file import FileArray
+from pipefunc.map._storage_array._irregular_helpers import infer_irregular_length
 
 if TYPE_CHECKING:
     from pathlib import Path

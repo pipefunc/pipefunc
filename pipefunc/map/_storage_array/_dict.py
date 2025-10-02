@@ -13,13 +13,12 @@ from pipefunc._utils import dump, load
 
 from ._base import (
     StorageBase,
-    infer_irregular_length,
     iterate_shape_indices,
     normalize_key,
     register_storage,
     select_by_mask,
-    try_getitem,
 )
+from ._irregular_helpers import infer_irregular_length, try_getitem
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
