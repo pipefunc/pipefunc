@@ -174,7 +174,9 @@ class StorageBase(abc.ABC):
     def irregular_extent(self, external_index: tuple[int, ...]) -> tuple[int, ...] | None:
         """Return the realised extent along irregular axes for ``external_index``."""
         if not self.irregular or not self.internal_shape or self._irregular_extent_cache is None:
+            # This *should* not never happen in normal pipeline.map use.
             return None
+
         if external_index in self._irregular_extent_cache:
             return self._irregular_extent_cache[external_index]
         extent = self._compute_irregular_extent(external_index)
