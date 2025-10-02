@@ -119,3 +119,5 @@ docs/source/*results
 docs/source/*run_folder*
 .codspeed
 .env*
+.code/
+uv.lock
