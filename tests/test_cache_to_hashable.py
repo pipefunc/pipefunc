@@ -9,6 +9,7 @@ import pytest
 from pipefunc.cache import _HASH_MARKER, UnhashableError, _cloudpickle_key, to_hashable
 
 has_pandas = importlib.util.find_spec("pandas") is not None
+has_polars = importlib.util.find_spec("polars") is not None
 
 M = _HASH_MARKER
 
@@ -69,6 +70,31 @@ def test_to_hashable_pandas_dataframe() -> None:
     assert result[0] == M
     assert result[1] == pd.DataFrame
     assert result[2] == (M, dict, (("A", (M, list, (1, 2))), ("B", (M, list, (3, 4)))))
+
+
+@pytest.mark.skipif(not has_polars, reason="polars not installed")
+def test_to_hashable_polars_dataframe() -> None:
+    import polars as pl
+
+    df = pl.DataFrame({"A": [1, 2], "B": [3, 4]})
+    result = to_hashable(df)
+    assert isinstance(result, tuple)
+    assert result[0] == M
+    assert result[1] == pl.DataFrame
+    assert result[2] == (M, dict, (("A", (M, list, (1, 2))), ("B", (M, list, (3, 4)))))
+
+
+@pytest.mark.skipif(not has_polars, reason="polars not installed")
+def test_to_hashable_polars_series() -> None:
+    import polars as pl
+
+    series = pl.Series("test", [1, 2, 3])
+    result = to_hashable(series)
+    assert isinstance(result, tuple)
+    assert result[0] == M
+    assert result[1] == pl.Series
+    assert result[2][0] == "test"
+    assert result[2][1] == (M, list, (1, 2, 3))
 
 
 def test_to_hashable_nested_structures() -> None:

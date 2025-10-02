@@ -31,6 +31,7 @@ has_xarray = importlib.util.find_spec("xarray") is not None
 has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
 has_zarr = importlib.util.find_spec("zarr") is not None
 has_psutil = importlib.util.find_spec("psutil") is not None
+has_polars = importlib.util.find_spec("polars") is not None
 
 storage_options = list(storage_registry)
 
@@ -376,6 +377,16 @@ def test_simple_from_step(tmp_path: Path) -> None:
 
         df = results.to_dataframe()
         assert df["x"].tolist() == [0, 1, 2, 3]
+        if has_polars:
+            import polars as pl
+
+            df_polars = load_dataframe("y", run_folder=tmp_path, backend="polars")
+            assert isinstance(df_polars, pl.DataFrame)
+            assert df_polars["x"].to_list() == [0, 1, 2, 3]
+
+            df_polars_results = results.to_dataframe(backend="polars")
+            assert isinstance(df_polars_results, pl.DataFrame)
+            assert df_polars_results["x"].to_list() == [0, 1, 2, 3]
 
 
 @pipefunc(output_name=("single", "double"))

@@ -156,6 +156,13 @@ def is_equal(  # noqa: PLR0911, PLR0912
 
             if isinstance(a, pd.DataFrame):
                 return a.equals(b)
+        if is_installed("polars"):
+            import polars as pl
+
+            if isinstance(a, pl.DataFrame):
+                return a.equals(b)
+            if isinstance(a, pl.Series):
+                return a.equals(b)
         # Cast to bool to prevent issues with custom equality methods
         return bool(a == b)
     except Exception:
