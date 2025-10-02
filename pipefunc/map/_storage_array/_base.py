@@ -70,22 +70,19 @@ def select_by_mask(
 def infer_irregular_length(value: Any) -> int:
     """Return the realised length for a single irregular axis."""
     if value is None or value is np.ma.masked:
-        result = 0
-    elif isinstance(value, np.ma.MaskedArray):
+        return 0
+    if isinstance(value, np.ma.MaskedArray):
         if value.ndim == 0:
-            result = 0 if np.ma.is_masked(value) else 1
-        elif value.mask is np.ma.nomask:
-            result = int(value.shape[0])
-        else:
-            mask = np.atleast_1d(value.mask)
-            valid = np.nonzero(~mask)[0]
-            result = 0 if valid.size == 0 else int(valid[-1]) + 1
-    else:
-        try:
-            result = len(value)  # type: ignore[arg-type]
-        except TypeError:
-            result = 1
-    return result
+            return 0 if np.ma.is_masked(value) else 1
+        if value.mask is np.ma.nomask:
+            return int(value.shape[0])
+        mask = np.atleast_1d(value.mask)
+        valid = np.nonzero(~mask)[0]
+        return 0 if valid.size == 0 else int(valid[-1]) + 1
+    try:
+        return len(value)  # type: ignore[arg-type]
+    except TypeError:
+        return 1
 
 
 class StorageBase(abc.ABC):
