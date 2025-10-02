@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable
 
 
 def try_getitem(
@@ -56,28 +56,3 @@ def ensure_masked_array_for_irregular(
     if np.any(mask):
         return np.ma.MaskedArray(data, mask=mask, dtype=object)
     return data
-
-
-def irregular_extent(
-    irregular: bool,
-    internal_shape: Sequence[Any],
-    cache: dict[tuple[int, ...], tuple[int, ...] | None],
-    external_index: tuple[int, ...],
-    compute_extent: Callable[[tuple[int, ...]], tuple[int, ...] | None],
-) -> tuple[int, ...] | None:
-    """Return the realised extent along irregular axes for ``external_index``."""
-    if not irregular or not internal_shape:
-        return None
-    if external_index in cache:
-        return cache[external_index]
-    extent = compute_extent(external_index)
-    cache[external_index] = extent
-    return extent
-
-
-def clear_irregular_extent_cache(
-    cache: dict[tuple[int, ...], tuple[int, ...] | None] | None,
-) -> None:
-    """Clear the cached irregular extents if present."""
-    if cache is not None:
-        cache.clear()

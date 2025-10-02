@@ -18,9 +18,7 @@ from pipefunc.map._shapes import (
 )
 
 from ._irregular_helpers import (
-    clear_irregular_extent_cache,
     ensure_masked_array_for_irregular,
-    irregular_extent,
 )
 
 if TYPE_CHECKING:
@@ -130,19 +128,58 @@ class StorageBase(abc.ABC):
     def dump_in_subprocess(self) -> bool:
         """Indicates if the storage can be dumped in a subprocess and read by the main process."""
 
-    # ---- Irregular array helpers -------------------------------------------------
+    @property
+    def size(self) -> int:
+        """Return number of elements in the array."""
+        return prod(self.resolved_shape)
+
+    @property
+    def rank(self) -> int:
+        """Return the rank of the array."""
+        return len(self.resolved_shape)
+
+    def _ensure_masked_array_for_irregular(self, data: Any) -> Any:
+        """Convert arrays with masked sentinels to MaskedArrays if irregular=True.
+
+        This should be called at the end of __getitem__ implementations
+        to ensure consistent behavior across all storage types.
+        """
+        return ensure_masked_array_for_irregular(
+            data,
+            irregular=self.irregular,
+            mask_factory=create_mask_for_masked_values,
+        )
+
+    @functools.cached_property
+    def full_shape(self) -> tuple[int, ...]:
+        """Return the full shape of the array."""
+        full_shape = select_by_mask(
+            self.shape_mask,
+            self.resolved_shape,
+            self.resolved_internal_shape,
+        )
+        assert shape_is_resolved(full_shape)
+        return full_shape
+
+    @functools.cached_property
+    def strides(self) -> tuple[int, ...]:
+        """Return the strides of the array."""
+        return shape_to_strides(self.resolved_shape)
+
+    def persist(self) -> None:  # noqa: B027
+        """Save a memory-based storage to disk."""
+
+    # -- Irregular array helpers --
 
     def irregular_extent(self, external_index: tuple[int, ...]) -> tuple[int, ...] | None:
         """Return the realised extent along irregular axes for ``external_index``."""
-        cache = getattr(self, "_irregular_extent_cache", None)
-        assert cache is not None
-        return irregular_extent(
-            self.irregular,
-            self.internal_shape,
-            cache,
-            external_index,
-            self._compute_irregular_extent,
-        )
+        if not self.irregular or not self.internal_shape or self._irregular_extent_cache is None:
+            return None
+        if external_index in self._irregular_extent_cache:
+            return self._irregular_extent_cache[external_index]
+        extent = self._compute_irregular_extent(external_index)
+        self._irregular_extent_cache[external_index] = extent
+        return extent
 
     def _compute_irregular_extent(
         self,
@@ -250,48 +287,8 @@ class StorageBase(abc.ABC):
         return True
 
     def _clear_irregular_extent_cache(self) -> None:
-        clear_irregular_extent_cache(self._irregular_extent_cache)
-
-    @property
-    def size(self) -> int:
-        """Return number of elements in the array."""
-        return prod(self.resolved_shape)
-
-    @property
-    def rank(self) -> int:
-        """Return the rank of the array."""
-        return len(self.resolved_shape)
-
-    def _ensure_masked_array_for_irregular(self, data: Any) -> Any:
-        """Convert arrays with masked sentinels to MaskedArrays if irregular=True.
-
-        This should be called at the end of __getitem__ implementations
-        to ensure consistent behavior across all storage types.
-        """
-        return ensure_masked_array_for_irregular(
-            data,
-            irregular=self.irregular,
-            mask_factory=create_mask_for_masked_values,
-        )
-
-    @functools.cached_property
-    def full_shape(self) -> tuple[int, ...]:
-        """Return the full shape of the array."""
-        full_shape = select_by_mask(
-            self.shape_mask,
-            self.resolved_shape,
-            self.resolved_internal_shape,
-        )
-        assert shape_is_resolved(full_shape)
-        return full_shape
-
-    @functools.cached_property
-    def strides(self) -> tuple[int, ...]:
-        """Return the strides of the array."""
-        return shape_to_strides(self.resolved_shape)
-
-    def persist(self) -> None:  # noqa: B027
-        """Save a memory-based storage to disk."""
+        if self._irregular_extent_cache is not None:
+            self._irregular_extent_cache.clear()
 
 
 def register_storage(cls: type[StorageBase], storage_id: str | None = None) -> None:
