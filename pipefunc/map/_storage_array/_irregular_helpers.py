@@ -10,16 +10,12 @@ import numpy as np
 def try_getitem(
     array: np.ndarray,
     key: tuple[int, ...],
-    *,
-    irregular: bool,
 ) -> tuple[Any, bool]:
     """Return the item at ``key`` or a masked sentinel when irregular."""
     try:
         return array[key], False
     except IndexError:
-        if irregular:
-            return np.ma.masked, True
-        raise
+        return np.ma.masked, True
 
 
 def infer_irregular_length(value: Any) -> int:

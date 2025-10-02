@@ -115,7 +115,7 @@ class DictArray(StorageBase):
                         stored = self._dict[external_key]
                         if self.irregular:
                             arr = np.ma.array(stored, copy=False)
-                            value, _ = try_getitem(arr, internal_key, irregular=True)
+                            value, _ = try_getitem(arr, internal_key)
                         else:
                             arr = np.asarray(stored)
                             value = arr[internal_key]
@@ -148,7 +148,7 @@ class DictArray(StorageBase):
             arr = np.ma.array(stored, copy=False)
             if not internal_key:
                 return arr
-            value, _ = try_getitem(arr, internal_key, irregular=True)
+            value, _ = try_getitem(arr, internal_key)
             return value
         if not internal_key:
             return stored
@@ -198,7 +198,7 @@ class DictArray(StorageBase):
                 for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
                     if self.irregular:
-                        sel, masked = try_getitem(value_array, internal_index, irregular=True)
+                        sel, masked = try_getitem(value_array, internal_index)
                         if masked:
                             continue
                         data[full_index] = sel

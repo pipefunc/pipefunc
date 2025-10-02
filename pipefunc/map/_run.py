@@ -853,7 +853,7 @@ def _set_output(
             internal_index,
         )
         if func._irregular_output:
-            _output, _masked = try_getitem(output, internal_index, irregular=True)
+            _output, _masked = try_getitem(output, internal_index)
         else:
             _output = output[internal_index]
         arr[flat_index] = _output

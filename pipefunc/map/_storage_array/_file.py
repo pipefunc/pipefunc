@@ -154,11 +154,7 @@ class FileArray(StorageBase):
             arr = np.ma.array(sub_array, copy=False)
             if not internal_indices:
                 return arr
-            value, _ = try_getitem(
-                arr,
-                internal_indices,  # type: ignore[arg-type]
-                irregular=True,
-            )
+            value, _ = try_getitem(arr, internal_indices)  # type: ignore[arg-type]
             return value
         if not internal_indices:
             return sub_array
@@ -184,11 +180,7 @@ class FileArray(StorageBase):
                 if self.irregular:
                     sub_array = np.ma.array(sub_array, copy=False)
                     if internal_index:
-                        sliced_value, masked = try_getitem(
-                            sub_array,
-                            internal_index,
-                            irregular=True,
-                        )
+                        sliced_value, masked = try_getitem(sub_array, internal_index)
                         sliced_data.append(sliced_value)
                         sliced_mask.append(masked)
                         continue
@@ -262,7 +254,7 @@ class FileArray(StorageBase):
                 for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
                     if self.irregular:
-                        sel, masked = try_getitem(sub_array, internal_index, irregular=True)
+                        sel, masked = try_getitem(sub_array, internal_index)
                         arr[full_index] = sel
                         full_mask[full_index] = masked
                     else:
