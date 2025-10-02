@@ -109,11 +109,6 @@ class DictArray(StorageBase):
                 itertools.product(*self._slice_indices(key, self.full_shape)),
             ):
                 external_key = tuple(x for x, m in zip(index, self.shape_mask) if m)
-                internal_key = (
-                    tuple(x for x, m in zip(index, self.shape_mask) if not m)
-                    if self.internal_shape
-                    else None
-                )
                 if self.internal_shape:
                     internal_key = tuple(x for x, m in zip(index, self.shape_mask) if not m)
                     if external_key in self._dict:
