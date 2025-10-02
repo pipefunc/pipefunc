@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from ._types import ShapeDict, ShapeTuple
 
 
+@functools.lru_cache(maxsize=256)
 def shape_to_strides(shape: tuple[int, ...]) -> tuple[int, ...]:
     """Compute strides for a multidimensional array given its shape.
 
