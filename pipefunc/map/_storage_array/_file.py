@@ -237,12 +237,18 @@ class FileArray(StorageBase):
 
             if file.is_file():
                 sub_array = load(file)
-                sub_array = np.asarray(sub_array)  # could be a list
+                sub_array = (
+                    np.ma.array(sub_array, copy=False) if self.irregular else np.asarray(sub_array)
+                )
                 for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
-                    sel, masked = try_getitem(sub_array, internal_index, irregular=self.irregular)
-                    arr[full_index] = sel
-                    full_mask[full_index] = masked
+                    if self.irregular:
+                        sel, masked = try_getitem(sub_array, internal_index, irregular=True)
+                        arr[full_index] = sel
+                        full_mask[full_index] = masked
+                    else:
+                        arr[full_index] = sub_array[internal_index]
+                        full_mask[full_index] = False
             else:
                 for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
