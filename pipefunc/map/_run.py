@@ -563,6 +563,9 @@ def _select_kwargs(
     return selected
 
 
+_NONE_SLICE = slice(None)
+
+
 def _maybe_trim_irregular_slice(
     source: Any,
     key: tuple[int | slice, ...] | int | slice,
@@ -574,13 +577,7 @@ def _maybe_trim_irregular_slice(
         or not source.irregular
     ):
         return value
-    if not any(
-        isinstance(axis_key, slice)
-        and axis_key.start is None
-        and axis_key.stop is None
-        and axis_key.step is None
-        for axis_key in at_least_tuple(key)
-    ):
+    if not any(axis_key == _NONE_SLICE for axis_key in at_least_tuple(key)):
         return value
     if value.ndim == 1:
         return value.compressed()
