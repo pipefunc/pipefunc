@@ -223,3 +223,14 @@ def test_file_array_with_internal_arrays_full_array_different_order_simple(tmp_p
     expected2 = data1
     expected2 = np.ma.MaskedArray(expected2, mask=False, dtype=object)
     assert np.array_equal(result, expected2)
+
+
+def test_file_storage_irregular_slice_without_internal_axes(tmp_path: Path) -> None:
+    store = FileArray(tmp_path, shape=(2,), irregular=True)
+    store.dump((0,), 5)
+    store.dump((1,), np.ma.masked)
+
+    result = store[(slice(None),)]
+    assert isinstance(result, np.ma.MaskedArray)
+    assert result.shape == (2,)
+    assert np.ma.is_masked(result[1])
