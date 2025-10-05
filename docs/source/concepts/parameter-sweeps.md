@@ -22,7 +22,7 @@ kernelspec:
 
 The `pipefunc.sweep` module provides a convenient way to contruct parameter sweeps.
 It was developed before `pipeline.map` which can perform sweep operations in parallel.
-However, by itself {class}`pipefunc.sweep.Sweep` might still be useful for cases where you have a pipeline that has no `mapspec`.
+However, by itself `pipefunc.sweep.Sweep` might still be useful for cases where you have a pipeline that has no `mapspec`.
 
 ```{code-cell} ipython3
 from pipefunc.sweep import Sweep

@@ -22,7 +22,7 @@ kernelspec:
 
 ## What is `VariantPipeline` and how to use it?
 
-{class}`pipefunc.VariantPipeline` allows creating pipelines with alternative implementations (variants) of functions. This is useful when you want to experiment with different implementations without creating separate pipelines.
+`pipefunc.VariantPipeline` allows creating pipelines with alternative implementations (variants) of functions. This is useful when you want to experiment with different implementations without creating separate pipelines.
 
 Here's a simple example:
 
@@ -97,9 +97,8 @@ pipeline.visualize(backend="graphviz")
 
 This will include dropdowns for each variant group, allowing you to select the specific variant you want to visualize.
 
-:::{admonition} The interactive widgets do not work in the documentation
-They are only functional in live Jupyter environments.
-:::
+!!! note "The interactive widgets do not work in the documentation"
+    They are only functional in live Jupyter environments.
 
 You can inspect available variants using `variants_mapping()`:
 
@@ -142,7 +141,7 @@ The `with_variant()` method returns either:
 - A regular `Pipeline` if all variants are resolved
 - Another `VariantPipeline` if some variants remain unselected
 
-Also check out {class}`pipefunc.VariantPipeline.from_pipelines` to create a `VariantPipeline` from multiple `Pipeline` objects without having to specify `variant` for each function.
+Also check out `pipefunc.VariantPipeline.from_pipelines` to create a `VariantPipeline` from multiple `Pipeline` objects without having to specify `variant` for each function.
 
 This makes `VariantPipeline` ideal for:
 

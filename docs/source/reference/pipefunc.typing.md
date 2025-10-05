@@ -1,8 +1,3 @@
-## `pipefunc.typing` module
+# pipefunc.typing
 
-```{eval-rst}
-.. automodule:: pipefunc.typing
-    :members:
-    :undoc-members:
-    :show-inheritance:
-```
+::: pipefunc.typing

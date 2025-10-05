@@ -26,26 +26,27 @@ kernelspec:
 These methods are used to execute the pipeline but have different use cases:
 
 - `pipeline.run(output_name, kwargs)` is used to execute the pipeline as a function and is fully sequential. It allows going from any input arguments to any output arguments. It does **not** support map-reduce operations. Internally, it keeps all intermediate results in memory in a dictionary.
-- `pipeline.map(inputs, ...)` is used to execute the pipeline in parallel. It supports map-reduce operations and is optimized for parallel execution. Internally, it puts all intermediate results in a {class}`~pipefunc.map.StorageBase` (there are implementations for storing on disk or in memory).
+- `pipeline.map(inputs, ...)` is used to execute the pipeline in parallel. It supports map-reduce operations and is optimized for parallel execution. Internally, it puts all intermediate results in a ``pipefunc.map.StorageBase`` (there are implementations for storing on disk or in memory).
 
-```{note}
+!!! note
+
 Internally, the `pipeline.run` method is called when using the pipeline as a function, the following are equivalent:
 
 - `pipeline.run(output_name, kwargs)`
 - `pipeline(output_name, **kwargs)`
 - `f = pipeline.func(output_name)` and then `f(**kwargs)`
 
-```
+
 
 Here is a table summarizing the differences between `pipeline.run` and `pipeline.map`:
 
 | Feature                                                | `pipeline.run` and `pipeline(...)`                                               | `pipeline.map`                                                                                                         |
 | ------------------------------------------------------ | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Execution mode                                         | Sequential                                                                       | Parallel (any {class}`~concurrent.futures.Executor` class) or sequential                                               |
-| Map-reduce support (via {class}`pipefunc.map.MapSpec`) | No                                                                               | Yes                                                                                                                    |
-| Input arguments                                        | Can provide _any_ input arguments for any function in the pipeline               | Requires the root arguments (use {class}`~pipefunc.Pipeline.subpipeline` to get a subgraph)                            |
-| Output arguments                                       | Can request the output of any function in the pipeline                           | Calculates _all_ function nodes in the entire pipeline (use {class}`~pipefunc.Pipeline.subpipeline` to get a subgraph) |
-| Intermediate results storage                           | In-memory dictionary                                                             | Configurable storage ({class}`~pipefunc.map.StorageBase`), e.g., on disk, cloud, or in (shared-)memory                 |
+| Execution mode                                         | Sequential                                                                       | Parallel (any ``concurrent.futures.Executor`` class) or sequential                                               |
+| Map-reduce support (via `pipefunc.map.MapSpec`) | No                                                                               | Yes                                                                                                                    |
+| Input arguments                                        | Can provide _any_ input arguments for any function in the pipeline               | Requires the root arguments (use ``pipefunc.Pipeline.subpipeline`` to get a subgraph)                            |
+| Output arguments                                       | Can request the output of any function in the pipeline                           | Calculates _all_ function nodes in the entire pipeline (use ``pipefunc.Pipeline.subpipeline`` to get a subgraph) |
+| Intermediate results storage                           | In-memory dictionary                                                             | Configurable storage (``pipefunc.map.StorageBase``), e.g., on disk, cloud, or in (shared-)memory                 |
 | Use case                                               | Executing the pipeline as a regular function, going from any input to any output | Optimized for parallel execution and map-reduce operations                                                             |
 | Calling syntax                                         | `pipeline.run(output_name, kwargs)` or `pipeline(output_name, **kwargs)`         | `pipeline.map(inputs, ...)`                                                                                            |
 
@@ -104,7 +105,8 @@ print(f"process_names: {process_names}")
 
 In both `executor` and `storage` you can use the special key `""` to apply the default executor or storage.
 
-```{note}
+!!! note
+
 The `executor` supports any executor that is compliant with the `concurrent.futures.Executor` interface.
 That includes:
 
@@ -116,7 +118,7 @@ That includes:
 - `loky.get_reusable_executor()`
 - `executorlib.SingleNodeExecutor`, `executorlib.SlurmClusterExecutor`, `executorlib.SlurmJobExecutor`, `executorlib.FluxClusterExecutor`, `executorlib.FluxJobExecutor`
 
-```
+
 
 ## How to use post-execution hooks?
 
@@ -174,15 +176,15 @@ In some scenarios, you might need to run `pipeline.map` multiple times with diff
 `pipefunc` provides a convenient way to manage and execute these concurrent map operations, giving you control over the degree of parallelism.
 This is particularly useful when dealing with tasks that have varying computational requirements or when you want to orchestrate a series of related but independent parameter sweeps.
 
-The core functions for this are {func}`~pipefunc.helpers.launch_maps` and {func}`~pipefunc.helpers.gather_maps`.
+The core functions for this are ``pipefunc.helpers.launch_maps`` and ``pipefunc.helpers.gather_maps``.
 
 **The workflow is as follows:**
 
-1.  Create a list of `AsyncMap` runners by calling {meth}`~pipefunc.Pipeline.map_async` with `start=False`. This prepares the map operations without immediately executing them.
+1.  Create a list of `AsyncMap` runners by calling ``pipefunc.Pipeline.map_async`` with `start=False`. This prepares the map operations without immediately executing them.
 2.  Pass these runners to `launch_maps` or `gather_maps` to execute them.
 
-- {func}`~pipefunc.helpers.launch_maps`: A non-blocking function ideal for interactive environments like Jupyter. It starts the execution in the background and returns an `asyncio.Task` that you can `await` later.
-- {func}`~pipefunc.helpers.gather_maps`: A blocking `async` function that runs the maps and waits for all of them to complete before returning.
+- ``pipefunc.helpers.launch_maps``: A non-blocking function ideal for interactive environments like Jupyter. It starts the execution in the background and returns an `asyncio.Task` that you can `await` later.
+- ``pipefunc.helpers.gather_maps``: A blocking `async` function that runs the maps and waits for all of them to complete before returning.
 
 Let's see an example:
 
