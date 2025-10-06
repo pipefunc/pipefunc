@@ -99,7 +99,7 @@ def _data_loader(
     return load_outputs(output_name, run_folder=run_folder)
 
 
-def _xarray(
+def _xarray(  # noqa: PLR0912
     output_name: str,
     mapspecs: list[MapSpec],
     inputs: dict[str, Any],
@@ -114,15 +114,9 @@ def _xarray(
     coord_mapping: dict[tuple[str, ...], dict[str, list[Any]]] = defaultdict(
         lambda: defaultdict(list),
     )
-    dims: set[str] = set()
     for name, axes in target_dependencies.items():
-        dims.update(axes)
-        if name in inputs:
-            array = inputs[name]
-            array = maybe_load_data(array)
-        elif load_intermediate:
-            array = data_loader(name)
-        else:
+        array = _load_dependency(name, inputs, data_loader, load_intermediate)
+        if array is None:
             continue
 
         array = _maybe_to_array(array)
@@ -149,14 +143,42 @@ def _xarray(
         coords[name] = (axes, array)
 
     data = data_loader(output_name)
+    mask = None
+    if np.ma.isMaskedArray(data):
+        mask = np.ma.getmaskarray(data)
+        if np.issubdtype(data.dtype, np.floating):
+            data = data.filled(np.nan)
+        else:
+            obj = np.empty(data.shape, dtype=object)
+            obj[~mask] = data.data[~mask]
+            obj[mask] = None
+            data = obj
     data = _maybe_to_array(data)
     data = _reshape_if_needed(data, output_name, axes_mapping)
 
-    return xr.DataArray(data, coords=coords, dims=axes_mapping[output_name], name=output_name)
+    array = xr.DataArray(data, coords=coords, dims=axes_mapping[output_name], name=output_name)
+    if mask is not None:
+        array.attrs["_mask"] = mask
+    return array
+
+
+def _load_dependency(
+    name: str,
+    inputs: dict[str, Any],
+    data_loader: Callable[[str], Any],
+    load_intermediate: bool,
+) -> Any | None:
+    if name in inputs:
+        return maybe_load_data(inputs[name])
+    if not load_intermediate:
+        return None
+    return data_loader(name)
 
 
 def _maybe_to_array(x: Any) -> np.ndarray | Any:
     """Convert an iterable to an array."""
+    if np.ma.isMaskedArray(x):
+        return x
     if isinstance(x, np.ndarray):
         return x
     shape = infer_shape(x)
@@ -235,7 +257,21 @@ def xarray_dataset_to_dataframe(ds: xr.Dataset) -> pd.DataFrame:
     if not ds.coords:
         # Return a single row dataframe if there are no coordinates
         return pd.DataFrame({data_var: [value.data] for data_var, value in ds.data_vars.items()})
-    df = ds.to_dataframe().reset_index(drop=True)
+    working = ds.copy(deep=False)
+    mask_columns: list[str] = []
+    for name, array in list(working.data_vars.items()):
+        mask = array.attrs.pop("_mask", None)
+        if mask is not None:
+            mask_name = f"__mask_{name}"
+            working[name] = xr.DataArray(array.data, coords=array.coords, dims=array.dims)
+            working[mask_name] = xr.DataArray(mask, coords=array.coords, dims=array.dims)
+            mask_columns.append(mask_name)
+
+    df = working.to_dataframe().reset_index(drop=True)
+    if mask_columns:
+        mask_all = df[mask_columns].all(axis=1)
+        df = df[~mask_all].reset_index(drop=True)
+        df = df.drop(columns=mask_columns)
     # Identify if a column is a DimensionlessArray
     for col in df.columns:
         if isinstance(df[col].iloc[0], DimensionlessArray):

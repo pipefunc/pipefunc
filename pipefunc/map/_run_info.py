@@ -17,7 +17,7 @@ from pipefunc._version import __version__
 from pipefunc.helpers import FileArray, FileValue
 
 from ._adaptive_scheduler_slurm_executor import is_slurm_executor
-from ._mapspec import MapSpec
+from ._mapspec import MapSpec, is_irregular
 from ._result import DirectValue
 from ._shapes import (
     external_shape_from_mask,
@@ -134,6 +134,7 @@ class RunInfo:
                     mask,
                     self.storage_class(output_name),
                     self.run_folder,
+                    irregular=is_irregular(mapspec),
                 )
                 store.update(zip(mapspec.output_names, arrays))
 
@@ -439,12 +440,13 @@ def _init_arrays(
     mask: tuple[bool, ...],
     storage_class: type[StorageBase],
     run_folder: Path | None,
+    irregular: bool,
 ) -> list[StorageBase]:
     external_shape = external_shape_from_mask(shape, mask)
     internal_shape = internal_shape_from_mask(shape, mask)
     output_names = at_least_tuple(output_name)
     paths = [_maybe_array_path(output_name, run_folder) for output_name in output_names]  # type: ignore[misc]
-    return [storage_class(path, external_shape, internal_shape, mask) for path in paths]
+    return [storage_class(path, external_shape, internal_shape, mask, irregular) for path in paths]
 
 
 def _maybe_array_path(output_name: str, run_folder: Path | None) -> Path | None:

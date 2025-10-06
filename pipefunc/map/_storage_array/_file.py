@@ -20,6 +20,7 @@ from ._base import (
     register_storage,
     select_by_mask,
 )
+from ._irregular_helpers import infer_irregular_length, try_getitem
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -46,6 +47,7 @@ class FileArray(StorageBase):
         shape: ShapeTuple,
         internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
+        irregular: bool = False,  # noqa: FBT002
         *,
         filename_template: str = FILENAME_TEMPLATE,
     ) -> None:
@@ -61,6 +63,8 @@ class FileArray(StorageBase):
         self.filename_template = str(filename_template)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
+        self.irregular = irregular
+        self._irregular_extent_cache: dict[tuple[int, ...], tuple[int, ...] | None] = {}
 
     def __repr__(self) -> str:
         return (
@@ -146,10 +150,16 @@ class FileArray(StorageBase):
             return np.ma.masked
 
         sub_array = load(file)
-        if internal_indices:
-            sub_array = np.asarray(sub_array)
-            return sub_array[internal_indices]
-        return sub_array
+        if self.irregular:
+            arr = np.ma.array(sub_array, copy=False)
+            if not internal_indices:
+                return arr
+            value, _ = try_getitem(arr, internal_indices)  # type: ignore[arg-type]
+            return value
+        if not internal_indices:
+            return sub_array
+        arr = np.asarray(sub_array)
+        return arr[internal_indices]
 
     def _get_item_sliced(
         self,
@@ -167,13 +177,22 @@ class FileArray(StorageBase):
             if file.is_file():
                 sub_array = load(file)
                 internal_index = tuple(i for i, m in zip(index, self.shape_mask) if not m)
-                if internal_index:
-                    sub_array = np.asarray(sub_array)  # could be a list
-                    sliced_sub_array = sub_array[internal_index]
-                    sliced_data.append(sliced_sub_array)
-                else:
+                if self.irregular:
+                    sub_array = np.ma.array(sub_array, copy=False)
+                    if internal_index:
+                        sliced_value, masked = try_getitem(sub_array, internal_index)
+                        sliced_data.append(sliced_value)
+                        sliced_mask.append(masked)
+                        continue
                     sliced_data.append(sub_array)
-                sliced_mask.append(False)
+                    sliced_mask.append(False)
+                else:
+                    if internal_index:
+                        sub_array = np.asarray(sub_array)
+                        sliced_data.append(sub_array[internal_index])
+                    else:
+                        sliced_data.append(sub_array)
+                    sliced_mask.append(False)
             else:
                 sliced_data.append(np.ma.masked)
                 sliced_mask.append(True)
@@ -186,7 +205,8 @@ class FileArray(StorageBase):
         new_shape = tuple(
             len(range_) for k, range_ in zip(normalized_key, slice_indices) if isinstance(k, slice)
         )
-        return sliced_array.reshape(new_shape)
+        result = sliced_array.reshape(new_shape)
+        return self._ensure_masked_array_for_irregular(result) if self.irregular else result
 
     def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray:
         """Return a masked numpy array containing all the data.
@@ -228,11 +248,18 @@ class FileArray(StorageBase):
 
             if file.is_file():
                 sub_array = load(file)
-                sub_array = np.asarray(sub_array)  # could be a list
+                sub_array = (
+                    np.ma.array(sub_array, copy=False) if self.irregular else np.asarray(sub_array)
+                )
                 for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
-                    arr[full_index] = sub_array[internal_index]
-                    full_mask[full_index] = False
+                    if self.irregular:
+                        sel, masked = try_getitem(sub_array, internal_index)
+                        arr[full_index] = sel
+                        full_mask[full_index] = masked
+                    else:
+                        arr[full_index] = sub_array[internal_index]
+                        full_mask[full_index] = False
             else:
                 for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
@@ -266,6 +293,7 @@ class FileArray(StorageBase):
         >>> arr.dump((2, 1, 5), dict(a=1, b=2))
 
         """
+        self._clear_irregular_extent_cache()
         key = self._normalize_key(key, for_dump=True)
         if not any(isinstance(k, slice) for k in key):
             dump(value, self._key_to_file(key))  # type: ignore[arg-type]
@@ -279,6 +307,20 @@ class FileArray(StorageBase):
     def dump_in_subprocess(self) -> bool:
         """Indicates if the storage can be dumped in a subprocess and read by the main process."""
         return True
+
+    def _compute_irregular_extent(self, external_index: tuple[int, ...]) -> tuple[int, ...] | None:
+        file = self._key_to_file(external_index)
+        if not file.is_file():
+            return (0,)
+
+        try:
+            value = load(file)
+        except FileNotFoundError:  # pragma: no cover - race condition guard
+            return (0,)
+
+        length = infer_irregular_length(value)
+        max_len = self.resolved_internal_shape[0]
+        return (min(length, max_len),)
 
     @classmethod
     def from_data(cls, data: list[Any] | np.ndarray, folder: str | Path) -> FileArray:

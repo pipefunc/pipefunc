@@ -18,6 +18,7 @@ from ._base import (
     register_storage,
     select_by_mask,
 )
+from ._irregular_helpers import infer_irregular_length, try_getitem
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
@@ -38,6 +39,7 @@ class DictArray(StorageBase):
         shape: ShapeTuple,
         internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
+        irregular: bool = False,  # noqa: FBT002
         *,
         mapping: MutableMapping[tuple[int, ...], Any] | None = None,
     ) -> None:
@@ -52,9 +54,11 @@ class DictArray(StorageBase):
         self.shape = tuple(shape)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
+        self.irregular = irregular
         if mapping is None:
             mapping = {}
         self._dict: dict[tuple[int, ...], Any] = mapping  # type: ignore[assignment]
+        self._irregular_extent_cache: dict[tuple[int, ...], tuple[int, ...] | None] = {}
         self.load()
 
     def __repr__(self) -> str:
@@ -78,11 +82,20 @@ class DictArray(StorageBase):
         return np_index in self._dict
 
     def _internal_mask(self) -> np.ma.MaskedArray:
-        if self.internal_shape:
-            return np.ma.empty(self.internal_shape, dtype=object)
-        return np.ma.masked
+        if not self.internal_shape:
+            return np.ma.masked
 
-    def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
+        shape = self.resolved_internal_shape
+        if not self.irregular:
+            # Regular arrays only need an uninitialised masked container; NumPy fills
+            # the mask lazily when values are written, avoiding per-call allocations.
+            return np.ma.empty(shape, dtype=object)
+
+        data = np.empty(shape, dtype=object)
+        mask = np.ones(shape, dtype=bool)
+        return np.ma.MaskedArray(data, mask=mask, dtype=object)
+
+    def __getitem__(self, key: tuple[int | slice, ...]) -> Any:  # noqa: PLR0911, PLR0912
         """Return the data associated with the given key."""
         key = normalize_key(key, self.resolved_shape, self.resolved_internal_shape, self.shape_mask)
         assert len(key) == len(self.full_shape)
@@ -99,8 +112,13 @@ class DictArray(StorageBase):
                 if self.internal_shape:
                     internal_key = tuple(x for x, m in zip(index, self.shape_mask) if not m)
                     if external_key in self._dict:
-                        arr = np.asarray(self._dict[external_key])
-                        value = arr[internal_key]
+                        stored = self._dict[external_key]
+                        if self.irregular:
+                            arr = np.ma.array(stored, copy=False)
+                            value, _ = try_getitem(arr, internal_key)
+                        else:
+                            arr = np.asarray(stored)
+                            value = arr[internal_key]
                     else:
                         value = self._internal_mask()[internal_key]
                 else:  # noqa: PLR5501
@@ -115,19 +133,27 @@ class DictArray(StorageBase):
                 for s, k in zip(self.full_shape, key)
                 if isinstance(k, slice)
             )
-            return data.reshape(new_shape)
+            result = data.reshape(new_shape)
+            if self.irregular:
+                return self._ensure_masked_array_for_irregular(result)
+            return result
 
         external_key = tuple(x for x, m in zip(key, self.shape_mask) if m)  # type: ignore[misc]
         internal_key = tuple(x for x, m in zip(key, self.shape_mask) if not m)  # type: ignore[misc]
-
         if external_key in self._dict:
-            data = self._dict[external_key]
+            stored = self._dict[external_key]
         else:
             return self._internal_mask()
-        if internal_key:
-            arr = np.asarray(data)
-            return arr[internal_key]
-        return data
+        if self.irregular:
+            arr = np.ma.array(stored, copy=False)
+            if not internal_key:
+                return arr
+            value, _ = try_getitem(arr, internal_key)
+            return value
+        if not internal_key:
+            return stored
+        arr = np.asarray(stored)
+        return arr[internal_key]
 
     def _slice_indices(self, key: tuple[int | slice, ...], shape: tuple[int, ...]) -> list[range]:
         assert len(key) == len(shape)
@@ -157,7 +183,7 @@ class DictArray(StorageBase):
         data = _masked_empty(self.full_shape)
         mask = np.full(self.full_shape, fill_value=True, dtype=bool)
         for external_index, value in self._dict.items():
-            value_array = np.asarray(value)
+            value_array = np.ma.array(value, copy=False) if self.irregular else np.asarray(value)
 
             if value_array.shape == self.resolved_internal_shape:
                 # Normal case - shapes match
@@ -171,7 +197,13 @@ class DictArray(StorageBase):
             else:
                 for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
-                    data[full_index] = value_array[internal_index]
+                    if self.irregular:
+                        sel, masked = try_getitem(value_array, internal_index)
+                        if masked:
+                            continue
+                        data[full_index] = sel
+                    else:
+                        data[full_index] = value_array[internal_index]
                     mask[full_index] = False
         return np.ma.MaskedArray(data, mask=mask, dtype=object)
 
@@ -196,6 +228,7 @@ class DictArray(StorageBase):
         >>> arr.dump((2, 1, 5), dict(a=1, b=2))
 
         """
+        self._clear_irregular_extent_cache()
         key = normalize_key(
             key,
             self.resolved_shape,
@@ -214,6 +247,15 @@ class DictArray(StorageBase):
             return
 
         self._dict[key] = value  # type: ignore[index]
+
+    def _compute_irregular_extent(self, external_index: tuple[int, ...]) -> tuple[int, ...] | None:
+        value = self._dict.get(external_index)
+        if value is None:
+            return (0,)
+
+        length = infer_irregular_length(value)
+        max_len = self.resolved_internal_shape[0]
+        return (min(length, max_len),)
 
     def _path(self) -> Path:
         assert self.folder is not None
@@ -263,6 +305,7 @@ class SharedMemoryDictArray(DictArray):
         shape: tuple[int, ...],
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
+        irregular: bool = False,  # noqa: FBT002
         *,
         mapping: DictProxy[tuple[int, ...], Any] | None = None,
     ) -> None:
@@ -275,6 +318,7 @@ class SharedMemoryDictArray(DictArray):
             shape=shape,
             internal_shape=internal_shape,
             shape_mask=shape_mask,
+            irregular=irregular,
             mapping=mapping,
         )
 

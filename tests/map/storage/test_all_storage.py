@@ -647,3 +647,64 @@ def test_size_one_with_internal_shape(storage_id, tmp_path: Path) -> None:
     for i in range(*internal_shape):
         for j in range(*shape):
             assert np.array_equal(y_original[i, j], y_new[i, j])
+
+
+def test_dict_array_raises_when_data_too_short() -> None:
+    arr = DictArray(None, (2,), (3,), shape_mask=(True, False))
+    arr.dump((0,), np.array([0]))
+
+    with pytest.raises(IndexError, match="out of bounds"):
+        arr[(slice(None), slice(None))]
+
+    with pytest.raises(IndexError, match=r"index 1 is out of bounds"):
+        arr[(0, 1)]
+
+    with pytest.raises(IndexError, match="out of bounds"):
+        arr.to_array()
+
+
+def test_file_array_raises_when_data_too_short(tmp_path: Path) -> None:
+    arr = FileArray(tmp_path, (2,), (3,), shape_mask=(True, False))
+    arr.dump((0,), np.array([0]))
+
+    with pytest.raises(IndexError, match="out of bounds"):
+        arr[(slice(None), slice(None))]
+
+    with pytest.raises(IndexError, match=r"index 1 is out of bounds"):
+        arr[(0, 1)]
+
+    with pytest.raises(IndexError, match="out of bounds"):
+        arr.to_array()
+
+
+def test_file_array_irregular_returns_masked(tmp_path: Path) -> None:
+    arr = FileArray(tmp_path, (2,), (3,), shape_mask=(True, False), irregular=True)
+    arr.dump((0,), np.array([0]))
+
+    masked_value = arr[(0, 1)]
+    assert np.ma.is_masked(masked_value)
+
+
+def test_irregular_storage_pass_through_non_numpy() -> None:
+    arr = DictArray(None, (1,), (), shape_mask=(True,), irregular=True)
+    sentinel = {"value": 1}
+    assert arr._ensure_masked_array_for_irregular(sentinel) is sentinel
+
+
+@pytest.mark.skipif(not has_zarr, reason="zarr not installed")
+def test_zarr_array_rejects_irregular(tmp_path: Path) -> None:
+    import zarr
+
+    from pipefunc.map import ZarrFileArray
+
+    store = zarr.MemoryStore()
+
+    with pytest.raises(NotImplementedError, match="not supported"):
+        ZarrFileArray(
+            tmp_path / "irregular.zarr",
+            (1,),
+            (),
+            shape_mask=(True,),
+            irregular=True,
+            store=store,
+        )
