@@ -15,7 +15,6 @@ from __future__ import annotations
 import functools
 import inspect
 import os
-import re
 import time
 import warnings
 from dataclasses import dataclass, field
@@ -1290,10 +1289,7 @@ class Pipeline:
         for f in self.functions:
             if f.mapspec is None:
                 continue
-            mapspec_str = str(f.mapspec)
-            for old, new in renames.items():
-                mapspec_str = re.sub(rf"\b{old}\b", new, mapspec_str)
-            f.mapspec = MapSpec.from_string(mapspec_str)
+            f.mapspec = f.mapspec.rename_axes(renames)
 
         self._clear_internal_cache()
         self.validate()
