@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import re
 import sys
 from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from contextlib import nullcontext
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
@@ -23,8 +25,6 @@ from pipefunc.map._storage_array._file import FileArray
 from pipefunc.typing import Array  # noqa: TC001
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from pipefunc.map._result import ResultDict
 
 has_xarray = importlib.util.find_spec("xarray") is not None
@@ -2050,3 +2050,75 @@ def test_load_dataframe_with_list_of_tuples_output(tmp_path: Path) -> None:
     assert isinstance(final_array, np.ndarray)
     assert final_array.shape == (3, 3)
     np.testing.assert_array_equal(final_array, np.array(expected, dtype=object))
+
+
+@pytest.mark.skipif(not has_xarray, reason="requires xarray")
+def test_load_from_different_directory(tmp_path: Path) -> None:
+    """Regression test for loading outputs using absolute path from different directory.
+
+    This tests the fix for a bug where load_dataframe and load_outputs would fail
+    when called with an absolute run_folder path from a different working directory.
+    The bug was caused by relative paths in run_info.json being resolved from the
+    current working directory instead of relative to the run_folder location.
+    """
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def double(x: int) -> int:
+        return x * 2
+
+    @pipefunc(output_name="result")
+    def aggregate(y: Array[int]) -> list[int]:
+        return list(y)
+
+    pipeline = Pipeline([double, aggregate])
+    inputs = {"x": [1, 2, 3]}
+
+    # Create a run_folder inside tmp_path
+    run_folder = tmp_path / "my_run"
+    results = pipeline.map(
+        inputs,
+        run_folder=run_folder,
+        parallel=False,
+        storage="dict",
+    )
+
+    expected_y = [2, 4, 6]
+    assert results["y"].output.tolist() == expected_y
+    assert results["result"].output == expected_y
+
+    # Save the absolute path
+    run_folder_abs = run_folder.absolute()
+
+    # Change to a completely different directory
+    original_cwd = Path.cwd()
+    try:
+        # Create and change to a different temp directory
+        other_dir = tmp_path / "other_directory"
+        other_dir.mkdir()
+        os.chdir(other_dir)
+
+        # Verify we're in a different directory
+        assert Path.cwd() == other_dir
+        assert Path.cwd() != run_folder_abs.parent
+
+        # Test load_outputs works with absolute path from different directory
+        loaded_result = load_outputs("result", run_folder=run_folder_abs)
+        assert loaded_result == expected_y
+
+        loaded_y = load_outputs("y", run_folder=run_folder_abs)
+        assert loaded_y.tolist() == expected_y
+
+        # Test load_dataframe works with absolute path from different directory
+        df_y = load_dataframe("y", run_folder=run_folder_abs)
+        assert len(df_y) == 3
+        assert "y" in df_y.columns
+        np.testing.assert_array_equal(df_y["y"].values, np.array(expected_y))
+
+        # Test load_xarray_dataset works with absolute path from different directory
+        ds = load_xarray_dataset("y", run_folder=run_folder_abs)
+        assert "y" in ds.data_vars
+        np.testing.assert_array_equal(ds["y"].values, np.array(expected_y))
+
+    finally:
+        # Restore original working directory
+        os.chdir(original_cwd)
