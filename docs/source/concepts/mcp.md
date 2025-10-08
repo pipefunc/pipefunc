@@ -47,10 +47,7 @@ def add(x: float, y: float) -> float:
 
 pipeline = Pipeline([add])
 mcp = build_mcp_server(pipeline)
-
-# For testing, we can inspect the server
 print(f"Server name: {mcp.name}")
-print(f"Available tools: {[tool.name for tool in mcp.list_tools()]}")
 ```
 
 To actually run the server (not executed in docs):
@@ -177,6 +174,7 @@ This example demonstrates how type hints and docstrings become the MCP tool inte
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.mcp import build_mcp_server
+from pipefunc.typing import Array
 
 @pipefunc(output_name="squared", mapspec="x[i] -> squared[i]")
 def square(x: float) -> float:
@@ -196,14 +194,14 @@ def square(x: float) -> float:
     return x ** 2
 
 @pipefunc(output_name="sum_of_squares")
-def sum_squares(squared: list[float]) -> float:
+def sum_squares(squared: Array) -> float:
     """
     Sum all squared values.
 
     Parameters
     ----------
-    squared : list[float]
-        List of squared values.
+    squared : Array
+        Array of squared values.
 
     Returns
     -------
