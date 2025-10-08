@@ -815,24 +815,13 @@ def to_hashable(  # noqa: C901, PLR0911, PLR0912
 
     # Handle polars Series and DataFrames
     if "polars" in sys.modules:
-        polars_module = sys.modules["polars"]
-        series_type = getattr(polars_module, "Series", None)
-        dataframe_type = getattr(polars_module, "DataFrame", None)
-        if series_type is not None and isinstance(obj, series_type):
-            return (
-                m,
-                tp,
-                (
-                    obj.name,
-                    to_hashable(obj.to_list(), fallback_to_pickle),
-                ),
-            )
-        if dataframe_type is not None and isinstance(obj, dataframe_type):
-            return (
-                m,
-                tp,
-                to_hashable(obj.to_dict(as_series=False), fallback_to_pickle),
-            )
+        polars = sys.modules["polars"]
+        if isinstance(obj, polars.Series):
+            hsh = (obj.name, to_hashable(obj.to_list(), fallback_to_pickle))
+            return (m, tp, hsh)
+        if isinstance(obj, polars.DataFrame):
+            hsh = to_hashable(obj.to_dict(as_series=False), fallback_to_pickle)
+            return (m, tp, hsh)
 
     if fallback_to_pickle:
         try:
