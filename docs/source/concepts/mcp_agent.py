@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["agno", "anthropic", "python-dotenv"]
+# dependencies = ["agno", "anthropic", "python-dotenv", "mcp"]
 # ///
 
 """Example Agno agent that consumes the Series Analyzer MCP server."""
@@ -30,6 +30,6 @@ agent = Agent(
 
 if __name__ == "__main__":
     agent.print_response(
-        "Analyze the series [3, 3.2, 3.1, 10.5, 3.0, 2.9, 9.8]. Highlight anomalies and summarize the data.",
+        "Analyze the series [3, 3.2, 3.1, 10.5, 3.0, 2.9, 9.8]. Highlight anomalies and summarize the data. Use the tool to get the results.",
         stream=True,
     )
