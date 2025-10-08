@@ -817,7 +817,12 @@ def to_hashable(  # noqa: C901, PLR0911, PLR0912
     if "polars" in sys.modules:
         polars = sys.modules["polars"]
         if isinstance(obj, polars.Series):
-            hsh = (obj.name, to_hashable(obj.to_list(), fallback_to_pickle))
+            # Include dtype to distinguish Series with different dtypes but same values
+            hsh = (
+                obj.name,
+                str(obj.dtype),
+                to_hashable(obj.to_list(), fallback_to_pickle),
+            )
             return (m, tp, hsh)
         if isinstance(obj, polars.DataFrame):
             hsh = to_hashable(obj.to_dict(as_series=False), fallback_to_pickle)

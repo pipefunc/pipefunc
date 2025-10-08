@@ -94,7 +94,43 @@ def test_to_hashable_polars_series() -> None:
     assert result[0] == M
     assert result[1] == pl.Series
     assert result[2][0] == "test"
-    assert result[2][1] == (M, list, (1, 2, 3))
+    # Check that dtype is included in the hash (second element)
+    assert result[2][1] == str(series.dtype)
+    assert result[2][2] == (M, list, (1, 2, 3))
+
+
+@pytest.mark.skipif(not has_polars, reason="polars not installed")
+def test_to_hashable_polars_series_different_dtypes() -> None:
+    """Test that Series with same values but different dtypes hash differently."""
+    import polars as pl
+
+    series_int64 = pl.Series("test", [1, 2, 3], dtype=pl.Int64)
+    series_int32 = pl.Series("test", [1, 2, 3], dtype=pl.Int32)
+
+    result_int64 = to_hashable(series_int64)
+    result_int32 = to_hashable(series_int32)
+
+    # The hashes should be different due to different dtypes
+    assert result_int64 != result_int32
+
+    # Verify dtype is included in hash
+    assert result_int64[2][1] == "Int64"
+    assert result_int32[2][1] == "Int32"
+
+
+@pytest.mark.skipif(not has_polars, reason="polars not installed")
+def test_to_hashable_polars_series_with_nulls() -> None:
+    """Test that Series with null values can be hashed."""
+    import polars as pl
+
+    series = pl.Series("test", [1, None, 3])
+    result = to_hashable(series)
+    assert isinstance(result, tuple)
+    assert result[0] == M
+    assert result[1] == pl.Series
+    assert result[2][0] == "test"
+    assert result[2][1] == str(series.dtype)
+    assert result[2][2] == (M, list, (1, None, 3))
 
 
 def test_to_hashable_nested_structures() -> None:

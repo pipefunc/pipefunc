@@ -189,9 +189,15 @@ class ResultDict(dict[str, Result]):
             requires("polars", reason="ResultDict.to_dataframe backend='polars'", extras="polars")
             import polars as pl
 
-            return pl.DataFrame({col: df[col].tolist() for col in df.columns})
-        msg = f"Unknown backend '{backend}'. Expected 'pandas' or 'polars'."
-        raise ValueError(msg)
+            try:
+                # Try using from_pandas first (most efficient, preserves types)
+                return pl.from_pandas(df)
+            except ImportError:
+                # Fallback to manual conversion if pyarrow is not available
+                # This happens when pandas has nullable types but pyarrow is not installed
+                return pl.DataFrame({col: df[col].to_numpy() for col in df.columns})
+        msg = f"Unknown backend '{backend}'. Expected 'pandas' or 'polars'."  # pragma: no cover
+        raise ValueError(msg)  # pragma: no cover
 
 
 def _is_np_subdtype(annotation: Any) -> bool:

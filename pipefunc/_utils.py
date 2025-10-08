@@ -104,7 +104,7 @@ def prod(iterable: Iterable[int]) -> int:
     return functools.reduce(operator.mul, iterable, 1)
 
 
-def is_equal(  # noqa: PLR0911, PLR0912
+def is_equal(  # noqa: C901, PLR0911, PLR0912
     a: Any,
     b: Any,
     *,
@@ -160,9 +160,17 @@ def is_equal(  # noqa: PLR0911, PLR0912
             import polars as pl
 
             if isinstance(a, pl.DataFrame):
-                return a.equals(b)
+                # Check schema first to avoid errors with different column types
+                if a.schema != b.schema:
+                    return False
+                # Use null_equal=True to properly handle null values
+                return a.equals(b, null_equal=True)
             if isinstance(a, pl.Series):
-                return a.equals(b)
+                # Check dtype first
+                if a.dtype != b.dtype:
+                    return False
+                # Use null_equal=True to properly handle null values
+                return a.equals(b, null_equal=True)
         # Cast to bool to prevent issues with custom equality methods
         return bool(a == b)
     except Exception:
