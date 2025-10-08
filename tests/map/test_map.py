@@ -2057,10 +2057,11 @@ def test_load_from_different_directory(tmp_path: Path) -> None:
     """Regression test for loading outputs using absolute path from different directory.
 
     This tests the fix for a bug where load_dataframe and load_outputs would fail
-    when called with an absolute run_folder path from a different working directory.
-    The bug was caused by relative paths in run_info.json being resolved from the
-    current working directory instead of relative to the run_folder location.
+    when called with an absolute run_folder path from a different working directory
+    when the run_info.json contains relative paths (common in older versions or
+    when run_folder is specified as a relative path).
     """
+    import json
 
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def double(x: int) -> int:
@@ -2086,6 +2087,24 @@ def test_load_from_different_directory(tmp_path: Path) -> None:
     assert results["y"].output.tolist() == expected_y
     assert results["result"].output == expected_y
 
+    # Modify run_info.json to use relative paths (simulating old pipefunc behavior)
+    run_info_path = run_folder / "run_info.json"
+    with run_info_path.open() as f:
+        run_info_data = json.load(f)
+
+    # Convert all absolute paths to relative paths
+    run_info_data["run_folder"] = "my_run"
+    run_info_data["input_paths"] = {
+        k: v.replace(str(tmp_path) + "/", "") for k, v in run_info_data["input_paths"].items()
+    }
+    run_info_data["defaults_path"] = run_info_data["defaults_path"].replace(
+        str(tmp_path) + "/",
+        "",
+    )
+
+    with run_info_path.open("w") as f:
+        json.dump(run_info_data, f, indent=4)
+
     # Save the absolute path
     run_folder_abs = run_folder.absolute()
 
@@ -2102,6 +2121,8 @@ def test_load_from_different_directory(tmp_path: Path) -> None:
         assert Path.cwd() != run_folder_abs.parent
 
         # Test load_outputs works with absolute path from different directory
+        # This would fail before the fix because relative paths would be resolved
+        # from the current working directory instead of relative to run_folder
         loaded_result = load_outputs("result", run_folder=run_folder_abs)
         assert loaded_result == expected_y
 
