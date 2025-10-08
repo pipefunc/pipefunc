@@ -13,16 +13,18 @@ kernelspec:
 
 # MCP Server Integration
 
-The {func}`~pipefunc.mcp.build_mcp_server` function exposes your PipeFunc pipelines as [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers, enabling AI assistants like Claude, ChatGPT, and others to execute your computational workflows directly.
-With a single function call, your pipeline becomes an AI-accessible tool with automatic parameter validation, job management, and progress tracking.
+The {func}`~pipefunc.mcp.build_mcp_server` function exposes PipeFunc pipelines as [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers.
+This allows AI assistants to execute your computational workflows as tools.
 
-**Key capabilities:**
+The server automatically extracts your pipeline's type annotations and docstrings to generate:
+- **Pydantic models** for input validation (from type hints)
+- **Tool descriptions** for AI assistants (from docstrings)
+- **Parameter schemas** with types, defaults, and documentation
 
-- **Automatic Tool Generation**: Pipeline parameters and documentation become MCP tool schemas
-- **Dual Execution Modes**: Synchronous (blocking) and asynchronous (background) execution
-- **Job Management**: Track, monitor, and cancel long-running async jobs
-- **Type Safety**: Automatic validation using Pydantic models from your type hints
-- **Multiple Transports**: HTTP, Server-Sent Events (SSE), and stdio support
+Additionally provides:
+- Synchronous and asynchronous execution modes
+- Job management for long-running computations
+- Multiple transport protocols (HTTP, SSE, stdio)
 
 ```{note}
 MCP servers work with JSON-serializable inputs. Complex types (NumPy arrays, etc.) are automatically converted to/from JSON-compatible formats.
@@ -62,14 +64,14 @@ if __name__ == "__main__":
 
 ## How It Works
 
-When you call `build_mcp_server(pipeline)`, the following happens automatically:
+When you call `build_mcp_server(pipeline)`:
 
-1. **Schema Generation**: Creates Pydantic models from your pipeline's type annotations and default values
-2. **Tool Registration**: Registers execution tools (`execute_pipeline_sync`, `execute_pipeline_async`) with detailed descriptions
-3. **Documentation Extraction**: Pulls parameter descriptions from your docstrings for tool help text
-4. **Job Management Setup**: Configures async job tracking with status monitoring and cancellation
+1. **Pydantic Model Generation**: Uses {meth}`pipeline.pydantic_model() <pipefunc.Pipeline.pydantic_model>` to create validation schemas from type annotations
+2. **Docstring Extraction**: Parses function docstrings (NumPy/Google/Sphinx style) to extract parameter descriptions
+3. **Tool Registration**: Creates MCP tools with the generated schemas and descriptions
+4. **Job Registry**: Sets up a global registry for tracking async jobs
 
-The MCP server exposes several tools:
+The server exposes these tools:
 
 - **`execute_pipeline_sync`**: Run pipeline and return results immediately (blocking)
 - **`execute_pipeline_async`**: Start background execution and return a job ID
@@ -86,7 +88,7 @@ The MCP server exposes several tools:
 
 ### Synchronous Execution
 
-Best for quick computations where you want immediate results:
+Blocks until completion and returns results:
 
 ```python
 # AI assistant calls:
@@ -96,7 +98,7 @@ execute_pipeline_sync(inputs={"x": 5, "y": 3})
 
 ### Asynchronous Execution
 
-Ideal for long-running pipelines, parameter sweeps, or when you need progress tracking:
+Returns immediately with a job ID for tracking:
 
 ```python
 # AI assistant starts job:
@@ -168,7 +170,7 @@ mcp.run(transport="stdio")
 
 ## Complete Example
 
-A more realistic example with parameter sweeps and mapspecs:
+This example demonstrates how type hints and docstrings become the MCP tool interface:
 
 ```{code-cell} ipython3
 %%writefile mcp_example.py
@@ -217,7 +219,12 @@ if __name__ == "__main__":
     mcp.run(path="/squares", port=8000, transport="streamable-http")
 ```
 
-The AI assistant can now call:
+The MCP server will automatically extract:
+- Parameter types from `x: float` → Pydantic validation
+- Parameter descriptions from docstring "Input value to square" → Tool help text
+- Return type from `-> float` → Output schema
+
+The AI assistant can then call:
 
 ```python
 execute_pipeline_async(inputs={"x": [1, 2, 3, 4, 5]})
@@ -260,5 +267,4 @@ When using parallel execution with `pipeline.map()`, ensure your pipeline module
 
 ---
 
-By exposing your pipelines as MCP servers, you make complex computational workflows accessible to AI assistants with minimal setup.
-The server handles all the complexity of parameter validation, type coercion, job tracking, and result formatting, so you can focus on building great pipelines.
+The MCP server handles parameter validation, type coercion, job tracking, and result formatting automatically based on your pipeline's type annotations and docstrings.
