@@ -14,7 +14,7 @@ kernelspec:
 # MCP Server Integration
 
 The {func}`~pipefunc.mcp.build_mcp_server` function exposes PipeFunc pipelines as [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers.
-This allows AI assistants to execute your computational workflows as tools.
+This allows AI agents and assistants to use your computational workflows as tools.
 
 The server automatically extracts your pipeline's type annotations and docstrings to generate:
 - **Pydantic models** for input validation (from type hints)
@@ -91,7 +91,7 @@ The server exposes these tools:
 Blocks until completion and returns results:
 
 ```python
-# AI assistant calls:
+# Client calls:
 execute_pipeline_sync(inputs={"x": 5, "y": 3})
 # Returns: {'result': {'output': 8.0, 'shape': None}}
 ```
@@ -101,7 +101,7 @@ execute_pipeline_sync(inputs={"x": 5, "y": 3})
 Returns immediately with a job ID for tracking:
 
 ```python
-# AI assistant starts job:
+# Start job:
 execute_pipeline_async(inputs={"x": [1, 2, 3], "y": [4, 5, 6]})
 # Returns: {"job_id": "uuid-string", "run_folder": "runs/job_uuid"}
 
@@ -117,7 +117,7 @@ cancel_job(job_id="uuid-string")
 
 ## Client Configuration
 
-Configure your AI assistant to use the server. For example, in Cursor IDE's `.cursor/mcp.json`:
+Configure your AI client to connect to the server. For example, in Cursor IDE's `.cursor/mcp.json`:
 
 ```json
 {
@@ -224,7 +224,7 @@ The MCP server will automatically extract:
 - Parameter descriptions from docstring "Input value to square" → Tool help text
 - Return type from `-> float` → Output schema
 
-The AI assistant can then call:
+AI agents can then call:
 
 ```python
 execute_pipeline_async(inputs={"x": [1, 2, 3, 4, 5]})
