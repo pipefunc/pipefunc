@@ -30,7 +30,7 @@ dependencies = ["cloudpickle", "networkx", "numpy"]
 adaptive = ["adaptive", "adaptive-scheduler>=2.14.0"]
 autodoc = ["griffe", "rich"]
 cli = ["griffe", "rich", "pydantic", "rich-argparse"]
-mcp = ["fastmcp<2.10.0", "rich", "griffe"]
+mcp = ["fastmcp>=2.12.0", "rich", "griffe"]
 pandas = ["pandas"]
 polars = ["polars"]
 # Prevent old holoviews resulting in broken env
