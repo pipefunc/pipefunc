@@ -12,6 +12,7 @@ Type Checking <type-checking>
 Variants <variants>
 Caching <caching>
 Automatic CLI <cli>
+MCP Server Integration <mcp>
 SLURM integration <slurm>
 Resource Management <resource-management>
 Simplifying Pipelines <simplifying-pipelines>
@@ -53,6 +54,7 @@ Below are the key concepts discussed in this section. Click on any topic to lear
 - **[Testing](./testing):** Best practices for testing, including mocking functions in pipelines.
 - **[Overhead and Efficiency](./overhead-and-efficiency):** Measure the performance overhead of `pipefunc`.
 - **[Parameter Sweeps](./parameter-sweeps):** Construct parameter sweeps and optimize execution with `pipefunc.sweep`.
+- **[MCP Server Integration](./mcp):** Expose pipelines as MCP servers for AI agents and assistants. Includes async execution, job management, and AI agent example.
 
 ## Contributing
 

@@ -189,6 +189,7 @@ class RunInfo:
     @classmethod
     def load(cls: type[RunInfo], run_folder: str | Path) -> RunInfo:
         path = cls.path(run_folder)
+        run_folder_abs = path.parent  # The directory containing run_info.json
         with path.open() as f:
             data = json.load(f)
         data["input_paths"] = {k: Path(v) for k, v in data["input_paths"].items()}
@@ -202,9 +203,13 @@ class RunInfo:
                 k: tuple(v) if isinstance(v, list) else v
                 for k, v in data["internal_shapes"].items()
             }
-        data["run_folder"] = Path(data["run_folder"])
-        data["inputs"] = {k: load(Path(v)) for k, v in data.pop("input_paths").items()}
-        data["defaults"] = load(Path(data.pop("defaults_path")))
+
+        data["run_folder"] = run_folder_abs
+        data["inputs"] = {
+            k: load(_resolve_json_path(v, run_folder_abs))
+            for k, v in data.pop("input_paths").items()
+        }
+        data["defaults"] = load(_resolve_json_path(data.pop("defaults_path"), run_folder_abs))
         return cls(**data)
 
     @staticmethod
@@ -452,6 +457,30 @@ def _maybe_array_path(output_name: str, run_folder: Path | None) -> Path | None:
         return None
     assert isinstance(output_name, str)
     return run_folder / "outputs" / output_name
+
+
+def _resolve_json_path(path: str | Path, run_folder_abs: Path) -> Path:
+    """Resolve a path from run_info.json relative to the run_folder location.
+
+    Paths in run_info.json are stored relative to the parent directory of
+    run_folder (e.g., "pipeline_run/inputs/node_id.cloudpickle" when run_folder
+    is "pipeline_run"). If the path is not absolute, resolve it relative to the
+    parent of run_folder_abs.
+
+    Parameters
+    ----------
+    path
+        Path from JSON (may be string or Path, absolute or relative)
+    run_folder_abs
+        Absolute path to the run_folder directory
+
+    Returns
+    -------
+        Absolute path resolved relative to parent of run_folder_abs if needed
+
+    """
+    p = path if isinstance(path, Path) else Path(path)
+    return p if p.is_absolute() else run_folder_abs.parent / p
 
 
 def _input_used_in_slurm_executor(

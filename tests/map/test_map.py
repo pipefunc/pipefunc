@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import re
 import sys
 from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from contextlib import nullcontext
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
@@ -23,8 +25,6 @@ from pipefunc.map._storage_array._file import FileArray
 from pipefunc.typing import Array  # noqa: TC001
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from pipefunc.map._result import ResultDict
 
 has_xarray = importlib.util.find_spec("xarray") is not None
@@ -2012,3 +2012,145 @@ def test_error_snapshot_in_parallel_map():
         pipeline.run("c", kwargs={"b": -1})
     with pytest.raises(ValueError, match="a cannot be negative"):
         pipeline.error_snapshot.reproduce()
+
+
+@pytest.mark.skipif(not has_xarray, reason="requires xarray")
+def test_load_dataframe_with_list_of_tuples_output(tmp_path: Path) -> None:
+    """Regression test for loading outputs that are lists of tuples.
+
+    This tests the fix for a bug where load_dataframe would fail when trying to
+    convert single outputs (not part of any mapspec) that are lists of tuples
+    into a DataFrame. The bug was caused by xarray trying to create a scalar
+    variable from multidimensional data without proper array conversion.
+    """
+
+    @pipefunc(output_name="processed", mapspec="x[i] -> processed[i]")
+    def process(x: int) -> tuple[int, int, int]:
+        return (x, x * 2, x * 3)
+
+    @pipefunc(output_name="final_results")
+    def aggregate(processed: Array[tuple]) -> list[tuple[int, ...]]:
+        # Return a list of tuples (not part of any mapspec)
+        return list(processed)
+
+    pipeline = Pipeline([process, aggregate])
+    inputs = {"x": [1, 2, 3]}
+
+    results = pipeline.map(
+        inputs,
+        run_folder=tmp_path,
+        parallel=False,
+        storage="dict",
+    )
+
+    # Check that the results are correct
+    expected = [(1, 2, 3), (2, 4, 6), (3, 6, 9)]
+    assert results["final_results"].output == expected
+
+    # Test load_outputs works correctly
+    loaded = load_outputs("final_results", run_folder=tmp_path)
+    assert loaded == expected
+
+    # Test load_dataframe works correctly (this was failing before the fix)
+    df = load_dataframe("final_results", run_folder=tmp_path)
+    assert len(df) == 1
+    assert "final_results" in df.columns
+
+    # Check that the array is properly unwrapped
+    final_array = df["final_results"].iloc[0]
+    assert isinstance(final_array, np.ndarray)
+    assert final_array.shape == (3, 3)
+    np.testing.assert_array_equal(final_array, np.array(expected, dtype=object))
+
+
+@pytest.mark.skipif(not has_xarray, reason="requires xarray")
+def test_load_from_different_directory(tmp_path: Path) -> None:
+    """Regression test for loading outputs using absolute path from different directory.
+
+    This tests the fix for a bug where load_dataframe and load_outputs would fail
+    when called with an absolute run_folder path from a different working directory
+    when the run_info.json contains relative paths (common in older versions or
+    when run_folder is specified as a relative path).
+    """
+    import json
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def double(x: int) -> int:
+        return x * 2
+
+    @pipefunc(output_name="result")
+    def aggregate(y: Array[int]) -> list[int]:
+        return list(y)
+
+    pipeline = Pipeline([double, aggregate])
+    inputs = {"x": [1, 2, 3]}
+
+    # Create a run_folder inside tmp_path
+    run_folder = tmp_path / "my_run"
+    results = pipeline.map(
+        inputs,
+        run_folder=run_folder,
+        parallel=False,
+        storage="dict",
+    )
+
+    expected_y = [2, 4, 6]
+    assert results["y"].output.tolist() == expected_y
+    assert results["result"].output == expected_y
+
+    # Modify run_info.json to use relative paths (simulating old pipefunc behavior)
+    run_info_path = run_folder / "run_info.json"
+    with run_info_path.open() as f:
+        run_info_data = json.load(f)
+
+    # Convert all absolute paths to relative paths
+    run_info_data["run_folder"] = "my_run"
+    run_info_data["input_paths"] = {
+        k: v.replace(str(tmp_path) + "/", "") for k, v in run_info_data["input_paths"].items()
+    }
+    run_info_data["defaults_path"] = run_info_data["defaults_path"].replace(
+        str(tmp_path) + "/",
+        "",
+    )
+
+    with run_info_path.open("w") as f:
+        json.dump(run_info_data, f, indent=4)
+
+    # Save the absolute path
+    run_folder_abs = run_folder.absolute()
+
+    # Change to a completely different directory
+    original_cwd = Path.cwd()
+    try:
+        # Create and change to a different temp directory
+        other_dir = tmp_path / "other_directory"
+        other_dir.mkdir()
+        os.chdir(other_dir)
+
+        # Verify we're in a different directory
+        assert Path.cwd() == other_dir
+        assert Path.cwd() != run_folder_abs.parent
+
+        # Test load_outputs works with absolute path from different directory
+        # This would fail before the fix because relative paths would be resolved
+        # from the current working directory instead of relative to run_folder
+        loaded_result = load_outputs("result", run_folder=run_folder_abs)
+        assert loaded_result == expected_y
+
+        loaded_y = load_outputs("y", run_folder=run_folder_abs)
+        assert loaded_y.tolist() == expected_y
+
+        # Test load_dataframe works with absolute path from different directory
+        df_y = load_dataframe("y", run_folder=run_folder_abs)
+        assert len(df_y) == 3
+        assert "y" in df_y.columns
+        np.testing.assert_array_equal(df_y["y"].values, np.array(expected_y))
+
+        # Test load_xarray_dataset works with absolute path from different directory
+        ds = load_xarray_dataset("y", run_folder=run_folder_abs)
+        assert "y" in ds.data_vars
+        np.testing.assert_array_equal(ds["y"].values, np.array(expected_y))
+
+    finally:
+        # Restore original working directory
+        os.chdir(original_cwd)
