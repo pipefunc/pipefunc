@@ -14,7 +14,9 @@ kernelspec:
 # MCP Server Integration
 
 The {func}`~pipefunc.mcp.build_mcp_server` function exposes PipeFunc pipelines as [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers.
-This allows AI agents and assistants to use your computational workflows as tools.
+This allows AI agents and assistants to use your ``pipefunc.Pipeline``s as tools.
+
+A complete Series Analyzer example later in this guide walks through building, wiring, and consuming an MCP server end-to-end.
 
 The server automatically extracts your pipeline's type annotations and docstrings to generate:
 - **Pydantic models** for input validation (from type hints)
@@ -31,33 +33,6 @@ MCP servers work with JSON-serializable inputs. Complex types (NumPy arrays, etc
 ```
 
 ---
-
-## Quick Start
-
-Here's a minimal example of creating and running an MCP server:
-
-```{code-cell} ipython3
-from pipefunc import Pipeline, pipefunc
-from pipefunc.mcp import build_mcp_server
-
-@pipefunc(output_name="result")
-def add(x: float, y: float) -> float:
-    """Add two numbers together."""
-    return x + y
-
-pipeline = Pipeline([add])
-mcp = build_mcp_server(pipeline)
-```
-
-To actually run the server (not executed in docs):
-
-```python
-if __name__ == "__main__":
-    mcp.run(path="/add", port=8000, transport="streamable-http")
-```
-
----
-
 ## How It Works
 
 When you call `build_mcp_server(pipeline)`:
@@ -90,11 +65,29 @@ Blocks until completion and returns results:
 
 ```python
 # Client calls:
-execute_pipeline_sync(inputs={"x": 5, "y": 3})
+execute_pipeline_sync(
+    inputs={"series": [2.0, 2.1, 2.2, 2.05, 2.15, 2.08, 2.12, 2.18, 50.0]},
+    parallel=False,
+)
 # Returns:
 # {
-#   "result": {
-#     "output": 8.0,
+#   "clean_series": {"output": [2.0, 2.1, 2.2, 2.05, 2.15, 2.08, 2.12, 2.18, 50.0], "shape": null},
+#   "summary": {
+#     "output": {
+#       "count": 9,
+#       "mean": 7.431111111111111,
+#       "median": 2.12,
+#       "min": 2.0,
+#       "max": 50.0,
+#       "std": 15.050490907050504,
+#       "range": 48.0
+#     },
+#     "shape": null
+#   },
+#   "anomalies": {
+#     "output": [
+#       {"index": 8, "value": 50.0, "z_score": 2.828405342509274}
+#     ],
 #     "shape": null
 #   }
 # }
@@ -106,11 +99,13 @@ Returns immediately with a job ID for tracking:
 
 ```python
 # Start job:
-execute_pipeline_async(inputs={"x": [1, 2, 3], "y": [4, 5, 6]})
-# Returns: {
-#   "job_id": "9d41...",
-#   "run_folder": "runs/job_9d41..."
-# }
+execute_pipeline_async(
+    inputs={
+        "series": [18, 17.5, 18.2, 17.8, 55.0, 18.1, 17.9],
+        "z_threshold": 2.0,
+    }
+)
+# Returns: {"job_id": "9d41...", "run_folder": "runs/job_9d41..."}
 
 # Check status:
 check_job_status(job_id="uuid-string")
@@ -132,8 +127,8 @@ Configure your AI client to connect to the server. For example, in Cursor IDE's 
 ```json
 {
   "mcpServers": {
-    "my-pipeline": {
-      "url": "http://127.0.0.1:8000/add"
+    "series-analyzer": {
+      "url": "http://127.0.0.1:8000/series"
     }
   }
 }
@@ -144,9 +139,9 @@ Or for Claude Desktop's `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "my-pipeline": {
+    "series-analyzer": {
       "command": "python",
-      "args": ["/path/to/my_mcp_server.py"]
+      "args": ["/path/to/server.py"]
     }
   }
 }
@@ -180,7 +175,7 @@ mcp.run(transport="stdio")
 
 ## AI Agent Example
 
-This example shows how to create an AI agent using [Agno](https://github.com/agno-agi/agno) that can use your pipeline as a tool:
+This example shows how to create an AI agent using [Agno](https://github.com/agno-agi/agno) that can use your pipeline as a tool. The pipeline, *Series Analyzer*, sanitizes numeric inputs, computes descriptive statistics, and flags anomalies based on z-scores:
 
 Create `server.py` with inline dependencies using [uv script](https://docs.astral.sh/uv/guides/scripts/):
 
@@ -191,42 +186,114 @@ Create `server.py` with inline dependencies using [uv script](https://docs.astra
 # dependencies = ["pipefunc[mcp]"]
 # ///
 
+from math import isnan
+from statistics import mean, median, pstdev
+
 from pipefunc import Pipeline, pipefunc
 from pipefunc.mcp import build_mcp_server
 
-@pipefunc(output_name="result")
-def calculate(x: float, y: float, operation: str) -> float:
+
+@pipefunc(output_name="clean_series")
+def clean_series(series: list[float]) -> list[float]:
     """
-    Perform a mathematical operation.
+    Remove null and NaN readings before analysis.
 
     Parameters
     ----------
-    x : float
-        First number
-    y : float
-        Second number
-    operation : str
-        Operation to perform: 'add', 'subtract', 'multiply', 'divide'
+    series : list[float]
+        Raw numeric samples to analyze.
 
     Returns
     -------
-    float
-        Result of the operation
+    list[float]
+        Cleaned numeric values with missing entries removed.
     """
-    ops = {
-        'add': lambda a, b: a + b,
-        'subtract': lambda a, b: a - b,
-        'multiply': lambda a, b: a * b,
-        'divide': lambda a, b: a / b if b != 0 else float('inf')
-    }
-    return ops[operation](x, y)
+    cleaned: list[float] = []
+    for value in series:
+        if value is None:
+            continue
+        number = float(value)
+        if isnan(number):
+            continue
+        cleaned.append(number)
+    if not cleaned:
+        msg = "series must contain at least one numeric value"
+        raise ValueError(msg)
+    return cleaned
 
-pipeline = Pipeline([calculate])
+
+@pipefunc(output_name="summary")
+def summarize(clean_series: list[float]) -> dict[str, float]:
+    """
+    Compute descriptive statistics for the cleaned samples.
+
+    Parameters
+    ----------
+    clean_series : list[float]
+        Sanitized numeric samples.
+
+    Returns
+    -------
+    dict[str, float]
+        Aggregate metrics such as count, mean, median, standard deviation, and range.
+    """
+    stats = {
+        "count": len(clean_series),
+        "mean": mean(clean_series),
+        "median": median(clean_series),
+        "min": min(clean_series),
+        "max": max(clean_series),
+        "std": pstdev(clean_series) if len(clean_series) > 1 else 0.0,
+    }
+    stats["range"] = stats["max"] - stats["min"]
+    return stats
+
+
+@pipefunc(output_name="anomalies")
+def detect_anomalies(
+    clean_series: list[float],
+    summary: dict[str, float],
+    z_threshold: float = 2.5,
+) -> list[dict[str, float]]:
+    """
+    Flag values whose z-score exceeds the configured threshold.
+
+    Parameters
+    ----------
+    clean_series : list[float]
+        Sanitized numeric samples.
+    summary : dict[str, float]
+        Descriptive statistics from :func:`summarize`.
+    z_threshold : float, default 2.5
+        Absolute z-score required to mark a value as an anomaly.
+
+    Returns
+    -------
+    list[dict[str, float]]
+        Each anomaly with its index, value, and z-score.
+    """
+    std = summary.get("std", 0.0)
+    if std <= 0:
+        return []
+    mean_value = summary["mean"]
+    anomalies: list[dict[str, float]] = []
+    for index, value in enumerate(clean_series):
+        z_score = (value - mean_value) / std
+        if abs(z_score) >= z_threshold:
+            anomalies.append({"index": index, "value": value, "z_score": z_score})
+    return anomalies
+
+
+pipeline = Pipeline(
+    [clean_series, summarize, detect_anomalies],
+    name="Series Analyzer",
+)
 mcp = build_mcp_server(pipeline)
 
 if __name__ == "__main__":
     # Start server on stdio for agent integration
     mcp.run(transport="stdio")
+
 ```
 
 Create `agent.py` to connect to the server:
@@ -235,12 +302,15 @@ Create `agent.py` to connect to the server:
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["agno", "anthropic"]
+# dependencies = ["agno", "anthropic", "python-dotenv"]
 # ///
 
 from agno.agent import Agent
 from agno.models.anthropic import Claude
 from agno.tools.mcp import MCPTools
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Create agent with MCP server connection via stdio
 agent = Agent(
@@ -249,104 +319,30 @@ agent = Agent(
         MCPTools(command="uv run --script server.py", transport="stdio")
     ],
     instructions=[
-        "You are a helpful math assistant.",
-        "Use the calculate tool to perform mathematical operations.",
-        "Always explain your calculations step by step."
+        "You are a data-analysis assistant.",
+        "When a user shares numbers, call the Series Analyzer MCP tool to compute statistics and flag anomalies.",
+        "Explain your findings using the returned summary and anomalies list."
     ],
     markdown=True,
 )
 
 # Agent can now use your pipeline as a tool
-# Requires ANTHROPIC_API_KEY environment variable
+# ANTHROPIC_API_KEY (and any other secrets) are loaded automatically from .env
 agent.print_response(
-    "What is 15 times 23, and then add 47 to the result?",
+    "Analyze the series [3, 3.2, 3.1, 10.5, 3.0, 2.9, 9.8]. Highlight anomalies and summarize the data.",
     stream=True
 )
 ```
-
-Run with:
+Create a `.env` file with your credentials (for example `ANTHROPIC_API_KEY=your-api-key`) and run:
 
 ```bash
-export ANTHROPIC_API_KEY="your-api-key"
 uv run --script agent.py
 ```
 
-No installation needed—`uv` automatically manages all dependencies! The agent will automatically discover and use the `execute_pipeline_sync` tool from your MCP server.
-
-For HTTP-based MCP servers, use:
-
-```python
-tools=[MCPTools(url="http://127.0.0.1:8000/calculate", transport="streamable-http")]
-```
+The `.env` file is loaded automatically, so no manual exporting is required. `uv` manages the dependencies declared in the script, and the agent will automatically discover and use the `execute_pipeline_sync` tool from your MCP server.
 
 ---
 
-## Complete Example
-
-This example demonstrates how type hints and docstrings become the MCP tool interface:
-
-```{code-cell} ipython3
-%%writefile mcp_example.py
-
-from pipefunc import Pipeline, pipefunc
-from pipefunc.mcp import build_mcp_server
-from pipefunc.typing import Array
-
-@pipefunc(output_name="squared", mapspec="x[i] -> squared[i]")
-def square(x: float) -> float:
-    """
-    Square a number.
-
-    Parameters
-    ----------
-    x : float
-        Input value to square.
-
-    Returns
-    -------
-    float
-        The squared value.
-    """
-    return x ** 2
-
-@pipefunc(output_name="sum_of_squares")
-def sum_squares(squared: Array) -> float:
-    """
-    Sum all squared values.
-
-    Parameters
-    ----------
-    squared : Array
-        Array of squared values.
-
-    Returns
-    -------
-    float
-        The sum of all squares.
-    """
-    return sum(squared)
-
-pipeline = Pipeline([square, sum_squares])
-
-if __name__ == "__main__":
-    mcp = build_mcp_server(pipeline, name="Square Summer")
-    mcp.run(path="/squares", port=8000, transport="streamable-http")
-```
-
-The MCP server will automatically extract:
-- Parameter types from `x: float` → Pydantic validation
-- Parameter descriptions from docstring "Input value to square" → Tool help text
-- Return type from `-> float` → Output schema
-
-AI agents can then call:
-
-```python
-execute_pipeline_async(inputs={"x": [1, 2, 3, 4, 5]})
-```
-
-And receive results for the entire parameter sweep with progress tracking.
-
----
 
 ## Dependencies
 
