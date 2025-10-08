@@ -24,7 +24,7 @@ from pipefunc.map._shapes import shape_is_resolved
 from pipefunc.map._storage_array._base import StorageBase
 from pipefunc.map._storage_array._file import FileArray
 
-if sys.version_info < (3, 12):
+if sys.version_info < (3, 12):  # pragma: no cover
     from typing_extensions import TypedDict
 else:
     from typing import TypedDict
