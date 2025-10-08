@@ -514,3 +514,101 @@ def test_mapspec_from_string_with_scope() -> None:
         spec = MapSpec.from_string(expr)
         assert spec.input_names == expected_inputs, f"Failed on input: {expr}"
         assert spec.output_names == expected_outputs, f"Failed on output: {expr}"
+
+
+def test_arrayspec_rename_axes():
+    # Test basic renaming
+    spec = ArraySpec("a", ("i", "j"))
+    renamed = spec.rename_axes({"i": "x", "j": "y"})
+    assert renamed.name == "a"
+    assert renamed.axes == ("x", "y")
+    assert str(renamed) == "a[x, y]"
+
+    # Test partial renaming (only one axis)
+    spec = ArraySpec("a", ("i", "j", "k"))
+    renamed = spec.rename_axes({"i": "x"})
+    assert renamed.axes == ("x", "j", "k")
+    assert str(renamed) == "a[x, j, k]"
+
+    # Test renaming with None (slice) axes
+    spec = ArraySpec("a", ("i", None, "j"))
+    renamed = spec.rename_axes({"i": "x", "j": "y"})
+    assert renamed.axes == ("x", None, "y")
+    assert str(renamed) == "a[x, :, y]"
+
+    # Test no-op when renames dict is empty
+    spec = ArraySpec("a", ("i", "j"))
+    renamed = spec.rename_axes({})
+    assert renamed.axes == ("i", "j")
+
+    # Test no-op when axis name not in renames
+    spec = ArraySpec("a", ("i", "j"))
+    renamed = spec.rename_axes({"z": "w"})
+    assert renamed.axes == ("i", "j")
+
+    # Test renaming preserves original spec (immutability)
+    spec = ArraySpec("a", ("i", "j"))
+    renamed = spec.rename_axes({"i": "x"})
+    assert spec.axes == ("i", "j")
+    assert renamed.axes == ("x", "j")
+
+    # Test multiple axes with mixed renaming
+    spec = ArraySpec("data", ("time", "space", "freq"))
+    renamed = spec.rename_axes({"time": "t", "space": "x"})
+    assert renamed.axes == ("t", "x", "freq")
+
+
+def test_mapspec_rename_axes():
+    # Test basic renaming
+    spec = MapSpec.from_string("a[i, j], b[i, j] -> c[i, j]")
+    renamed = spec.rename_axes({"i": "x", "j": "y"})
+    assert str(renamed) == "a[x, y], b[x, y] -> c[x, y]"
+
+    # Test partial renaming
+    spec = MapSpec.from_string("a[i, j], b[i, k] -> c[i, j, k]")
+    renamed = spec.rename_axes({"i": "x"})
+    assert str(renamed) == "a[x, j], b[x, k] -> c[x, j, k]"
+
+    # Test renaming with slices
+    spec = MapSpec.from_string("a[i, :], b[:, j] -> c[i, j]")
+    renamed = spec.rename_axes({"i": "x", "j": "y"})
+    assert str(renamed) == "a[x, :], b[:, y] -> c[x, y]"
+
+    # Test renaming with multiple outputs
+    spec = MapSpec.from_string("a[i, j] -> b[i, j], c[i, j]")
+    renamed = spec.rename_axes({"i": "x", "j": "y"})
+    assert str(renamed) == "a[x, y] -> b[x, y], c[x, y]"
+
+    # Test renaming complex case
+    spec = MapSpec.from_string("x[i, j], y[j, :, k] -> z[i, j, k]")
+    renamed = spec.rename_axes({"i": "a", "j": "b", "k": "c"})
+    assert str(renamed) == "x[a, b], y[b, :, c] -> z[a, b, c]"
+
+    # Test no-op when renames dict is empty
+    spec = MapSpec.from_string("a[i, j] -> b[i, j]")
+    renamed = spec.rename_axes({})
+    assert str(renamed) == str(spec)
+
+    # Test preserves immutability
+    spec = MapSpec.from_string("a[i, j] -> b[i, j]")
+    renamed = spec.rename_axes({"i": "x"})
+    assert str(spec) == "a[i, j] -> b[i, j]"
+    assert str(renamed) == "a[x, j] -> b[x, j]"
+
+    # Test with scoped names
+    spec = MapSpec.from_string("foo.a[i, j] -> foo.c[i, j]")
+    renamed = spec.rename_axes({"i": "x", "j": "y"})
+    assert str(renamed) == "foo.a[x, y] -> foo.c[x, y]"
+
+    # Test maintains consistency across inputs and outputs
+    spec = MapSpec.from_string("a[i], b[j] -> c[i, j, k]")
+    renamed = spec.rename_axes({"i": "x", "j": "y", "k": "z"})
+    assert renamed.output_indices == ("x", "y", "z")
+    assert renamed.input_names == ("a", "b")
+
+    # Test input_keys and output_key work after renaming
+    spec = MapSpec.from_string("x[i, j], y[j, :, k] -> z[i, j, k]")
+    renamed = spec.rename_axes({"i": "a", "j": "b", "k": "c"})
+    # Verify that the renamed spec still works correctly
+    assert renamed.output_indices == ("a", "b", "c")
+    assert renamed.external_indices == ("a", "b", "c")
