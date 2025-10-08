@@ -1287,9 +1287,7 @@ class Pipeline:
             raise ValueError(msg)
 
         for f in self.functions:
-            if f.mapspec is None:
-                continue
-            f.mapspec = f.mapspec.rename_axes(renames)
+            f.update_mapspec_axes(renames)
 
         self._clear_internal_cache()
         self.validate()
