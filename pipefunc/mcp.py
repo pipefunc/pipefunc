@@ -430,7 +430,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         inputs: Model,  # type: ignore[valid-type]
         parallel: bool = True,  # noqa: FBT002
         run_folder: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> str:
         """Execute pipeline synchronously and return results immediately.
 
         Blocks until completion. Best for small-to-medium pipelines.
@@ -511,7 +511,7 @@ async def _execute_pipeline_sync(
     inputs: pydantic.BaseModel,  # type: ignore[valid-type]
     parallel: bool = True,  # noqa: FBT002
     run_folder: str | None = None,
-) -> dict[str, Any]:
+) -> str:
     await ctx.info(f"Executing pipeline {pipeline.name=} with inputs: {inputs}")
     result = pipeline.map(
         inputs=inputs,
@@ -528,7 +528,7 @@ async def _execute_pipeline_sync(
             else result_obj.output,
             "shape": getattr(result_obj.output, "shape", None),
         }
-    return output
+    return str(output)
 
 
 async def _execute_pipeline_async(
