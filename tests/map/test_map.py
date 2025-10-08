@@ -2001,3 +2001,52 @@ def test_error_snapshot_in_parallel_map():
         pipeline.run("c", kwargs={"b": -1})
     with pytest.raises(ValueError, match="a cannot be negative"):
         pipeline.error_snapshot.reproduce()
+
+
+@pytest.mark.skipif(not has_xarray, reason="requires xarray")
+def test_load_dataframe_with_list_of_tuples_output(tmp_path: Path) -> None:
+    """Regression test for loading outputs that are lists of tuples.
+
+    This tests the fix for a bug where load_dataframe would fail when trying to
+    convert single outputs (not part of any mapspec) that are lists of tuples
+    into a DataFrame. The bug was caused by xarray trying to create a scalar
+    variable from multidimensional data without proper array conversion.
+    """
+
+    @pipefunc(output_name="processed", mapspec="x[i] -> processed[i]")
+    def process(x: int) -> tuple[int, int, int]:
+        return (x, x * 2, x * 3)
+
+    @pipefunc(output_name="final_results")
+    def aggregate(processed: Array[tuple]) -> list[tuple[int, ...]]:
+        # Return a list of tuples (not part of any mapspec)
+        return list(processed)
+
+    pipeline = Pipeline([process, aggregate])
+    inputs = {"x": [1, 2, 3]}
+
+    results = pipeline.map(
+        inputs,
+        run_folder=tmp_path,
+        parallel=False,
+        storage="dict",
+    )
+
+    # Check that the results are correct
+    expected = [(1, 2, 3), (2, 4, 6), (3, 6, 9)]
+    assert results["final_results"].output == expected
+
+    # Test load_outputs works correctly
+    loaded = load_outputs("final_results", run_folder=tmp_path)
+    assert loaded == expected
+
+    # Test load_dataframe works correctly (this was failing before the fix)
+    df = load_dataframe("final_results", run_folder=tmp_path)
+    assert len(df) == 1
+    assert "final_results" in df.columns
+
+    # Check that the array is properly unwrapped
+    final_array = df["final_results"].iloc[0]
+    assert isinstance(final_array, np.ndarray)
+    assert final_array.shape == (3, 3)
+    np.testing.assert_array_equal(final_array, np.array(expected, dtype=object))
