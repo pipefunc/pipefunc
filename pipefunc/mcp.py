@@ -2,11 +2,12 @@
 
 import json
 import operator
+import sys
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal
 
 import fastmcp
 import pydantic
@@ -15,13 +16,18 @@ from rich.console import Console
 from pipefunc._pipeline._autodoc import PipelineDocumentation, format_pipeline_docs
 from pipefunc._pipeline._base import Pipeline
 from pipefunc._utils import requires
-from pipefunc.map import load_all_outputs, load_outputs
+from pipefunc.map import load_all_outputs
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run_eager_async import AsyncMap
 from pipefunc.map._run_info import RunInfo
 from pipefunc.map._shapes import shape_is_resolved
 from pipefunc.map._storage_array._base import StorageBase
 from pipefunc.map._storage_array._file import FileArray
+
+if sys.version_info < (3, 12):
+    from typing_extensions import TypedDict
+else:
+    from typing import TypedDict
 
 
 @dataclass
@@ -761,8 +767,10 @@ def _run_info(run_folder: str) -> dict[str, Any]:
 
 def _load_outputs(run_folder: str, output_names: list[str] | None = None) -> dict[str, Any]:
     try:
-        if output_names is None:
-            return load_all_outputs(run_folder=run_folder)
-        return load_outputs(*output_names, run_folder=run_folder)
+        result = load_all_outputs(run_folder=run_folder)
     except Exception as e:  # noqa: BLE001  # pragma: no cover
         return {"error": str(e)}
+    if output_names is not None:
+        # Filter to requested outputs
+        return {k: result[k] for k in output_names}
+    return result
