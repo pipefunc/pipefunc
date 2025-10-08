@@ -112,7 +112,7 @@ async def test_execute_pipeline_sync_simple(simple_pipeline: Pipeline) -> None:
     assert mcp is not None
     async with Client(mcp) as client:
         result = await client.call_tool("execute_pipeline_sync", {"inputs": {"x": 1, "y": 2}})
-        assert result[0].text == "{'result': {'output': 3.0, 'shape': None}}"
+        assert result.content[0].text == "{'result': {'output': 3.0, 'shape': None}}"
 
 
 # Test async job management functionality
@@ -130,7 +130,7 @@ async def test_execute_pipeline_async_simple(simple_pipeline: Pipeline) -> None:
         # Start async job
         result = await client.call_tool("execute_pipeline_async", {"inputs": {"x": 5, "y": 10}})
 
-        response = parse_mcp_response(result[0].text)
+        response = parse_mcp_response(result.content[0].text)
         assert "job_id" in response
         assert "run_folder" in response
         assert response["run_folder"].startswith("runs/job_")
@@ -155,7 +155,7 @@ async def test_check_job_status_completed(simple_pipeline: Pipeline) -> None:
             "execute_pipeline_async",
             {"inputs": {"x": 3, "y": 7}},
         )
-        job_info = parse_mcp_response(start_result[0].text)
+        job_info = parse_mcp_response(start_result.content[0].text)
         job_id = job_info["job_id"]
 
         # Wait for job to complete with retry logic
@@ -164,7 +164,7 @@ async def test_check_job_status_completed(simple_pipeline: Pipeline) -> None:
         status_info = None
         while waited < max_wait:
             status_result = await client.call_tool("check_job_status", {"job_id": job_id})
-            status_info = parse_mcp_response(status_result[0].text)
+            status_info = parse_mcp_response(status_result.content[0].text)
             if status_info["status"] == "completed":
                 break
             await asyncio.sleep(0.01)
@@ -195,12 +195,12 @@ async def test_check_job_status_with_progress(slow_pipeline: Pipeline) -> None:
             "execute_pipeline_async",
             {"inputs": {"x": [1, 2, 3, 4, 5]}},
         )
-        job_info = parse_mcp_response(start_result[0].text)
+        job_info = parse_mcp_response(start_result.content[0].text)
         job_id = job_info["job_id"]
 
         # Check status while potentially running
         status_result = await client.call_tool("check_job_status", {"job_id": job_id})
-        status_info = parse_mcp_response(status_result[0].text)
+        status_info = parse_mcp_response(status_result.content[0].text)
 
         assert status_info["job_id"] == job_id
         assert status_info["status"] in ["running", "completed"]
@@ -212,7 +212,7 @@ async def test_check_job_status_with_progress(slow_pipeline: Pipeline) -> None:
         final_status_info = None
         while waited < max_wait:
             final_status_result = await client.call_tool("check_job_status", {"job_id": job_id})
-            final_status_info = parse_mcp_response(final_status_result[0].text)
+            final_status_info = parse_mcp_response(final_status_result.content[0].text)
             # Skip test if parsing failed due to complex numpy arrays
             if final_status_info.get("parse_error"):
                 pytest.skip("Response parsing failed due to complex numpy arrays")
@@ -246,7 +246,7 @@ async def test_list_jobs_empty() -> None:
     mcp = build_mcp_server(Pipeline([]))
     async with Client(mcp) as client:
         result = await client.call_tool("list_jobs", {})
-        jobs_info = parse_mcp_response(result[0].text)
+        jobs_info = parse_mcp_response(result.content[0].text)
 
         assert jobs_info["total_count"] == 0
         assert jobs_info["jobs"] == []
@@ -271,7 +271,7 @@ async def test_list_jobs_with_multiple_jobs(simple_pipeline: Pipeline) -> None:
                 "execute_pipeline_async",
                 {"inputs": {"x": i, "y": i + 1}},
             )
-            job_info = parse_mcp_response(start_result[0].text)
+            job_info = parse_mcp_response(start_result.content[0].text)
             job_ids.append(job_info["job_id"])
 
         # Wait for jobs to complete
@@ -279,7 +279,7 @@ async def test_list_jobs_with_multiple_jobs(simple_pipeline: Pipeline) -> None:
 
         # List all jobs
         list_result = await client.call_tool("list_jobs", {})
-        jobs_info = parse_mcp_response(list_result[0].text)
+        jobs_info = parse_mcp_response(list_result.content[0].text)
 
         assert jobs_info["total_count"] == 3
         assert len(jobs_info["jobs"]) == 3
@@ -312,12 +312,12 @@ async def test_cancel_job(slow_pipeline: Pipeline) -> None:
             "execute_pipeline_async",
             {"inputs": {"x": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}},
         )
-        job_info = parse_mcp_response(start_result[0].text)
+        job_info = parse_mcp_response(start_result.content[0].text)
         job_id = job_info["job_id"]
 
         # Immediately try to cancel
         cancel_result = await client.call_tool("cancel_job", {"job_id": job_id})
-        cancel_info = parse_mcp_response(cancel_result[0].text)
+        cancel_info = parse_mcp_response(cancel_result.content[0].text)
 
         # The job might complete before cancellation, so we check both possibilities
         if "status" in cancel_info:
@@ -339,7 +339,7 @@ async def test_cancel_nonexistent_job(simple_pipeline: Pipeline) -> None:
     async with Client(mcp) as client:
         fake_job_id = "00000000-0000-0000-0000-000000000000"
         cancel_result = await client.call_tool("cancel_job", {"job_id": fake_job_id})
-        cancel_info = parse_mcp_response(cancel_result[0].text)
+        cancel_info = parse_mcp_response(cancel_result.content[0].text)
 
         assert "error" in cancel_info
         assert cancel_info["error"] == "Job not found"
@@ -359,7 +359,7 @@ async def test_cancel_completed_job(simple_pipeline: Pipeline) -> None:
             "execute_pipeline_async",
             {"inputs": {"x": 1, "y": 2}},
         )
-        job_info = parse_mcp_response(start_result[0].text)
+        job_info = parse_mcp_response(start_result.content[0].text)
         job_id = job_info["job_id"]
 
         # Wait for job to complete
@@ -367,7 +367,7 @@ async def test_cancel_completed_job(simple_pipeline: Pipeline) -> None:
         waited = 0.0
         while waited < max_wait:
             status_result = await client.call_tool("check_job_status", {"job_id": job_id})
-            status_info = parse_mcp_response(status_result[0].text)
+            status_info = parse_mcp_response(status_result.content[0].text)
             if status_info["status"] == "completed":
                 break
             await asyncio.sleep(0.01)
@@ -375,7 +375,7 @@ async def test_cancel_completed_job(simple_pipeline: Pipeline) -> None:
 
         # Now try to cancel the completed job
         cancel_result = await client.call_tool("cancel_job", {"job_id": job_id})
-        cancel_info = parse_mcp_response(cancel_result[0].text)
+        cancel_info = parse_mcp_response(cancel_result.content[0].text)
 
         # Should get the "already completed" error message
         assert "error" in cancel_info
@@ -394,7 +394,7 @@ async def test_check_nonexistent_job_status(simple_pipeline):
     async with Client(mcp) as client:
         fake_job_id = "00000000-0000-0000-0000-000000000000"
         status_result = await client.call_tool("check_job_status", {"job_id": fake_job_id})
-        status_info = parse_mcp_response(status_result[0].text)
+        status_info = parse_mcp_response(status_result.content[0].text)
 
         assert "error" in status_info
         assert status_info["error"] == "Job not found"
@@ -414,7 +414,7 @@ async def test_async_job_with_custom_run_folder(simple_pipeline: Pipeline, tmp_p
             "execute_pipeline_async",
             {"inputs": {"x": 1, "y": 2}, "run_folder": custom_folder},
         )
-        job_info = parse_mcp_response(start_result[0].text)
+        job_info = parse_mcp_response(start_result.content[0].text)
 
         assert job_info["run_folder"] == str(custom_folder)
 
@@ -427,7 +427,7 @@ async def test_async_job_with_custom_run_folder(simple_pipeline: Pipeline, tmp_p
                 "check_job_status",
                 {"job_id": job_info["job_id"]},
             )
-            status_info = parse_mcp_response(status_result[0].text)
+            status_info = parse_mcp_response(status_result.content[0].text)
             if status_info["status"] in ["completed", "cancelled"]:
                 break
             await asyncio.sleep(0.01)
@@ -454,18 +454,18 @@ async def test_end_to_end_async_workflow(complex_pipeline: Pipeline) -> None:
             "execute_pipeline_async",
             {"inputs": {"x": [1, 2, 3, 4]}},
         )
-        job_info = parse_mcp_response(start_result[0].text)
+        job_info = parse_mcp_response(start_result.content[0].text)
         job_id = job_info["job_id"]
 
         # 2. Check initial status (might be running)
         initial_status_result = await client.call_tool("check_job_status", {"job_id": job_id})
-        initial_status = parse_mcp_response(initial_status_result[0].text)
+        initial_status = parse_mcp_response(initial_status_result.content[0].text)
         assert initial_status["job_id"] == job_id
         assert initial_status["status"] in ["running", "completed"]
 
         # 3. List jobs (should show our job)
         list_result = await client.call_tool("list_jobs", {})
-        jobs_info = parse_mcp_response(list_result[0].text)
+        jobs_info = parse_mcp_response(list_result.content[0].text)
         assert jobs_info["total_count"] >= 1
         job_ids = [job["job_id"] for job in jobs_info["jobs"]]
         assert job_id in job_ids
@@ -476,7 +476,7 @@ async def test_end_to_end_async_workflow(complex_pipeline: Pipeline) -> None:
         status_info = None
         while waited < max_wait:
             status_result = await client.call_tool("check_job_status", {"job_id": job_id})
-            status_info = parse_mcp_response(status_result[0].text)
+            status_info = parse_mcp_response(status_result.content[0].text)
             # Skip test if parsing failed due to complex numpy arrays
             if status_info.get("parse_error"):
                 pytest.skip("Response parsing failed due to complex numpy arrays")
@@ -549,7 +549,7 @@ async def test_run_info_with_completed_run(simple_pipeline: Pipeline, tmp_path: 
 
         # Test run_info on the completed run
         result = await client.call_tool("run_info", {"run_folder": str(custom_folder)})
-        info = parse_mcp_response(result[0].text)
+        info = parse_mcp_response(result.content[0].text)
 
         # Verify structure
         assert "run_info" in info
@@ -598,7 +598,7 @@ async def test_run_info_with_complex_pipeline(complex_pipeline: Pipeline, tmp_pa
 
         # Test run_info
         result = await client.call_tool("run_info", {"run_folder": str(custom_folder)})
-        info = parse_mcp_response(result[0].text)
+        info = parse_mcp_response(result.content[0].text)
 
         # Verify multiple outputs
         run_info = info["run_info"]
@@ -637,11 +637,11 @@ async def test_run_info_with_async_incomplete_run(slow_pipeline: Pipeline, tmp_p
             "execute_pipeline_async",
             {"inputs": {"x": [1, 2, 3, 4, 5]}, "run_folder": str(custom_folder)},
         )
-        job_info = parse_mcp_response(start_result[0].text)
+        job_info = parse_mcp_response(start_result.content[0].text)
         assert "job_id" in job_info
         # Immediately check run_info (might catch it while running)
         result = await client.call_tool("run_info", {"run_folder": str(custom_folder)})
-        info = parse_mcp_response(result[0].text)
+        info = parse_mcp_response(result.content[0].text)
 
         # Should have the basic structure even if running
         assert "run_info" in info
@@ -718,7 +718,7 @@ async def test_list_historical_runs(simple_pipeline: Pipeline, tmp_path: Path) -
     async with Client(build_mcp_server(simple_pipeline)) as client:
         # Does not yet exist
         runs_reply1 = await client.call_tool("list_historical_runs", {"folder": str(tmp_path)})
-        runs1 = json.loads(runs_reply1[0].text)
+        runs1 = json.loads(runs_reply1.content[0].text)
         assert "runs" in runs1
         assert len(runs1["runs"]) == 0
         result = await client.call_tool(
@@ -728,12 +728,12 @@ async def test_list_historical_runs(simple_pipeline: Pipeline, tmp_path: Path) -
                 "run_folder": str(tmp_path / "run_folder"),
             },
         )
-        assert "result" in result[0].text
+        assert "result" in result.content[0].text
         runs_reply2 = await client.call_tool(
             "list_historical_runs",
             {"folder": str(tmp_path), "max_runs": 100},
         )
-        runs2 = json.loads(runs_reply2[0].text)
+        runs2 = json.loads(runs_reply2.content[0].text)
         assert "runs" in runs2
         assert len(runs2["runs"]) == 1
         assert runs2["runs"][0]["last_modified"] is not None
@@ -757,16 +757,16 @@ async def test_load_outputs(simple_pipeline: Pipeline, tmp_path: Path) -> None:
                 "run_folder": str(tmp_path / "run_folder"),
             },
         )
-        assert "result" in result[0].text
+        assert "result" in result.content[0].text
         outputs = await client.call_tool(
             "load_outputs",
             {"run_folder": str(tmp_path / "run_folder")},
         )
-        assert "result" in outputs[0].text
-        assert json.loads(outputs[0].text) == {"result": 15.0}
+        assert "result" in outputs.content[0].text
+        assert json.loads(outputs.content[0].text) == {"result": 15.0}
 
         output = await client.call_tool(
             "load_outputs",
             {"run_folder": str(tmp_path / "run_folder"), "output_names": ["result"]},
         )
-        assert json.loads(output[0].text) == 15.0
+        assert json.loads(output.content[0].text) == {"result": 15.0}
