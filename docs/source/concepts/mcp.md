@@ -47,7 +47,6 @@ def add(x: float, y: float) -> float:
 
 pipeline = Pipeline([add])
 mcp = build_mcp_server(pipeline)
-print(f"Server name: {mcp.name}")
 ```
 
 To actually run the server (not executed in docs):
@@ -79,6 +78,8 @@ The server exposes these tools:
 - **`list_historical_runs`**: Browse previous pipeline executions
 - **`load_outputs`**: Load results from completed runs
 
+Every tool returns JSON-serializable dictionaries so AI clients can surface rich status information without additional parsing.
+
 ---
 
 ## Execution Modes
@@ -90,7 +91,13 @@ Blocks until completion and returns results:
 ```python
 # Client calls:
 execute_pipeline_sync(inputs={"x": 5, "y": 3})
-# Returns: {'result': {'output': 8.0, 'shape': None}}
+# Returns:
+# {
+#   "result": {
+#     "output": 8.0,
+#     "shape": null
+#   }
+# }
 ```
 
 ### Asynchronous Execution
@@ -100,7 +107,10 @@ Returns immediately with a job ID for tracking:
 ```python
 # Start job:
 execute_pipeline_async(inputs={"x": [1, 2, 3], "y": [4, 5, 6]})
-# Returns: {"job_id": "uuid-string", "run_folder": "runs/job_uuid"}
+# Returns: {
+#   "job_id": "9d41...",
+#   "run_folder": "runs/job_9d41..."
+# }
 
 # Check status:
 check_job_status(job_id="uuid-string")
@@ -108,7 +118,10 @@ check_job_status(job_id="uuid-string")
 
 # Cancel if needed:
 cancel_job(job_id="uuid-string")
+# Returns: {"status": "cancelled", "job_id": "uuid-string"}
 ```
+
+By default, asynchronous runs are saved under `runs/job_<job_id>`; pass `run_folder` explicitly to change the destination.
 
 ---
 
@@ -161,6 +174,109 @@ mcp.run(transport="sse")
 
 ```python
 mcp.run(transport="stdio")
+```
+
+---
+
+## AI Agent Example
+
+This example shows how to create an AI agent using [Agno](https://github.com/agno-agi/agno) that can use your pipeline as a tool:
+
+Create `server.py` with inline dependencies using [uv script](https://docs.astral.sh/uv/guides/scripts/):
+
+```python
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["pipefunc[mcp]"]
+# ///
+
+from pipefunc import Pipeline, pipefunc
+from pipefunc.mcp import build_mcp_server
+
+@pipefunc(output_name="result")
+def calculate(x: float, y: float, operation: str) -> float:
+    """
+    Perform a mathematical operation.
+
+    Parameters
+    ----------
+    x : float
+        First number
+    y : float
+        Second number
+    operation : str
+        Operation to perform: 'add', 'subtract', 'multiply', 'divide'
+
+    Returns
+    -------
+    float
+        Result of the operation
+    """
+    ops = {
+        'add': lambda a, b: a + b,
+        'subtract': lambda a, b: a - b,
+        'multiply': lambda a, b: a * b,
+        'divide': lambda a, b: a / b if b != 0 else float('inf')
+    }
+    return ops[operation](x, y)
+
+pipeline = Pipeline([calculate])
+mcp = build_mcp_server(pipeline)
+
+if __name__ == "__main__":
+    # Start server on stdio for agent integration
+    mcp.run(transport="stdio")
+```
+
+Create `agent.py` to connect to the server:
+
+```python
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["agno", "anthropic"]
+# ///
+
+from agno.agent import Agent
+from agno.models.anthropic import Claude
+from agno.tools.mcp import MCPTools
+
+# Create agent with MCP server connection via stdio
+agent = Agent(
+    model=Claude(id="claude-sonnet-4-5"),
+    tools=[
+        MCPTools(command="uv run --script server.py", transport="stdio")
+    ],
+    instructions=[
+        "You are a helpful math assistant.",
+        "Use the calculate tool to perform mathematical operations.",
+        "Always explain your calculations step by step."
+    ],
+    markdown=True,
+)
+
+# Agent can now use your pipeline as a tool
+# Requires ANTHROPIC_API_KEY environment variable
+agent.print_response(
+    "What is 15 times 23, and then add 47 to the result?",
+    stream=True
+)
+```
+
+Run with:
+
+```bash
+export ANTHROPIC_API_KEY="your-api-key"
+uv run --script agent.py
+```
+
+No installation needed—`uv` automatically manages all dependencies! The agent will automatically discover and use the `execute_pipeline_sync` tool from your MCP server.
+
+For HTTP-based MCP servers, use:
+
+```python
+tools=[MCPTools(url="http://127.0.0.1:8000/calculate", transport="streamable-http")]
 ```
 
 ---
@@ -242,7 +358,7 @@ pip install "pipefunc[mcp]"
 
 This installs:
 
-- **fastmcp** (≥2.12.0) – MCP server framework
+- **fastmcp** – MCP server framework
 - **Rich** – Enhanced terminal output
 - **Griffe** – Docstring parsing for parameter descriptions
 

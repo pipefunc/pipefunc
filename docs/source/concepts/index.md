@@ -47,7 +47,7 @@ Below are the key concepts discussed in this section. Click on any topic to lear
 - **[Variants](./variants):** Use `VariantPipeline` to manage multiple function implementations within a single pipeline.
 - **[Caching](./caching):** Cache function results with `memoize` and `Pipeline` cache options. Understand cache types and shared memory caching.
 - **[Automatic CLI](./cli):** Automatically generate a CLI for your pipeline, complete with documentation.
-- **[MCP Server Integration](./mcp):** Expose pipelines as MCP servers for AI assistants. Includes async execution and job management.
+- **[MCP Server Integration](./mcp):** Expose pipelines as MCP servers for AI agents and assistants. Includes async execution, job management, and AI agent example.
 - **[SLURM Integration](./slurm):** Submit pipeline.map calls to SLURM clusters with `pipefunc` and [`adaptive-scheduler`](https://adaptive-scheduler.readthedocs.io/en/latest/).
 - **[Resource Management](./resource-management):** Specify and dynamically allocate resources (CPU, memory, GPU) for individual functions.
 - **[Simplifying Pipelines](./simplifying-pipelines):** Merge nodes with `simplified_pipeline` and `NestedPipeFunc`. Understand the trade-offs.
