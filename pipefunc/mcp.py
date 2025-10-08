@@ -26,7 +26,7 @@ from pipefunc.map._storage_array._file import FileArray
 
 if sys.version_info < (3, 12):  # pragma: no cover
     from typing_extensions import TypedDict
-else:
+else:  # pragma: no cover
     from typing import TypedDict
 
 

@@ -527,6 +527,33 @@ class PipeFunc(Generic[T]):
         renames = {name: _prepend_name_with_scope(name, scope) for name in all_parameters}
         self.update_renames(renames, update_from="current")
 
+    def update_mapspec_axes(self, renames: dict[str, str]) -> None:
+        """Update the MapSpec by renaming axes.
+
+        This method renames axes in the MapSpec while preserving the structure
+        of the array specifications. It uses the `MapSpec.rename_axes()` method
+        to perform type-safe axis renaming.
+
+        Parameters
+        ----------
+        renames
+            Dictionary mapping old axis names to new axis names.
+
+        Examples
+        --------
+        >>> @pipefunc(output_name="c", mapspec="a[i, j], b[i, j] -> c[i, j]")
+        ... def f(a, b):
+        ...     return a + b
+        >>> f.update_mapspec_axes({"i": "x", "j": "y"})
+        >>> str(f.mapspec)
+        'a[x, y], b[x, y] -> c[x, y]'
+
+        """
+        if self.mapspec is None:
+            return
+        self.mapspec = self.mapspec.rename_axes(renames)
+        self._clear_internal_cache()
+
     def update_bound(self, bound: dict[str, Any], *, overwrite: bool = False) -> None:
         """Update the bound arguments for the function that are fixed.
 
