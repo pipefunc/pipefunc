@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 from pathlib import Path
 
 import pytest
@@ -39,6 +40,11 @@ def test_run_info_load_handles_relative_paths(tmp_path, cwd_is_different):
         pipeline.map({"x": [1, 2, 3]}, run_folder=run_folder, parallel=False)
 
         run_folder_abs = run_folder.resolve()
+        with (run_folder_abs / "run_info.json").open() as fh:
+            run_info_data = json.load(fh)
+
+        assert run_info_data["input_paths"]["x"] == "inputs/x.cloudpickle"
+        assert run_info_data["defaults_path"] == "defaults/defaults.cloudpickle"
 
         if cwd_is_different:
             # Mimic the ReadTheDocs failure: load from *outside* the run folder root.

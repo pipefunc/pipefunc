@@ -174,7 +174,10 @@ class RunInfo:
         data = asdict(self)
         del data["inputs"]  # Cannot serialize inputs
         del data["defaults"]  # or defaults
-        data["input_paths"] = {k: str(v) for k, v in self.input_paths.items()}
+        data["input_paths"] = {
+            k: _path_relative_to_run_folder(v, self.run_folder)
+            for k, v in self.input_paths.items()
+        }
         data["all_output_names"] = sorted(data["all_output_names"])
         dicts_with_tuples = ["shapes", "shape_masks", "resolved_shapes"]
         if isinstance(self.storage, dict):
@@ -182,7 +185,10 @@ class RunInfo:
         for key in dicts_with_tuples:
             data[key] = {_maybe_tuple_to_str(k): v for k, v in data[key].items()}
         data["run_folder"] = str(data["run_folder"])
-        data["defaults_path"] = str(self.defaults_path)
+        data["defaults_path"] = _path_relative_to_run_folder(
+            self.defaults_path,
+            self.run_folder,
+        )
         with path.open("w") as f:
             json.dump(data, f, indent=4)
 
@@ -460,42 +466,19 @@ def _maybe_array_path(output_name: str, run_folder: Path | None) -> Path | None:
 
 
 def _resolve_json_path(path: str | Path, run_folder_abs: Path) -> Path:
-    """Resolve a run_info path using heuristics that preserve legacy layouts.
+    """Resolve a path stored in run_info.json relative to run_folder."""
 
-    Historically, ``run_info.json`` stored paths relative to the current working
-    directory, e.g. ``"pipeline_run/inputs/x.cloudpickle"``.  Newer versions aim
-    to make these paths independent of the caller's working directory by
-    resolving them relative to ``run_folder``.  When loading older metadata we
-    therefore need to try both interpretations.
-
-    Parameters
-    ----------
-    path
-        Path from JSON (may be string or Path, absolute or relative)
-    run_folder_abs
-        Absolute path to the ``run_folder`` directory
-
-    Returns
-    -------
-    Path
-        Absolute path pointing to the expected on-disk artefact
-
-    """
     p = path if isinstance(path, Path) else Path(path)
-    if p.is_absolute():
-        return p
+    return p if p.is_absolute() else (run_folder_abs / p).resolve()
 
-    candidate_if_missing: Path | None = None
 
-    for base in (run_folder_abs, *run_folder_abs.parents):
-        candidate = (base / p).resolve()
-        if candidate_if_missing is None:
-            candidate_if_missing = candidate
-        if candidate.exists():
-            return candidate
-
-    assert candidate_if_missing is not None
-    return candidate_if_missing
+def _path_relative_to_run_folder(path: Path, run_folder: Path | None) -> str:
+    if run_folder is None:
+        return str(path)
+    try:
+        return str(path.relative_to(run_folder))
+    except ValueError:  # pragma: no cover - unexpected, defensive only
+        return str(path)
 
 
 def _input_used_in_slurm_executor(
