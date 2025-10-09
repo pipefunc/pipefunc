@@ -175,8 +175,7 @@ class RunInfo:
         del data["inputs"]  # Cannot serialize inputs
         del data["defaults"]  # or defaults
         data["input_paths"] = {
-            k: _path_relative_to_run_folder(v, self.run_folder)
-            for k, v in self.input_paths.items()
+            k: _path_relative_to_run_folder(v, self.run_folder) for k, v in self.input_paths.items()
         }
         data["all_output_names"] = sorted(data["all_output_names"])
         dicts_with_tuples = ["shapes", "shape_masks", "resolved_shapes"]
@@ -467,7 +466,6 @@ def _maybe_array_path(output_name: str, run_folder: Path | None) -> Path | None:
 
 def _resolve_json_path(path: str | Path, run_folder_abs: Path) -> Path:
     """Resolve a path stored in run_info.json relative to run_folder."""
-
     p = path if isinstance(path, Path) else Path(path)
     return p if p.is_absolute() else (run_folder_abs / p).resolve()
 

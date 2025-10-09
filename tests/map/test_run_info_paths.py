@@ -1,14 +1,19 @@
 from __future__ import annotations
 
-import os
 import json
+import os
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map._run_info import RunInfo
-from pipefunc.typing import Array
+
+if TYPE_CHECKING:
+    from pipefunc.typing import Array
+else:  # pragma: no cover - runtime-only alias for annotations
+    Array = Any
 
 
 @pytest.mark.parametrize("cwd_is_different", [False, True])
