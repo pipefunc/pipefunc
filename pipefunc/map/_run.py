@@ -26,6 +26,7 @@ from pipefunc._utils import (
 )
 from pipefunc._widgets.helpers import maybe_async_task_status_widget
 from pipefunc.cache import HybridCache, to_hashable
+from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
 
 from ._adaptive_scheduler_slurm_executor import (
     is_slurm_executor,
@@ -54,7 +55,6 @@ if TYPE_CHECKING:
     from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
     from pipefunc._widgets.progress_rich import RichProgressTracker
     from pipefunc.cache import _CacheBase
-    from pipefunc.exceptions import ErrorSnapshot
 
     from ._prepare import Prepared
     from ._progress import Status
@@ -676,6 +676,23 @@ class _InternalShape:
         return tuple(cls(_try_shape(output)) for output in outputs)
 
 
+def _entry_contains_error(entry: Any) -> bool:
+    if isinstance(entry, _InternalShape):
+        return False
+    if isinstance(entry, (ErrorSnapshot, PropagatedErrorSnapshot)):
+        return True
+    return any(
+        isinstance(value, (ErrorSnapshot, PropagatedErrorSnapshot))
+        for value in at_least_tuple(entry)
+    )
+
+
+def _count_errors_in_result(result: Any) -> int:
+    if isinstance(result, list | tuple):
+        return sum(_entry_contains_error(entry) for entry in result)
+    return int(_entry_contains_error(result))
+
+
 def _run_iteration_and_process(
     index: int,
     func: PipeFunc,
@@ -937,10 +954,21 @@ def _submit(
     assert progress is not None
     status.mark_in_progress(n=chunksize)
     fut = executor.submit(func, *args)
-    mark_complete = functools.partial(status.mark_complete, n=chunksize)
-    fut.add_done_callback(mark_complete)
-    if not progress.in_async:
-        fut.add_done_callback(progress.update_progress)
+
+    def _on_done(future: Future) -> None:
+        exc = future.exception()
+        if exc is not None:
+            successes = 0
+            failures = chunksize
+        else:
+            result = future.result()
+            failures = _count_errors_in_result(result)
+            successes = chunksize - failures
+        status.mark_finished(successes=successes, failures=failures)
+        if not progress.in_async:
+            progress.update_progress()
+
+    fut.add_done_callback(_on_done)
     return fut
 
 
@@ -1071,8 +1099,11 @@ def _wrap_with_status_update(
     def wrapped(*args: Any) -> Any:
         status.mark_in_progress()
         result = func(*args)
-        status.mark_complete()
-        progress.update_progress()
+        failures = _count_errors_in_result(result)
+        successes = max(0, 1 - failures)
+        status.mark_finished(successes=successes, failures=failures)
+        if not progress.in_async:
+            progress.update_progress()
         return result
 
     return wrapped
