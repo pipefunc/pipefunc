@@ -32,7 +32,7 @@ from pipefunc._utils import (
     is_pydantic_base_model,
     requires,
 )
-from pipefunc.exceptions import ErrorSnapshot
+from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
 from pipefunc.map._run import _EVALUATED_RESOURCES
@@ -1544,8 +1544,6 @@ def _is_named_tuple(hint: Any) -> bool:
 def _default_output_picker(output: Any, name: str, output_name: OUTPUT_TYPE) -> Any:
     """Default output picker function for tuples."""
     # If output is an error, return it as-is for all output names
-    from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
-
     if isinstance(output, (ErrorSnapshot, PropagatedErrorSnapshot)):
         return output
     return output[output_name.index(name)]

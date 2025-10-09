@@ -536,7 +536,6 @@ def test_tuple_output_with_output_picker():
     def custom_picker(result, key):
         """Custom output picker function."""
         # If result is an error, return it as-is for all outputs
-        from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
 
         if isinstance(result, (ErrorSnapshot, PropagatedErrorSnapshot)):
             return result

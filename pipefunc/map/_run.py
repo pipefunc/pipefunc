@@ -741,7 +741,6 @@ def _update_array(
     # we dump it in the executor. Otherwise, we dump it in the main process during the result array update.
     # We do this to offload the I/O and serialization overhead to the executor process if possible.
     assert isinstance(func.mapspec, MapSpec)
-    from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
 
     output_key = None
     has_dumped = False
