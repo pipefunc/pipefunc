@@ -2063,6 +2063,54 @@ def test_load_dataframe_with_list_of_tuples_output(tmp_path: Path) -> None:
     np.testing.assert_array_equal(final_array, np.array(expected, dtype=object))
 
 
+@pytest.mark.skipif(not has_xarray, reason="requires xarray")
+def test_load_dataframe_with_1d_list_output(tmp_path: Path) -> None:
+    """Regression test for loading single outputs that are 1D lists.
+
+    This tests that single outputs (not part of any mapspec) returning 1D lists
+    are properly stored as data variables (not coordinates) in xarray and result
+    in a single-row DataFrame with the list/array as the cell value.
+    """
+
+    @pipefunc(output_name="my_list")
+    def return_list() -> list[int]:
+        # Return a simple 1D list (not part of any mapspec)
+        return [1, 2, 3]
+
+    pipeline = Pipeline([return_list])
+
+    results = pipeline.map(
+        {},
+        run_folder=tmp_path,
+        parallel=False,
+        storage="dict",
+    )
+
+    # Check that the results are correct
+    expected = [1, 2, 3]
+    assert results["my_list"].output == expected
+
+    # Test load_outputs works correctly
+    loaded = load_outputs("my_list", run_folder=tmp_path)
+    assert loaded == expected
+
+    # Test xarray dataset structure
+    ds = results.to_xarray()
+    assert "my_list" in ds.data_vars, "my_list should be a data variable, not a coordinate"
+    assert "my_list" not in ds.coords, "my_list should not be a coordinate"
+
+    # Test load_dataframe works correctly
+    df = load_dataframe("my_list", run_folder=tmp_path)
+    assert len(df) == 1, "Should have exactly 1 row"
+    assert "my_list" in df.columns, "Should have 'my_list' column"
+
+    # Check that the array is properly unwrapped
+    list_value = df["my_list"].iloc[0]
+    assert isinstance(list_value, np.ndarray)
+    assert list_value.shape == (3,)
+    np.testing.assert_array_equal(list_value, np.array(expected))
+
+
 def test_legacy_fix(tmp_path: Path) -> None:
     """Test that _legacy_fix correctly converts legacy format paths to new format."""
 

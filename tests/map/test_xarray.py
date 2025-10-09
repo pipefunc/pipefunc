@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def test_to_xarray_1_dim(tmp_path: Path):
+def test_to_xarray_1_dim(tmp_path: Path) -> None:
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def double_it(x: int) -> int:
         return 2 * x
@@ -33,7 +33,7 @@ def test_to_xarray_1_dim(tmp_path: Path):
     assert da.to_numpy().tolist() == [2, 4, 6]
 
 
-def test_to_xarray_2_dim(tmp_path: Path):
+def test_to_xarray_2_dim(tmp_path: Path) -> None:
     @pipefunc(output_name="z", mapspec="x[i], y[j] -> z[i, j]")
     def f(x: int, y: int) -> int:
         return x + y
@@ -54,7 +54,7 @@ def test_to_xarray_2_dim(tmp_path: Path):
     assert da.to_numpy().tolist() == [[5, 6], [6, 7], [7, 8]]
 
 
-def test_to_xarray_2_dim_zipped(tmp_path: Path):
+def test_to_xarray_2_dim_zipped(tmp_path: Path) -> None:
     @pipefunc(output_name="r", mapspec="x[i], y[i], z[j] -> r[i, j]")
     def f(x: int, y: int, z: int) -> int:
         return x + y + z
@@ -75,7 +75,7 @@ def test_to_xarray_2_dim_zipped(tmp_path: Path):
     assert da.to_numpy().tolist() == [[12, 13], [14, 15], [16, 17]]
 
 
-def test_to_xarray_1_dim_2_funcs(tmp_path: Path):
+def test_to_xarray_1_dim_2_funcs(tmp_path: Path) -> None:
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def f(x: int) -> int:
         return 2 * x
@@ -100,7 +100,7 @@ def test_to_xarray_1_dim_2_funcs(tmp_path: Path):
     assert da.to_numpy().tolist() == [3, 5, 7]
 
 
-def test_to_xarray_from_step(tmp_path: Path):
+def test_to_xarray_from_step(tmp_path: Path) -> None:
     @pipefunc(output_name="x")
     def generate_ints(n: int) -> list[int]:
         """Generate a list of integers from 0 to n-1."""
@@ -137,7 +137,7 @@ def test_to_xarray_from_step(tmp_path: Path):
     assert da.coords["x"].to_numpy().tolist() == expected_coords["x"]
 
 
-def test_xarray_from_result(tmp_path: Path):
+def test_xarray_from_result(tmp_path: Path) -> None:
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def double_it(x: int) -> int:
         return 2 * x
@@ -152,7 +152,8 @@ def test_xarray_from_result(tmp_path: Path):
     inputs = {"x": [1, 2, 3], "a": 10}
     results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, storage="dict")
     ds = xarray_dataset_from_results(inputs, results, pipeline)
-    assert "returns_array" in ds.coords
+    # Both single outputs (not part of mapspec) should be data variables, not coordinates
+    assert "returns_array" in ds.data_vars
     assert "returns_custom_object" in ds.data_vars
 
 
