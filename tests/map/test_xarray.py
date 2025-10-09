@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+import pytest
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc.map import load_dataframe, load_outputs
+from pipefunc.map import load_dataframe, load_outputs, load_xarray_dataset
 from pipefunc.map.xarray import DimensionlessArray, load_xarray, xarray_dataset_from_results
 
 if TYPE_CHECKING:
@@ -416,6 +417,90 @@ def test_single_output_2d_list(tmp_path: Path) -> None:
     assert isinstance(matrix_value, np.ndarray)
     assert matrix_value.shape == (2, 3)
     np.testing.assert_array_equal(matrix_value, np.array(expected, dtype=object))
+
+
+@pytest.mark.parametrize("dtype", [np.int16, np.float32, np.complex64])
+def test_single_output_numpy_dtype_preserved(tmp_path: Path, dtype: Any) -> None:
+    """Single-output numpy arrays keep dtype in xarray Dataset and DataFrame."""
+
+    values = np.array([1, 2, 3], dtype=dtype)
+    if np.issubdtype(dtype, np.complexfloating):  # pragma: no branch - limited branch
+        values = np.array([1 + 1j, 2 + 2j, 3 + 3j], dtype=dtype)
+
+    @pipefunc(output_name="typed")
+    def make_array() -> npt.NDArray:
+        return values
+
+    pipeline = Pipeline([make_array])
+    results = pipeline.map({}, run_folder=tmp_path, parallel=False, storage="dict")
+
+    ds = results.to_xarray()
+    dimless = ds["typed"].to_numpy().item()
+    assert isinstance(dimless, DimensionlessArray)
+    np.testing.assert_array_equal(dimless.arr, values)
+    assert dimless.arr.dtype == dtype
+
+    df = load_dataframe("typed", run_folder=tmp_path)
+    typed_value = df["typed"].iloc[0]
+    assert isinstance(typed_value, np.ndarray)
+    np.testing.assert_array_equal(typed_value, values)
+    assert typed_value.dtype == dtype
+
+
+@pytest.mark.parametrize("dtype", [np.int16, np.float32, np.float64])
+def test_scalar_numpy_dtype_preserved(tmp_path: Path, dtype: Any) -> None:
+    """Zero-dimensional numpy outputs keep dtype when materialized."""
+
+    scalar = np.array(5, dtype=dtype)
+
+    @pipefunc(output_name="scalar_val")
+    def make_scalar() -> npt.NDArray:
+        return scalar
+
+    pipeline = Pipeline([make_scalar])
+    pipeline.map({}, run_folder=tmp_path, parallel=False, storage="dict")
+
+    ds = load_xarray_dataset(
+        "scalar_val",
+        run_folder=tmp_path,
+        load_intermediate=True,
+    )
+    dimless = ds["scalar_val"].to_numpy().item()
+    assert isinstance(dimless, DimensionlessArray)
+    np.testing.assert_array_equal(dimless.arr, scalar)
+    assert dimless.arr.dtype == dtype
+
+    df = load_dataframe("scalar_val", run_folder=tmp_path)
+    scalar_value = df["scalar_val"].iloc[0]
+    assert isinstance(scalar_value, np.ndarray)
+    np.testing.assert_array_equal(scalar_value, scalar)
+    assert scalar_value.dtype == dtype
+
+
+@pytest.mark.parametrize("coord_dtype", [np.int8, np.float16])
+def test_mapspec_coordinate_dtype_preserved(tmp_path: Path, coord_dtype: Any) -> None:
+    """Coordinates derived from mapspec inputs retain their numpy dtype."""
+
+    coord_values = np.array([1, 2, 3], dtype=coord_dtype)
+
+    @pipefunc(output_name="axis", mapspec="... -> axis[i]")
+    def axis() -> npt.NDArray:
+        return coord_values
+
+    @pipefunc(output_name="values", mapspec="axis[i] -> values[i]")
+    def values(axis: Any) -> float:
+        return float(axis * 2)
+
+    pipeline = Pipeline([axis, values])
+    results = pipeline.map({}, run_folder=tmp_path, parallel=False, storage="dict")
+
+    ds = results.to_xarray()
+    coord = ds.coords["axis"].to_numpy()
+    np.testing.assert_array_equal(coord, coord_values)
+    assert coord.dtype == coord_dtype
+
+    df = results.to_dataframe()
+    assert df["axis"].dtype == coord_dtype
 
 
 def test_aggregation_to_scalar(tmp_path: Path) -> None:
