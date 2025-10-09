@@ -479,8 +479,8 @@ def _resolve_json_path(path: str | Path, run_folder_abs: Path) -> Path:
     -------
     Path
         Absolute path pointing to the expected on-disk artefact
-    """
 
+    """
     p = path if isinstance(path, Path) else Path(path)
     if p.is_absolute():
         return p
