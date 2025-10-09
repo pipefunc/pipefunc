@@ -76,3 +76,45 @@ async def test_map_async_continue_returns_per_index_outputs() -> None:
 
     outputs = result["y"].output
     _assert_expected_outputs(outputs)
+
+
+@pipefunc(output_name="ynon")
+def _single_fail(x: int) -> int:
+    msg = "boom"
+    raise ValueError(msg)
+
+
+def test_parallel_continue_non_mapspec_executor() -> None:
+    """Non-mapspec futures should still record snapshot outputs by index."""
+
+    pipeline = Pipeline([_single_fail])
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        result = pipeline.map(
+            {"x": 1},
+            error_handling="continue",
+            parallel=True,
+            executor=executor,
+            show_progress="headless",
+        )
+
+    snapshot = result["ynon"].output
+    assert isinstance(snapshot, ErrorSnapshot)
+    assert snapshot.kwargs["x"] == 1
+
+
+@pytest.mark.asyncio
+async def test_map_async_continue_non_mapspec_executor() -> None:
+    """Async non-mapspec futures also surface snapshots without chunk metadata."""
+
+    pipeline = Pipeline([_single_fail])
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        async_map = pipeline.map_async(
+            {"x": 1},
+            error_handling="continue",
+            executor=executor,
+            start=True,
+        )
+        result = await async_map.task
+
+    snapshot = result["ynon"].output
+    assert isinstance(snapshot, ErrorSnapshot)
