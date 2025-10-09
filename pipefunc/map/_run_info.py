@@ -211,10 +211,10 @@ class RunInfo:
 
         data["run_folder"] = run_folder_abs
         data["inputs"] = {
-            k: load(_resolve_json_path(v, run_folder_abs))
+            k: load((run_folder_abs / Path(v)).resolve())
             for k, v in data.pop("input_paths").items()
         }
-        data["defaults"] = load(_resolve_json_path(data.pop("defaults_path"), run_folder_abs))
+        data["defaults"] = load((run_folder_abs / Path(data.pop("defaults_path"))).resolve())
         return cls(**data)
 
     @staticmethod
@@ -462,12 +462,6 @@ def _maybe_array_path(output_name: str, run_folder: Path | None) -> Path | None:
         return None
     assert isinstance(output_name, str)
     return run_folder / "outputs" / output_name
-
-
-def _resolve_json_path(path: str | Path, run_folder_abs: Path) -> Path:
-    """Resolve a path stored in run_info.json relative to run_folder."""
-    p = path if isinstance(path, Path) else Path(path)
-    return p if p.is_absolute() else (run_folder_abs / p).resolve()
 
 
 def _path_relative_to_run_folder(path: Path, run_folder: Path | None) -> str:
