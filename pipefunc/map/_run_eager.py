@@ -9,8 +9,10 @@ from pipefunc._pipefunc import PipeFunc
 from pipefunc.map._run import (
     _finalize_run_map,
     _KwargsTask,
+    _MapTask,
     _maybe_executor,
     _process_task,
+    _SingleTask,
     _submit_func,
     prepare_run,
 )
@@ -293,15 +295,14 @@ class _FunctionTracker:
         self.func_futures[func] = set()
 
         # Track futures for this function
-        if func.requires_mapping:
-            chunk_tasks, _ = kwargs_task.task
-            for chunk_task in chunk_tasks:
+        if isinstance(kwargs_task.task, _MapTask):
+            for chunk_task in kwargs_task.task.chunk_tasks:
                 fut = _ensure_future(chunk_task.value)
                 self.future_to_func[fut] = func
                 self.func_futures[func].add(fut)
         else:
-            task = kwargs_task.task
-            fut = _ensure_future(task)
+            assert isinstance(kwargs_task.task, _SingleTask)
+            fut = _ensure_future(kwargs_task.task.value)
             self.future_to_func[fut] = func
             self.func_futures[func].add(fut)
 

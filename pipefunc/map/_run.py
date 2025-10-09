@@ -10,7 +10,7 @@ from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import numpy as np
 import numpy.typing as npt
@@ -1073,11 +1073,11 @@ def _maybe_parallel_map(
         chunksize = _chunksize_for_func(func, chunksizes, len(indices), ex)
         chunks = list(_chunk_indices(indices, chunksize))
         process_chunk = functools.partial(_process_chunk, process_index=process_index)
-        futures: list[_ChunkTask] = []
+        chunk_tasks: list[_ChunkTask] = []
         for chunk in chunks:
             fut = _submit(process_chunk, ex, status, progress, len(chunk), chunk)
-            futures.append(_ChunkTask(fut, chunk))
-        return futures
+            chunk_tasks.append(_ChunkTask(fut, chunk))
+        return chunk_tasks
     if status is not None:
         assert progress is not None
         process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
@@ -1162,17 +1162,23 @@ def _load_data(kwargs: dict[str, Any]) -> None:
         kwargs[k] = maybe_load_data(v)
 
 
+class _SingleTask(NamedTuple):
+    value: Any
+
+
 class _ChunkTask(NamedTuple):
     value: Any
     chunk_indices: tuple[int, ...] | None
 
 
-MapTask: TypeAlias = tuple[list[_ChunkTask], _MapSpecArgs]
+class _MapTask(NamedTuple):
+    chunk_tasks: list[_ChunkTask]
+    args: _MapSpecArgs
 
 
 class _KwargsTask(NamedTuple):
     kwargs: dict[str, Any]
-    task: MapTask | Any
+    task: _MapTask | _SingleTask
 
 
 # NOTE: A similar async version of this function is provided below.
@@ -1280,6 +1286,7 @@ def _submit_func(
     kwargs = _func_kwargs(func, run_info, store)
     status = progress.progress_dict[func.output_name] if progress is not None else None
     cache = cache if func.cache else None
+    task: _MapTask | _SingleTask
     if func.requires_mapping:
         args = _prepare_submit_map_spec(
             func,
@@ -1291,7 +1298,7 @@ def _submit_func(
             return_results,
             cache=cache,
         )
-        r = _maybe_parallel_map(
+        chunk_tasks = _maybe_parallel_map(
             func,
             args.process_index,
             args.missing,
@@ -1300,9 +1307,9 @@ def _submit_func(
             status,
             progress,
         )
-        task = r, args
+        task = _MapTask(chunk_tasks, args)
     else:
-        task = _maybe_execute_single(
+        single_value = _maybe_execute_single(
             executor,
             status,
             progress,
@@ -1312,6 +1319,7 @@ def _submit_func(
             cache,
             run_info.error_handling,
         )
+        task = _SingleTask(single_value)
     return _KwargsTask(kwargs, task)
 
 
@@ -1533,23 +1541,24 @@ def _process_task(
 ) -> ResultDict | None:
     kwargs, task = kwargs_task
     if func.requires_mapping:
-        chunk_tasks, args = task
+        assert isinstance(task, _MapTask)
         chunk_outputs_list = [
             _result(chunk_task.value, func, kwargs, run_info, chunk_task.chunk_indices)
-            for chunk_task in chunk_tasks
+            for chunk_task in task.chunk_tasks
         ]
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
         output = _output_from_mapspec_task(
             func,
             store,
-            args,
+            task.args,
             chained_outputs_list,
             run_info,
             return_results,
         )
     else:
-        r = _result(task, func, kwargs, run_info)
+        assert isinstance(task, _SingleTask)
+        r = _result(task.value, func, kwargs, run_info)
         output = _dump_single_output(func, r, store, run_info)
 
     if return_results:
@@ -1586,7 +1595,7 @@ async def _process_task_async(
     kwargs, task = kwargs_task
     loop = asyncio.get_event_loop()
     if func.requires_mapping:
-        chunk_tasks, args = task
+        assert isinstance(task, _MapTask)
         futs = [
             _result_async(
                 chunk_task.value,
@@ -1596,7 +1605,7 @@ async def _process_task_async(
                 run_info,
                 chunk_indices=chunk_task.chunk_indices,
             )
-            for chunk_task in chunk_tasks
+            for chunk_task in task.chunk_tasks
         ]
         chunk_outputs_list = await asyncio.gather(*futs)
         # Flatten the list of chunked outputs
@@ -1604,14 +1613,15 @@ async def _process_task_async(
         output = _output_from_mapspec_task(
             func,
             store,
-            args,
+            task.args,
             chained_outputs_list,
             run_info,
             return_results,
         )
     else:
-        assert isinstance(task, Future)
-        r = await _result_async(task, loop, func, kwargs, run_info)
+        assert isinstance(task, _SingleTask)
+        assert isinstance(task.value, Future)
+        r = await _result_async(task.value, loop, func, kwargs, run_info)
         output = _dump_single_output(func, r, store, run_info)
     if return_results:
         assert output is not None
