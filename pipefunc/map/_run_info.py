@@ -460,27 +460,42 @@ def _maybe_array_path(output_name: str, run_folder: Path | None) -> Path | None:
 
 
 def _resolve_json_path(path: str | Path, run_folder_abs: Path) -> Path:
-    """Resolve a path from run_info.json relative to the run_folder location.
+    """Resolve a run_info path using heuristics that preserve legacy layouts.
 
-    Paths in run_info.json are stored relative to the parent directory of
-    run_folder (e.g., "pipeline_run/inputs/node_id.cloudpickle" when run_folder
-    is "pipeline_run"). If the path is not absolute, resolve it relative to the
-    parent of run_folder_abs.
+    Historically, ``run_info.json`` stored paths relative to the current working
+    directory, e.g. ``"pipeline_run/inputs/x.cloudpickle"``.  Newer versions aim
+    to make these paths independent of the caller's working directory by
+    resolving them relative to ``run_folder``.  When loading older metadata we
+    therefore need to try both interpretations.
 
     Parameters
     ----------
     path
         Path from JSON (may be string or Path, absolute or relative)
     run_folder_abs
-        Absolute path to the run_folder directory
+        Absolute path to the ``run_folder`` directory
 
     Returns
     -------
-        Absolute path resolved relative to parent of run_folder_abs if needed
-
+    Path
+        Absolute path pointing to the expected on-disk artefact
     """
+
     p = path if isinstance(path, Path) else Path(path)
-    return p if p.is_absolute() else run_folder_abs.parent / p
+    if p.is_absolute():
+        return p
+
+    candidate_if_missing: Path | None = None
+
+    for base in (run_folder_abs, *run_folder_abs.parents):
+        candidate = (base / p).resolve()
+        if candidate_if_missing is None:
+            candidate_if_missing = candidate
+        if candidate.exists():
+            return candidate
+
+    assert candidate_if_missing is not None
+    return candidate_if_missing
 
 
 def _input_used_in_slurm_executor(
