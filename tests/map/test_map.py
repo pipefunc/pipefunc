@@ -2147,7 +2147,7 @@ def test_load_from_different_directory(tmp_path: Path) -> None:
 
 def test_runinfo_load_relative_path_regression(tmp_path: Path) -> None:
     """Test the specific bug where RunInfo.load fails with relative paths from different cwd.
-    
+
     This test demonstrates the regression that would occur without the .absolute() fix
     in RunInfo.load() method.
     """
@@ -2159,42 +2159,42 @@ def test_runinfo_load_relative_path_regression(tmp_path: Path) -> None:
 
     pipeline = Pipeline([simple_func])
     run_folder = tmp_path / "run"
-    
+
     # Run pipeline to create the structure
     pipeline.map({"x": 5}, run_folder=run_folder, parallel=False, storage="dict")
-    
+
     # Manually modify run_info.json to have relative paths (simulating old pipefunc behavior)
     run_info_path = run_folder / "run_info.json"
     with run_info_path.open() as f:
         data = json.load(f)
-    
+
     # Make paths relative to the parent directory (common in older versions)
     data["input_paths"] = {k: f"run/{Path(v).name}" for k, v in data["input_paths"].items()}
     data["defaults_path"] = f"run/{Path(data['defaults_path']).name}"
-    
+
     with run_info_path.open("w") as f:
         json.dump(data, f)
-    
-    # Change to different directory  
+
+    # Change to different directory
     other_dir = tmp_path / "other"
     other_dir.mkdir()
     original_cwd = Path.cwd()
-    
+
     try:
         os.chdir(other_dir)
-        
+
         # Try to load with a relative path from this different directory
         # Without the .absolute() fix, this would fail because run_folder_abs
         # would be relative, causing _resolve_json_path to resolve paths incorrectly
         relative_path_to_run = Path("..") / "run"
-        
+
         # This should work with our fix
         run_info = RunInfo.load(relative_path_to_run)
         assert run_info.run_folder == relative_path_to_run.absolute()
-        
+
         # Verify we can access the loaded data
         assert "x" in run_info.inputs
         assert run_info.inputs["x"] == 5
-        
+
     finally:
         os.chdir(original_cwd)
