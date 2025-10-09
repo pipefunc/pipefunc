@@ -24,6 +24,7 @@ dependencies:
   - fastmcp>=2.12.0
   # optional-dependencies: pandas
   - pandas
+  - xarray
   # optional-dependencies: plotting
   - bokeh
   - python-graphviz
@@ -34,8 +35,6 @@ dependencies:
   # optional-dependencies: widgets
   - graphviz-anywidget>=0.7.0
   - ipywidgets
-  # optional-dependencies: xarray
-  - xarray
   # optional-dependencies: zarr
   - zarr>=2,<3
   - numcodecs<0.16.0

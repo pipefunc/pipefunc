@@ -31,7 +31,8 @@ adaptive = ["adaptive", "adaptive-scheduler>=2.14.0"]
 autodoc = ["griffe", "rich"]
 cli = ["griffe", "rich", "pydantic", "rich-argparse"]
 mcp = ["fastmcp>=2.12.0", "rich", "griffe"]
-pandas = ["pandas"]
+pandas = ["pandas", "xarray"]  # DataFrame loading requires xarray for conversion
+polars = ["polars", "pandas", "xarray"]  # Polars backend requires pandas+xarray for conversion
 # Prevent old holoviews resulting in broken env
 plotting = ["bokeh", "graphviz", "holoviews>=1.14.0", "matplotlib"]
 profiling = ["psutil"]
@@ -72,7 +73,7 @@ docs = [
     "pipefunc[all]",
 ]
 all = [
-    "pipefunc[adaptive,autodoc,cli,pandas,mcp,plotting,profiling,pydantic,rich,widgets,xarray,zarr]",
+    "pipefunc[adaptive,autodoc,cli,pandas,polars,mcp,plotting,profiling,pydantic,rich,widgets,xarray,zarr]",
 ]
 dev = [ # all + dev deps
     "black[jupyter]",
@@ -92,6 +93,7 @@ extras = [
     "ipywidgets",
     "matplotlib",
     "pandas",
+    "polars",
     "psutil",
     "pydantic",
     "rich",

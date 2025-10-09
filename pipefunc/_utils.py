@@ -104,7 +104,7 @@ def prod(iterable: Iterable[int]) -> int:
     return functools.reduce(operator.mul, iterable, 1)
 
 
-def is_equal(  # noqa: PLR0911, PLR0912
+def is_equal(  # noqa: C901, PLR0911, PLR0912
     a: Any,
     b: Any,
     *,
@@ -156,6 +156,21 @@ def is_equal(  # noqa: PLR0911, PLR0912
 
             if isinstance(a, pd.DataFrame):
                 return a.equals(b)
+        if is_installed("polars"):
+            import polars as pl
+
+            if isinstance(a, pl.DataFrame):
+                # Check schema first to avoid errors with different column types
+                if a.schema != b.schema:
+                    return False
+                # Use null_equal=True to properly handle null values
+                return a.equals(b, null_equal=True)
+            if isinstance(a, pl.Series):
+                # Check dtype first
+                if a.dtype != b.dtype:
+                    return False
+                # Use null_equal=True to properly handle null values
+                return a.equals(b, null_equal=True)
         # Cast to bool to prevent issues with custom equality methods
         return bool(a == b)
     except Exception:
@@ -557,3 +572,31 @@ def infer_shape(x: Any) -> tuple[int, ...]:  # noqa: PLR0911
         return (len(x), first_len)
 
     return (len(x), *first_sub_shape)
+
+
+def pandas_to_polars(df: Any) -> Any:
+    """Convert a pandas DataFrame to a polars DataFrame.
+
+    Tries to use `pl.from_pandas()` first for efficient type-preserving conversion.
+    Falls back to manual conversion if pyarrow is not available.
+
+    Parameters
+    ----------
+    df
+        A pandas DataFrame to convert.
+
+    Returns
+    -------
+        A polars DataFrame.
+
+    """
+    requires("polars", reason="pandas_to_polars conversion", extras="polars")
+    import polars as pl
+
+    try:
+        # Try using from_pandas first (most efficient, preserves types)
+        return pl.from_pandas(df)
+    except ImportError:
+        # Fallback to manual conversion if pyarrow is not available
+        # This happens when pandas has nullable types but pyarrow is not installed
+        return pl.DataFrame({col: df[col].to_numpy() for col in df.columns})
