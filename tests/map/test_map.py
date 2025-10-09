@@ -16,7 +16,7 @@ from pipefunc._utils import prod
 from pipefunc.map._load import load_all_outputs, load_dataframe, load_outputs, load_xarray_dataset
 from pipefunc.map._mapspec import trace_dependencies
 from pipefunc.map._prepare import _reduced_axes
-from pipefunc.map._run_info import RunInfo, map_shapes
+from pipefunc.map._run_info import RunInfo, _legacy_fix, map_shapes
 from pipefunc.map._storage_array._base import StorageBase, storage_registry
 from pipefunc.map._storage_array._dict import SharedMemoryDictArray
 from pipefunc.map._storage_array._file import FileArray
@@ -2061,3 +2061,62 @@ def test_load_dataframe_with_list_of_tuples_output(tmp_path: Path) -> None:
     assert isinstance(final_array, np.ndarray)
     assert final_array.shape == (3, 3)
     np.testing.assert_array_equal(final_array, np.array(expected, dtype=object))
+
+
+def test_legacy_fix(tmp_path: Path) -> None:
+    """Test that _legacy_fix correctly converts legacy format paths to new format."""
+
+    # Test 1: Legacy format (<=v0.86.0)
+    legacy_data: dict[str, Any] = {
+        "run_folder": "adaptive_1d/run_folder_0.0",
+        "defaults_path": "adaptive_1d/run_folder_0.0/defaults/defaults.cloudpickle",
+        "input_paths": {
+            "x": "adaptive_1d/run_folder_0.0/inputs/x.cloudpickle",
+            "d": "adaptive_1d/run_folder_0.0/inputs/d.cloudpickle",
+            "c": "adaptive_1d/run_folder_0.0/inputs/c.cloudpickle",
+        },
+    }
+
+    run_folder = tmp_path / "adaptive_1d" / "run_folder_0.0"
+    _legacy_fix(legacy_data, run_folder)
+
+    assert legacy_data["run_folder"] == str(run_folder.resolve())
+    assert legacy_data["defaults_path"] == "defaults/defaults.cloudpickle"
+    assert legacy_data["input_paths"] == {
+        "x": "inputs/x.cloudpickle",
+        "d": "inputs/d.cloudpickle",
+        "c": "inputs/c.cloudpickle",
+    }
+
+    # Test 2: New format (>v0.86.0) should remain unchanged
+    new_data: dict[str, Any] = {
+        "run_folder": str(run_folder.resolve()),
+        "defaults_path": "defaults/defaults.cloudpickle",
+        "input_paths": {
+            "x": "inputs/x.cloudpickle",
+            "d": "inputs/d.cloudpickle",
+        },
+    }
+
+    new_data_copy = new_data.copy()
+    _legacy_fix(new_data, run_folder)
+
+    # Should be unchanged (except run_folder might be different object)
+    assert new_data["defaults_path"] == new_data_copy["defaults_path"]
+    assert new_data["input_paths"] == new_data_copy["input_paths"]
+
+    # Test 3: Different run_folder structure
+    legacy_data_2: dict[str, Any] = {
+        "run_folder": "foo/bar/my_run",
+        "defaults_path": "foo/bar/my_run/defaults/defaults.cloudpickle",
+        "input_paths": {
+            "a": "foo/bar/my_run/inputs/a.cloudpickle",
+        },
+    }
+
+    run_folder_2 = tmp_path / "foo" / "bar" / "my_run"
+    _legacy_fix(legacy_data_2, run_folder_2)
+
+    assert legacy_data_2["run_folder"] == str(run_folder_2.resolve())
+    assert legacy_data_2["defaults_path"] == "defaults/defaults.cloudpickle"
+    assert legacy_data_2["input_paths"]["a"] == "inputs/a.cloudpickle"
