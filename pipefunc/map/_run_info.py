@@ -211,10 +211,10 @@ class RunInfo:
 
         data["run_folder"] = run_folder_abs
         data["inputs"] = {
-            k: load((run_folder_abs / Path(v)).resolve())
+            k: load(_abspath_from_run_folder(v, run_folder_abs))
             for k, v in data.pop("input_paths").items()
         }
-        data["defaults"] = load((run_folder_abs / Path(data.pop("defaults_path"))).resolve())
+        data["defaults"] = load(_abspath_from_run_folder(data.pop("defaults_path"), run_folder_abs))
         return cls(**data)
 
     @staticmethod
@@ -471,6 +471,20 @@ def _path_relative_to_run_folder(path: Path, run_folder: Path | None) -> str:
         return str(path.relative_to(run_folder))
     except ValueError:  # pragma: no cover - unexpected, defensive only
         return str(path)
+
+
+def _abspath_from_run_folder(path: str | Path, run_folder_abs: Path) -> Path:
+    """Resolve a path stored in run_info.json under a specific run_folder."""
+    candidate = path if isinstance(path, Path) else Path(path)
+    if candidate.is_absolute():
+        return candidate
+
+    run_folder_rel = run_folder_abs.relative_to(run_folder_abs.parent)
+    rel_parts = run_folder_rel.parts
+    cand_parts = candidate.parts
+    if cand_parts[: len(rel_parts)] == rel_parts:
+        candidate = Path(*cand_parts[len(rel_parts) :])
+    return (run_folder_abs / candidate).resolve()
 
 
 def _input_used_in_slurm_executor(
