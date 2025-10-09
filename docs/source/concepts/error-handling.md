@@ -85,3 +85,54 @@ except Exception:
 ```
 
 {class}`~pipefunc.ErrorSnapshot` is very useful for debugging complex pipelines, making it easy to replicate and understand issues as they occur.
+
+## Continue Mode in Parallel and Async Runs
+
+`Pipeline.map(..., error_handling="continue")` behaves consistently whether work
+is executed sequentially, through `parallel=True` with an executor
+(`ThreadPoolExecutor`, `ProcessPoolExecutor`, etc.), or via
+`pipeline.map_async`. Every failing element becomes an
+{class}`~pipefunc.ErrorSnapshot`, and the snapshot is written back to the correct
+index even when the work was processed in a chunked executor task.
+
+```{code-cell} ipython3
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from pipefunc import Pipeline, pipefunc
+
+@pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+def double_or_fail(x: int) -> int:
+    if x == 13:
+        raise ValueError("boom")
+    return x * 2
+
+pipeline = Pipeline([double_or_fail])
+inputs = {"x": list(range(20))}
+
+with ThreadPoolExecutor(max_workers=4) as executor:
+    parallel_result = pipeline.map(
+        inputs,
+        parallel=True,
+        executor=executor,
+        chunksizes=6,
+        error_handling="continue",
+    )
+
+
+async def run_async() -> tuple[object, object]:
+    async_result = pipeline.map_async(
+        inputs,
+        executor=ThreadPoolExecutor(max_workers=4),
+        chunksizes=5,
+        error_handling="continue",
+    )
+    async_outputs = await async_result.task
+    return parallel_result["y"].output[13], async_outputs["y"].output[13]
+
+
+parallel_err, async_err = asyncio.run(run_async())
+parallel_err, async_err
+```
+
+This means downstream pipeline steps can trust that per-index error metadata is
+aligned, regardless of the execution strategy or chunk size.
