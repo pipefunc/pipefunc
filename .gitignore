@@ -121,3 +121,4 @@ docs/source/*run_folder*
 .env*
 uv.lock
 docs/source/concepts/cli-example.py
+.code/

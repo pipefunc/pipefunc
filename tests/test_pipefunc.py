@@ -195,6 +195,72 @@ def test_update_renames_with_mapspec() -> None:
     assert f.output_name == "c"
 
 
+def test_update_mapspec_axes() -> None:
+    """Test PipeFunc.update_mapspec_axes() method."""
+
+    # Test basic axis renaming
+    @pipefunc(output_name="c", mapspec="a[i, j], b[i, j] -> c[i, j]")
+    def f(a, b):
+        return a + b
+
+    assert str(f.mapspec) == "a[i, j], b[i, j] -> c[i, j]"
+    f.update_mapspec_axes({"i": "x", "j": "y"})
+    assert str(f.mapspec) == "a[x, y], b[x, y] -> c[x, y]"
+
+    # Test partial renaming (only one axis)
+    @pipefunc(output_name="result", mapspec="data[i, j] -> result[i, j]")
+    def g(data):
+        return data * 2
+
+    g.update_mapspec_axes({"i": "row"})
+    assert str(g.mapspec) == "data[row, j] -> result[row, j]"
+
+    # Test multiple axes with different names
+    @pipefunc(output_name="out", mapspec="x[i], y[j], z[k] -> out[i, j, k]")
+    def h(x, y, z):
+        return x + y + z
+
+    h.update_mapspec_axes({"i": "a", "j": "b", "k": "c"})
+    assert str(h.mapspec) == "x[a], y[b], z[c] -> out[a, b, c]"
+
+    # Test with None (slice) axes
+    @pipefunc(output_name="sliced", mapspec="data[:, j] -> sliced[j]")
+    def sliced_func(data):
+        return data
+
+    sliced_func.update_mapspec_axes({"j": "col"})
+    assert str(sliced_func.mapspec) == "data[:, col] -> sliced[col]"
+
+    # Test no-op when mapspec is None
+    @pipefunc(output_name="no_map")
+    def no_mapspec(x):
+        return x
+
+    assert no_mapspec.mapspec is None
+    no_mapspec.update_mapspec_axes({"i": "x"})  # Should not raise
+    assert no_mapspec.mapspec is None
+
+    # Test empty renames dict (no-op)
+    @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
+    def empty_rename(a):
+        return a
+
+    original_mapspec = str(empty_rename.mapspec)
+    empty_rename.update_mapspec_axes({})
+    assert str(empty_rename.mapspec) == original_mapspec
+
+    # Test cache clearing by checking that cached properties are recalculated
+    @pipefunc(output_name="c", mapspec="a[i, j] -> c[i, j]")
+    def cache_test(a):
+        return a
+
+    # Access a cached property
+    _ = cache_test.output_name
+    cache_test.update_mapspec_axes({"i": "x"})
+    # If cache wasn't cleared, this would fail
+    assert str(cache_test.mapspec) == "a[x, j] -> c[x, j]"
+
+
 def test_validate_update_defaults_and_renames_and_bound() -> None:
     @pipefunc(output_name="c", defaults={"b": 1}, renames={"a": "a1"})
     def f(a=42, b=69):

@@ -96,6 +96,29 @@ class ArraySpec:
             raise ValueError(msg)
         return ArraySpec(self.name, self.axes + axis)
 
+    def rename_axes(self, renames: dict[str, str]) -> ArraySpec:
+        """Return a new ArraySpec with renamed axes.
+
+        Parameters
+        ----------
+        renames
+            Dictionary mapping old axis names to new axis names.
+
+        Returns
+        -------
+            A new ArraySpec with renamed axes.
+
+        Examples
+        --------
+        >>> spec = ArraySpec("a", ("i", "j"))
+        >>> renamed = spec.rename_axes({"i": "x", "j": "y"})
+        >>> renamed.axes
+        ('x', 'y')
+
+        """
+        new_axes = tuple(renames.get(ax, ax) if ax is not None else ax for ax in self.axes)
+        return ArraySpec(self.name, new_axes)
+
 
 @dataclass(frozen=True)
 class MapSpec:
@@ -283,6 +306,31 @@ class MapSpec:
             return ArraySpec(renames.get(spec.name, spec.name), spec.axes)
 
         return MapSpec(tuple(map(_rename, self.inputs)), tuple(map(_rename, self.outputs)))
+
+    def rename_axes(self, renames: dict[str, str]) -> MapSpec:
+        """Return a new MapSpec with renamed axes.
+
+        Parameters
+        ----------
+        renames
+            Dictionary mapping old axis names to new axis names.
+
+        Returns
+        -------
+            A new MapSpec with renamed axes applied to all inputs and outputs.
+
+        Examples
+        --------
+        >>> spec = MapSpec.from_string("a[i, j], b[i, j] -> c[i, j]")
+        >>> renamed = spec.rename_axes({"i": "x", "j": "y"})
+        >>> str(renamed)
+        'a[x, y], b[x, y] -> c[x, y]'
+
+        """
+        return MapSpec(
+            tuple(spec.rename_axes(renames) for spec in self.inputs),
+            tuple(spec.rename_axes(renames) for spec in self.outputs),
+        )
 
 
 def _shape_to_key(shape: tuple[int, ...], linear_index: int) -> tuple[int, ...]:

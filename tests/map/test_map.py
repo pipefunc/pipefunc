@@ -16,7 +16,7 @@ from pipefunc._utils import prod
 from pipefunc.map._load import load_all_outputs, load_dataframe, load_outputs, load_xarray_dataset
 from pipefunc.map._mapspec import trace_dependencies
 from pipefunc.map._prepare import _reduced_axes
-from pipefunc.map._run_info import RunInfo, map_shapes
+from pipefunc.map._run_info import RunInfo, _legacy_fix, map_shapes
 from pipefunc.map._storage_array._base import StorageBase, storage_registry
 from pipefunc.map._storage_array._dict import SharedMemoryDictArray
 from pipefunc.map._storage_array._file import FileArray
@@ -31,6 +31,7 @@ has_xarray = importlib.util.find_spec("xarray") is not None
 has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
 has_zarr = importlib.util.find_spec("zarr") is not None
 has_psutil = importlib.util.find_spec("psutil") is not None
+has_polars = importlib.util.find_spec("polars") is not None
 
 storage_options = list(storage_registry)
 
@@ -376,6 +377,16 @@ def test_simple_from_step(tmp_path: Path) -> None:
 
         df = results.to_dataframe()
         assert df["x"].tolist() == [0, 1, 2, 3]
+        if has_polars:
+            import polars as pl
+
+            df_polars = load_dataframe("y", run_folder=tmp_path, backend="polars")
+            assert isinstance(df_polars, pl.DataFrame)
+            assert df_polars["x"].to_list() == [0, 1, 2, 3]
+
+            df_polars_results = results.to_dataframe(backend="polars")
+            assert isinstance(df_polars_results, pl.DataFrame)
+            assert df_polars_results["x"].to_list() == [0, 1, 2, 3]
 
 
 @pipefunc(output_name=("single", "double"))
@@ -2001,3 +2012,111 @@ def test_error_snapshot_in_parallel_map():
         pipeline.run("c", kwargs={"b": -1})
     with pytest.raises(ValueError, match="a cannot be negative"):
         pipeline.error_snapshot.reproduce()
+
+
+@pytest.mark.skipif(not has_xarray, reason="requires xarray")
+def test_load_dataframe_with_list_of_tuples_output(tmp_path: Path) -> None:
+    """Regression test for loading outputs that are lists of tuples.
+
+    This tests the fix for a bug where load_dataframe would fail when trying to
+    convert single outputs (not part of any mapspec) that are lists of tuples
+    into a DataFrame. The bug was caused by xarray trying to create a scalar
+    variable from multidimensional data without proper array conversion.
+    """
+
+    @pipefunc(output_name="processed", mapspec="x[i] -> processed[i]")
+    def process(x: int) -> tuple[int, int, int]:
+        return (x, x * 2, x * 3)
+
+    @pipefunc(output_name="final_results")
+    def aggregate(processed: Array[tuple]) -> list[tuple[int, ...]]:
+        # Return a list of tuples (not part of any mapspec)
+        return list(processed)
+
+    pipeline = Pipeline([process, aggregate])
+    inputs = {"x": [1, 2, 3]}
+
+    results = pipeline.map(
+        inputs,
+        run_folder=tmp_path,
+        parallel=False,
+        storage="dict",
+    )
+
+    # Check that the results are correct
+    expected = [(1, 2, 3), (2, 4, 6), (3, 6, 9)]
+    assert results["final_results"].output == expected
+
+    # Test load_outputs works correctly
+    loaded = load_outputs("final_results", run_folder=tmp_path)
+    assert loaded == expected
+
+    # Test load_dataframe works correctly (this was failing before the fix)
+    df = load_dataframe("final_results", run_folder=tmp_path)
+    assert len(df) == 1
+    assert "final_results" in df.columns
+
+    # Check that the array is properly unwrapped
+    final_array = df["final_results"].iloc[0]
+    assert isinstance(final_array, np.ndarray)
+    assert final_array.shape == (3, 3)
+    np.testing.assert_array_equal(final_array, np.array(expected, dtype=object))
+
+
+def test_legacy_fix(tmp_path: Path) -> None:
+    """Test that _legacy_fix correctly converts legacy format paths to new format."""
+
+    # Test 1: Legacy format (<=v0.86.0)
+    legacy_data: dict[str, Any] = {
+        "run_folder": "adaptive_1d/run_folder_0.0",
+        "defaults_path": "adaptive_1d/run_folder_0.0/defaults/defaults.cloudpickle",
+        "input_paths": {
+            "x": "adaptive_1d/run_folder_0.0/inputs/x.cloudpickle",
+            "d": "adaptive_1d/run_folder_0.0/inputs/d.cloudpickle",
+            "c": "adaptive_1d/run_folder_0.0/inputs/c.cloudpickle",
+        },
+    }
+
+    run_folder = tmp_path / "adaptive_1d" / "run_folder_0.0"
+    _legacy_fix(legacy_data, run_folder)
+
+    assert legacy_data["run_folder"] == str(run_folder.resolve())
+    assert legacy_data["defaults_path"] == "defaults/defaults.cloudpickle"
+    assert legacy_data["input_paths"] == {
+        "x": "inputs/x.cloudpickle",
+        "d": "inputs/d.cloudpickle",
+        "c": "inputs/c.cloudpickle",
+    }
+
+    # Test 2: New format (>v0.86.0) should remain unchanged
+    new_data: dict[str, Any] = {
+        "run_folder": str(run_folder.resolve()),
+        "defaults_path": "defaults/defaults.cloudpickle",
+        "input_paths": {
+            "x": "inputs/x.cloudpickle",
+            "d": "inputs/d.cloudpickle",
+        },
+    }
+
+    new_data_copy = new_data.copy()
+    _legacy_fix(new_data, run_folder)
+
+    # Should be unchanged (except run_folder might be different object)
+    assert new_data["defaults_path"] == new_data_copy["defaults_path"]
+    assert new_data["input_paths"] == new_data_copy["input_paths"]
+
+    # Test 3: Different run_folder structure
+    legacy_data_2: dict[str, Any] = {
+        "run_folder": "foo/bar/my_run",
+        "defaults_path": "foo/bar/my_run/defaults/defaults.cloudpickle",
+        "input_paths": {
+            "a": "foo/bar/my_run/inputs/a.cloudpickle",
+        },
+    }
+
+    run_folder_2 = tmp_path / "foo" / "bar" / "my_run"
+    _legacy_fix(legacy_data_2, run_folder_2)
+
+    assert legacy_data_2["run_folder"] == str(run_folder_2.resolve())
+    assert legacy_data_2["defaults_path"] == "defaults/defaults.cloudpickle"
+    assert legacy_data_2["input_paths"]["a"] == "inputs/a.cloudpickle"

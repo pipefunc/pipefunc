@@ -200,6 +200,7 @@ def _xarray_dataset(
     ds = xr.merge(to_merge, compat="override")
     for name in single_output_names:
         array = data_loader(name)
+        array = _maybe_to_array(array)
         if isinstance(array, np.ndarray):
             if array.ndim == 1:
                 ds[name] = array
@@ -234,7 +235,17 @@ def xarray_dataset_to_dataframe(ds: xr.Dataset) -> pd.DataFrame:
     """Convert an xarray dataset to a pandas dataframe."""
     if not ds.coords:
         # Return a single row dataframe if there are no coordinates
-        return pd.DataFrame({data_var: [value.data] for data_var, value in ds.data_vars.items()})
+        data = {}
+        for data_var, value in ds.data_vars.items():
+            val = value.data
+            # Unwrap 0D numpy arrays
+            if isinstance(val, np.ndarray) and val.ndim == 0:
+                val = val.item()
+            # Unwrap DimensionlessArray
+            if isinstance(val, DimensionlessArray):
+                val = val.arr
+            data[data_var] = [val]
+        return pd.DataFrame(data)
     df = ds.to_dataframe().reset_index(drop=True)
     # Identify if a column is a DimensionlessArray
     for col in df.columns:

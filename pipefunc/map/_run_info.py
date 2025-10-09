@@ -177,24 +177,30 @@ class RunInfo:
         data = asdict(self)
         del data["inputs"]  # Cannot serialize inputs
         del data["defaults"]  # or defaults
-        data["input_paths"] = {k: str(v) for k, v in self.input_paths.items()}
+        # Here .relative_to to lstrip(run_folder) prefix for both input_paths and defaults_path
+        # We used to *not* do this in versions <=0.86.0, see _legacy_fix
+        data["input_paths"] = {
+            k: str(v.relative_to(self.run_folder)) for k, v in self.input_paths.items()
+        }
         data["all_output_names"] = sorted(data["all_output_names"])
         dicts_with_tuples = ["shapes", "shape_masks", "resolved_shapes"]
         if isinstance(self.storage, dict):
             dicts_with_tuples.append("storage")
         for key in dicts_with_tuples:
             data[key] = {_maybe_tuple_to_str(k): v for k, v in data[key].items()}
-        data["run_folder"] = str(data["run_folder"])
-        data["defaults_path"] = str(self.defaults_path)
+        data["run_folder"] = str(data["run_folder"].absolute())
+        data["defaults_path"] = str(self.defaults_path.relative_to(self.run_folder))
         with path.open("w") as f:
             json.dump(data, f, indent=4)
 
     @classmethod
     def load(cls: type[RunInfo], run_folder: str | Path) -> RunInfo:
-        path = cls.path(run_folder)
+        path = cls.path(run_folder)  # run_info.json
+        run_folder_abs = path.absolute().parent
         with path.open() as f:
             data = json.load(f)
-        data["input_paths"] = {k: Path(v) for k, v in data["input_paths"].items()}
+        _legacy_fix(data, run_folder_abs)
+        data["input_paths"] = {k: run_folder_abs / v for k, v in data["input_paths"].items()}
         data["all_output_names"] = set(data["all_output_names"])
         if isinstance(data["storage"], dict):
             data["storage"] = {_maybe_str_to_tuple(k): v for k, v in data["storage"].items()}
@@ -205,9 +211,9 @@ class RunInfo:
                 k: tuple(v) if isinstance(v, list) else v
                 for k, v in data["internal_shapes"].items()
             }
-        data["run_folder"] = Path(data["run_folder"])
-        data["inputs"] = {k: load(Path(v)) for k, v in data.pop("input_paths").items()}
-        data["defaults"] = load(Path(data.pop("defaults_path")))
+        data["run_folder"] = run_folder_abs
+        data["inputs"] = {k: load(v) for k, v in data.pop("input_paths").items()}
+        data["defaults"] = load(run_folder_abs / data.pop("defaults_path"))
         return cls(**data)
 
     @staticmethod
@@ -256,6 +262,45 @@ class RunInfo:
                     internal[name] = internal_shape_from_mask(new_shape, self.shape_masks[name])
         if has_updated:
             self.dump()
+
+
+def _legacy_fix(data: dict, run_folder: Path) -> None:
+    """Fix legacy format where paths included run_folder prefix.
+
+    Legacy format (<=v0.86.0):
+    - run_folder: "foo/my_run_folder"
+    - input_paths: {"x": "foo/my_run_folder/inputs/x.cloudpickle"}
+    - defaults_path: "foo/my_run_folder/defaults/defaults.cloudpickle"
+
+    New format (>v0.86.0):
+    - run_folder: /absolute/path/to/foo/my_run_folder
+    - input_paths: {"x": "inputs/x.cloudpickle"}
+    - defaults_path: "defaults/defaults.cloudpickle"
+
+    Parameters
+    ----------
+    data
+        RunInfo data dict (modified in place)
+    run_folder
+        Original run_folder path
+
+    """
+    stored_run_folder = data["run_folder"]
+
+    # Detect legacy: check if paths start with stored run_folder
+    is_legacy = data["defaults_path"].startswith(stored_run_folder)
+
+    if not is_legacy:
+        return
+
+    # Fix paths: strip the stored run_folder prefix
+    stored_prefix = Path(stored_run_folder)
+
+    data["run_folder"] = str(run_folder.resolve())
+    data["defaults_path"] = str(Path(data["defaults_path"]).relative_to(stored_prefix))
+    data["input_paths"] = {
+        k: str(Path(v).relative_to(stored_prefix)) for k, v in data["input_paths"].items()
+    }
 
 
 # Max size for inputs in bytes (100 kB)

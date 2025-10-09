@@ -2,11 +2,12 @@
 
 import json
 import operator
+import sys
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal
 
 import fastmcp
 import pydantic
@@ -15,13 +16,18 @@ from rich.console import Console
 from pipefunc._pipeline._autodoc import PipelineDocumentation, format_pipeline_docs
 from pipefunc._pipeline._base import Pipeline
 from pipefunc._utils import requires
-from pipefunc.map import load_all_outputs, load_outputs
+from pipefunc.map import load_all_outputs
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run_eager_async import AsyncMap
 from pipefunc.map._run_info import RunInfo
 from pipefunc.map._shapes import shape_is_resolved
 from pipefunc.map._storage_array._base import StorageBase
 from pipefunc.map._storage_array._file import FileArray
+
+if sys.version_info < (3, 12):  # pragma: no cover
+    from typing_extensions import TypedDict
+else:  # pragma: no cover
+    from typing import TypedDict
 
 
 @dataclass
@@ -436,7 +442,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         ctx: fastmcp.Context,
         inputs: Model,  # type: ignore[valid-type]
         run_folder: str | None = None,
-    ) -> str:
+    ) -> dict[str, Any]:
         """Start pipeline execution asynchronously and return job_id immediately.
 
         Returns job_id for tracking. Best for long-running pipelines and parameter sweeps.
@@ -447,7 +453,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         name="check_job_status",
         description="Check status of an active pipeline job started by execute_pipeline_async in this MCP session. Only works for jobs in the current session's registry, not previous sessions.",
     )
-    async def check_job_status(job_id: str) -> str:
+    async def check_job_status(job_id: str) -> dict[str, Any]:
         """Check status of active jobs from current session only."""
         return await _check_job_status(job_id)
 
@@ -456,7 +462,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         description="Cancel an active pipeline job from this MCP session."
         " Only works for jobs started by execute_pipeline_async in the current session.",
     )
-    async def cancel_job(ctx: fastmcp.Context, job_id: str) -> str:
+    async def cancel_job(ctx: fastmcp.Context, job_id: str) -> dict[str, Any]:
         """Cancel active jobs from current session only."""
         return await _cancel_job(ctx, job_id)
 
@@ -465,7 +471,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         description="List all active pipeline jobs tracked in this MCP session."
         " Only shows jobs from execute_pipeline_async in the current session, not previous sessions or other executions.",
     )
-    async def list_jobs() -> str:
+    async def list_jobs() -> dict[str, Any]:
         """List active jobs from current session only."""
         return await _list_jobs()
 
@@ -530,7 +536,7 @@ async def _execute_pipeline_async(
     ctx: fastmcp.Context,
     inputs: pydantic.BaseModel,  # type: ignore[valid-type]
     run_folder: str | None = None,
-) -> str:
+) -> dict[str, Any]:
     job_id = str(uuid.uuid4())
     actual_run_folder = run_folder or f"runs/job_{job_id}"
 
@@ -553,13 +559,13 @@ async def _execute_pipeline_async(
     )
 
     await ctx.info(f"Started async job {job_id} in folder {actual_run_folder}")
-    return str({"job_id": job_id, "run_folder": actual_run_folder})
+    return {"job_id": job_id, "run_folder": actual_run_folder}
 
 
-async def _check_job_status(job_id: str) -> str:
+async def _check_job_status(job_id: str) -> dict[str, Any]:
     job = job_registry.get(job_id)
     if not job:
-        return str({"error": "Job not found"})
+        return {"error": "Job not found"}
 
     task = job.runner.task
     is_done = task.done()
@@ -603,26 +609,26 @@ async def _check_job_status(job_id: str) -> str:
             }
         result_info["results"] = output
 
-    return str(result_info)
+    return result_info
 
 
-async def _cancel_job(ctx: fastmcp.Context, job_id: str) -> str:
+async def _cancel_job(ctx: fastmcp.Context, job_id: str) -> dict[str, Any]:
     job = job_registry.get(job_id)
     if not job:
-        return str({"error": "Job not found"})
+        return {"error": "Job not found"}
 
     task = job.runner.task
     if not task.done():
         task.cancel()
         job.status = "cancelled"
         await ctx.info(f"Cancelled job {job_id}")
-        return str({"status": "cancelled", "job_id": job_id})
-    return str({"error": "Job not found or already completed", "job_id": job_id})
+        return {"status": "cancelled", "job_id": job_id}
+    return {"error": "Job not found or already completed", "job_id": job_id}
 
 
-async def _list_jobs() -> str:
+async def _list_jobs() -> dict[str, Any]:
     if not job_registry:
-        return str({"jobs": [], "total_count": 0})
+        return {"jobs": [], "total_count": 0}
 
     jobs_info = []
     for job_id, job in job_registry.items():
@@ -638,7 +644,7 @@ async def _list_jobs() -> str:
         }
         jobs_info.append(job_info)
 
-    return str({"jobs": jobs_info, "total_count": len(jobs_info)})
+    return {"jobs": jobs_info, "total_count": len(jobs_info)}
 
 
 def _progress_info_from_disk(run_info: RunInfo) -> tuple[dict[str, Any], bool]:
@@ -761,8 +767,10 @@ def _run_info(run_folder: str) -> dict[str, Any]:
 
 def _load_outputs(run_folder: str, output_names: list[str] | None = None) -> dict[str, Any]:
     try:
-        if output_names is None:
-            return load_all_outputs(run_folder=run_folder)
-        return load_outputs(*output_names, run_folder=run_folder)
+        result = load_all_outputs(run_folder=run_folder)
     except Exception as e:  # noqa: BLE001  # pragma: no cover
         return {"error": str(e)}
+    if output_names is not None:
+        # Filter to requested outputs
+        return {k: result[k] for k in output_names}
+    return result

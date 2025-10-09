@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
+import types
 
 import cloudpickle
 import numpy as np
@@ -12,6 +14,7 @@ from pipefunc._utils import (
     format_args,
     format_function_call,
     format_kwargs,
+    get_ncores,
     handle_error,
     infer_shape,
     is_classmethod,
@@ -24,6 +27,7 @@ from pipefunc._utils import (
 )
 
 has_pydantic = importlib.util.find_spec("pydantic") is not None
+has_polars = importlib.util.find_spec("polars") is not None
 
 
 @pytest.fixture(autouse=True)  # Automatically use in all tests
@@ -103,6 +107,18 @@ def test_cache_invalidation_on_file_size_change(tmp_path, modify_size):
     assert result1 != result2
     # Check cache was invalidated (i.e., miss occurred)
     assert _cached_load.cache_info().misses == 2
+
+
+def test_get_ncores_slurm_executor(monkeypatch):
+    fake_module = types.ModuleType("adaptive_scheduler")
+
+    class FakeSlurmExecutor:
+        """Minimal stand-in for adaptive_scheduler.SlurmExecutor."""
+
+    fake_module.SlurmExecutor = FakeSlurmExecutor
+    monkeypatch.setitem(sys.modules, "adaptive_scheduler", fake_module)
+
+    assert get_ncores(FakeSlurmExecutor()) == 1
 
 
 def test_format_args_empty() -> None:
@@ -233,6 +249,67 @@ def test_equal_dicts_with_pandas() -> None:
     d3 = {"a": df3}
     assert equal_dicts(d1, d2)
     assert not equal_dicts(d1, d3)
+
+
+@pytest.mark.skipif(not has_polars, reason="polars not installed")
+def test_equal_dicts_with_polars() -> None:
+    """Test equal_dicts with polars DataFrames."""
+    import polars as pl
+
+    df1 = pl.DataFrame({"x": [1, 2], "y": [3, 4]})
+    df2 = pl.DataFrame({"x": [1, 2], "y": [3, 4]})
+    df3 = pl.DataFrame({"x": [1, 2], "y": [3, 5]})
+    d1 = {"a": df1}
+    d2 = {"a": df2}
+    d3 = {"a": df3}
+    assert equal_dicts(d1, d2)
+    assert not equal_dicts(d1, d3)
+
+
+@pytest.mark.skipif(not has_polars, reason="polars not installed")
+def test_equal_dicts_with_polars_nulls() -> None:
+    """Test equal_dicts with polars DataFrames containing null values."""
+    import polars as pl
+
+    # Test DataFrames with nulls
+    df1 = pl.DataFrame({"x": [1, None, 3], "y": [None, 4, 5]})
+    df2 = pl.DataFrame({"x": [1, None, 3], "y": [None, 4, 5]})
+    df3 = pl.DataFrame({"x": [1, 2, 3], "y": [None, 4, 5]})
+    d1 = {"a": df1}
+    d2 = {"a": df2}
+    d3 = {"a": df3}
+    assert equal_dicts(d1, d2)
+    assert not equal_dicts(d1, d3)
+
+    # Test Series with nulls
+    s1 = pl.Series("test", [1, None, 3])
+    s2 = pl.Series("test", [1, None, 3])
+    s3 = pl.Series("test", [1, 2, 3])
+    d1 = {"a": s1}
+    d2 = {"a": s2}
+    d3 = {"a": s3}
+    assert equal_dicts(d1, d2)
+    assert not equal_dicts(d1, d3)
+
+
+@pytest.mark.skipif(not has_polars, reason="polars not installed")
+def test_equal_dicts_with_polars_different_dtypes() -> None:
+    """Test equal_dicts with polars DataFrames with different dtypes."""
+    import polars as pl
+
+    # Same values but different dtypes should not be equal
+    df1 = pl.DataFrame({"x": [1, 2, 3]}, schema={"x": pl.Int64})
+    df2 = pl.DataFrame({"x": [1, 2, 3]}, schema={"x": pl.Int32})
+    d1 = {"a": df1}
+    d2 = {"a": df2}
+    assert not equal_dicts(d1, d2)
+
+    # Same for Series
+    s1 = pl.Series("test", [1, 2, 3], dtype=pl.Int64)
+    s2 = pl.Series("test", [1, 2, 3], dtype=pl.Int32)
+    d1 = {"a": s1}
+    d2 = {"a": s2}
+    assert not equal_dicts(d1, d2)
 
 
 def test_equal_dicts() -> None:
