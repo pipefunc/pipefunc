@@ -294,9 +294,9 @@ class _FunctionTracker:
 
         # Track futures for this function
         if func.requires_mapping:
-            r, _ = kwargs_task.task
-            for task in r:
-                fut = _ensure_future(task)
+            chunk_tasks, _ = kwargs_task.task
+            for chunk_task in chunk_tasks:
+                fut = _ensure_future(chunk_task.value)
                 self.future_to_func[fut] = func
                 self.func_futures[func].add(fut)
         else:

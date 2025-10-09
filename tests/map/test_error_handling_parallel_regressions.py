@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 import threading
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import Executor, Future, ProcessPoolExecutor, ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
 import pytest
@@ -59,6 +59,60 @@ def test_parallel_continue_preserves_alignment_with_chunk_errors() -> None:
     outputs = result["y"].output
     _assert_expected_outputs(outputs)
     assert all(entry is not None for entry in outputs)
+
+
+class _NoAttrFuture(Future):
+    """Future that rejects setting arbitrary attributes (simulates wrapped futures)."""
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if name == "_pipefunc_chunk_indices":
+            msg = "chunk metadata attribute not supported"
+            raise AttributeError(msg)
+        super().__setattr__(name, value)
+
+
+class _ProxyExecutor(Executor):
+    """Executor wrapper returning futures without custom attributes."""
+
+    def __init__(self, max_workers: int) -> None:
+        self._pool = ThreadPoolExecutor(max_workers=max_workers)
+
+    def submit(self, fn, /, *args, **kwargs):  # type: ignore[override]
+        inner = self._pool.submit(fn, *args, **kwargs)
+        proxy: _NoAttrFuture = _NoAttrFuture()
+
+        def _transfer(source: Future) -> None:
+            exc = source.exception()
+            if exc is None:
+                proxy.set_result(source.result())
+            else:
+                proxy.set_exception(exc)
+
+        inner.add_done_callback(_transfer)
+        return proxy
+
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:  # noqa: FBT002
+        self._pool.shutdown(wait=wait, cancel_futures=cancel_futures)
+
+
+def test_parallel_continue_without_future_attrs() -> None:
+    """Chunk metadata is preserved even when futures reject dynamic attributes."""
+
+    pipeline = Pipeline([_double_or_fail])
+    executor = _ProxyExecutor(max_workers=3)
+    try:
+        result = pipeline.map(
+            {"x": INPUT_VALUES},
+            error_handling="continue",
+            parallel=True,
+            executor=executor,
+            chunksizes=8,
+        )
+    finally:
+        executor.shutdown()
+
+    outputs = result["y"].output
+    _assert_expected_outputs(outputs)
 
 
 @pytest.mark.asyncio
@@ -286,3 +340,26 @@ async def test_async_serialization_error_continue() -> None:
     # Each snapshot should have correct per-element kwargs
     for i, snapshot in enumerate(outputs, start=1):
         assert snapshot.kwargs["x"] == i
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="ProcessPoolExecutor pickling behavior differs on Windows",
+)
+async def test_async_serialization_error_non_mapspec_continue() -> None:
+    """Async map should handle non-mapspec infrastructure failures gracefully."""
+    pipeline = Pipeline([_return_lock])
+    with ProcessPoolExecutor(max_workers=1) as executor:
+        async_run = pipeline.map_async(
+            {"x": 1},
+            error_handling="continue",
+            executor=executor,
+            start=True,
+        )
+        result = await async_run.task
+
+    snapshot = result["unpicklable"].output
+    assert isinstance(snapshot, ErrorSnapshot)
+    # Should contain PicklingError or TypeError in the exception
+    assert "pickle" in str(snapshot.exception).lower() or "lock" in str(snapshot.exception).lower()

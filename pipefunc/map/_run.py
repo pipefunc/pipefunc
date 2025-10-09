@@ -677,8 +677,6 @@ class _InternalShape:
 
 
 def _entry_contains_error(entry: Any) -> bool:
-    if isinstance(entry, _InternalShape):
-        return False
     if isinstance(entry, (ErrorSnapshot, PropagatedErrorSnapshot)):
         return True
     return any(
@@ -1065,7 +1063,7 @@ def _maybe_parallel_map(
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     status: Status | None,
     progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
-) -> list[Any]:
+) -> list[_ChunkTask]:
     if not indices:
         return []
     ex = _executor_for_func(func, executor)
@@ -1075,19 +1073,16 @@ def _maybe_parallel_map(
         chunksize = _chunksize_for_func(func, chunksizes, len(indices), ex)
         chunks = list(_chunk_indices(indices, chunksize))
         process_chunk = functools.partial(_process_chunk, process_index=process_index)
-        futures: list[Future] = []
+        futures: list[_ChunkTask] = []
         for chunk in chunks:
             fut = _submit(process_chunk, ex, status, progress, len(chunk), chunk)
-            # Keep logical indices alongside the future so `_result` can recover
-            # which map entries belong to a failed chunk.
-            fut._pipefunc_chunk_indices = chunk  # type: ignore[attr-defined]
-            futures.append(fut)
+            futures.append(_ChunkTask(fut, chunk))
         return futures
     if status is not None:
         assert progress is not None
         process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
     # Put the process_index result in a tuple to have consistent shapes when func has mapspec
-    return [(process_index(i),) for i in indices]
+    return [_ChunkTask((process_index(i),), (i,)) for i in indices]
 
 
 def _wrap_with_status_update(
@@ -1170,6 +1165,11 @@ def _load_data(kwargs: dict[str, Any]) -> None:
 class _KwargsTask(NamedTuple):
     kwargs: dict[str, Any]
     task: tuple[Any, _MapSpecArgs] | Any
+
+
+class _ChunkTask(NamedTuple):
+    value: Any
+    chunk_indices: tuple[int, ...] | None
 
 
 # NOTE: A similar async version of this function is provided below.
@@ -1453,40 +1453,26 @@ def _error_outputs_for_chunk(
     return outputs
 
 
-def _chunk_indices_from_task(task: Any) -> tuple[int, ...] | None:
-    chunk = getattr(task, "_pipefunc_chunk_indices", None)
-    if chunk is None:
-        return None
-    return tuple(chunk)
-
-
 def _result(
     x: Any | Future,
     func: PipeFunc,
     kwargs: dict[str, Any],
     run_info: RunInfo,
-    index: int | None = None,
-    *,
     chunk_indices: tuple[int, ...] | None = None,
 ) -> Any:
     if isinstance(x, Future):
         try:
             return x.result()
         except Exception as e:  # noqa: BLE001
-            indices = chunk_indices
-            if indices is None and index is not None:
-                indices = (index,)
-            if indices is None:
+            # Non-mapspec functions (single outputs) don't have chunk_indices
+            if chunk_indices is None:
                 _raise_and_set_error_snapshot(e, func, kwargs, run_info)
                 assert run_info.error_handling == "continue"
                 return func.error_snapshot
-            outputs = _error_outputs_for_chunk(func, kwargs, run_info, indices, e)
+            # Mapspec functions with chunks return list of per-element errors
+            outputs = _error_outputs_for_chunk(func, kwargs, run_info, chunk_indices, e)
             assert run_info.error_handling == "continue"
-            if func.requires_mapping:
-                return outputs
-            # Non-mapping futures correspond to single outputs
-            assert outputs, "Chunk indices expected at least one entry"
-            return outputs[0][0]
+            return outputs
 
     return x
 
@@ -1497,26 +1483,21 @@ async def _result_async(
     func: PipeFunc,
     kwargs: dict[str, Any],
     run_info: RunInfo,
-    index: int | None = None,
     *,
     chunk_indices: tuple[int, ...] | None = None,
 ) -> Any:
     try:
         return await asyncio.wrap_future(task, loop=loop)
     except Exception as e:  # noqa: BLE001
-        indices = chunk_indices
-        if indices is None and index is not None:
-            indices = (index,)
-        if indices is None:
+        # Non-mapspec functions (single outputs) don't have chunk_indices
+        if chunk_indices is None:
             _raise_and_set_error_snapshot(e, func, kwargs, run_info)
             assert run_info.error_handling == "continue"
             return func.error_snapshot
-        outputs = _error_outputs_for_chunk(func, kwargs, run_info, indices, e)
+        # Mapspec functions with chunks return list of per-element errors
+        outputs = _error_outputs_for_chunk(func, kwargs, run_info, chunk_indices, e)
         assert run_info.error_handling == "continue"
-        if func.requires_mapping:
-            return outputs
-        assert outputs, "Chunk indices expected at least one entry"
-        return outputs[0][0]
+        return outputs
 
 
 def _to_result_dict(
@@ -1549,10 +1530,10 @@ def _process_task(
 ) -> ResultDict | None:
     kwargs, task = kwargs_task
     if func.requires_mapping:
-        r, args = task
+        chunk_tasks, args = task
         chunk_outputs_list = [
-            _result(x, func, kwargs, run_info, i, chunk_indices=_chunk_indices_from_task(x))
-            for i, x in enumerate(r)
+            _result(chunk_task.value, func, kwargs, run_info, chunk_task.chunk_indices)
+            for chunk_task in chunk_tasks
         ]
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
@@ -1602,18 +1583,17 @@ async def _process_task_async(
     kwargs, task = kwargs_task
     loop = asyncio.get_event_loop()
     if func.requires_mapping:
-        r, args = task
+        chunk_tasks, args = task
         futs = [
             _result_async(
-                x,
+                chunk_task.value,
                 loop,
                 func,
                 kwargs,
                 run_info,
-                i,
-                chunk_indices=_chunk_indices_from_task(x),
+                chunk_indices=chunk_task.chunk_indices,
             )
-            for i, x in enumerate(r)
+            for chunk_task in chunk_tasks
         ]
         chunk_outputs_list = await asyncio.gather(*futs)
         # Flatten the list of chunked outputs
