@@ -10,7 +10,7 @@ from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
 
 import numpy as np
 import numpy.typing as npt
@@ -1082,7 +1082,7 @@ def _maybe_parallel_map(
         assert progress is not None
         process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
     # Put the process_index result in a tuple to have consistent shapes when func has mapspec
-    return [_ChunkTask((process_index(i),), (i,)) for i in indices]
+    return [_ChunkTask((process_index(i),), chunk_indices=(i,)) for i in indices]
 
 
 def _wrap_with_status_update(
@@ -1162,14 +1162,17 @@ def _load_data(kwargs: dict[str, Any]) -> None:
         kwargs[k] = maybe_load_data(v)
 
 
-class _KwargsTask(NamedTuple):
-    kwargs: dict[str, Any]
-    task: tuple[Any, _MapSpecArgs] | Any
-
-
 class _ChunkTask(NamedTuple):
     value: Any
     chunk_indices: tuple[int, ...] | None
+
+
+MapTask: TypeAlias = tuple[list[_ChunkTask], _MapSpecArgs]
+
+
+class _KwargsTask(NamedTuple):
+    kwargs: dict[str, Any]
+    task: MapTask | Any
 
 
 # NOTE: A similar async version of this function is provided below.
