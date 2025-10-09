@@ -189,7 +189,7 @@ class RunInfo:
     @classmethod
     def load(cls: type[RunInfo], run_folder: str | Path) -> RunInfo:
         path = cls.path(run_folder)
-        run_folder_abs = path.parent  # The directory containing run_info.json
+        run_folder_abs = path.parent.absolute()  # The directory containing run_info.json
         with path.open() as f:
             data = json.load(f)
         data["input_paths"] = {k: Path(v) for k, v in data["input_paths"].items()}
