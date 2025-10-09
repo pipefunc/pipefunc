@@ -159,6 +159,38 @@ result = pipeline.map({"x": [1, 2, 3, 4]}, error_handling="continue")
 # total = PropagatedErrorSnapshot  # Entire function skipped
 ```
 
+## Parallel and Async Execution
+
+`error_handling="continue"` behaves the same in sequential runs, threaded
+executors, process pools, and `pipeline.map_async`. When a chunk of parallel work
+fails, each element in that chunk is recorded as an `ErrorSnapshot`, so the
+result arrays keep the right index-to-error mapping.
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+
+inputs = {"x": list(range(12))}
+
+with ThreadPoolExecutor(max_workers=4) as executor:
+    parallel_result = pipeline.map(
+        inputs,
+        parallel=True,
+        executor=executor,
+        chunksizes=6,
+        error_handling="continue",
+    )
+
+async_result = pipeline.map_async(
+    inputs,
+    executor=ThreadPoolExecutor(max_workers=4),
+    chunksizes=4,
+    error_handling="continue",
+)
+
+# In both runs, `parallel_result["y"].output[13]` and `await async_result.task`
+# contain an ErrorSnapshot describing `x == 13` without shifting other indices.
+```
+
 ## Working with Mixed Results
 
 When `error_handling="continue"`, arrays use object dtype to store mixed types:
