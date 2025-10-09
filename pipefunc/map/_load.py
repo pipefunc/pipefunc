@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 from pipefunc._utils import (
     at_least_tuple,
     load,
+    pandas_to_polars,
     requires,
 )
 from pipefunc.helpers import FileValue
@@ -144,16 +145,7 @@ def load_dataframe(
     if backend == "pandas":
         return df
     if backend == "polars":
-        requires("polars", reason="load_dataframe with backend='polars'", extras="polars")
-        import polars as pl
-
-        try:
-            # Try using from_pandas first (most efficient, preserves types)
-            return pl.from_pandas(df)
-        except ImportError:
-            # Fallback to manual conversion if pyarrow is not available
-            # This happens when pandas has nullable types but pyarrow is not installed
-            return pl.DataFrame({col: df[col].to_numpy() for col in df.columns})
+        return pandas_to_polars(df)
     msg = f"Unknown backend '{backend}'. Expected 'pandas' or 'polars'."  # pragma: no cover
     raise ValueError(msg)  # pragma: no cover
 

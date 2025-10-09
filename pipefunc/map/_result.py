@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
 import numpy as np
 
-from pipefunc._utils import requires
+from pipefunc._utils import pandas_to_polars, requires
 
 from ._storage_array._base import StorageBase
 
@@ -186,16 +186,7 @@ class ResultDict(dict[str, Result]):
         if backend == "pandas":
             return df
         if backend == "polars":
-            requires("polars", reason="ResultDict.to_dataframe backend='polars'", extras="polars")
-            import polars as pl
-
-            try:
-                # Try using from_pandas first (most efficient, preserves types)
-                return pl.from_pandas(df)
-            except ImportError:
-                # Fallback to manual conversion if pyarrow is not available
-                # This happens when pandas has nullable types but pyarrow is not installed
-                return pl.DataFrame({col: df[col].to_numpy() for col in df.columns})
+            return pandas_to_polars(df)
         msg = f"Unknown backend '{backend}'. Expected 'pandas' or 'polars'."  # pragma: no cover
         raise ValueError(msg)  # pragma: no cover
 

@@ -572,3 +572,31 @@ def infer_shape(x: Any) -> tuple[int, ...]:  # noqa: PLR0911
         return (len(x), first_len)
 
     return (len(x), *first_sub_shape)
+
+
+def pandas_to_polars(df: Any) -> Any:
+    """Convert a pandas DataFrame to a polars DataFrame.
+
+    Tries to use `pl.from_pandas()` first for efficient type-preserving conversion.
+    Falls back to manual conversion if pyarrow is not available.
+
+    Parameters
+    ----------
+    df
+        A pandas DataFrame to convert.
+
+    Returns
+    -------
+        A polars DataFrame.
+
+    """
+    requires("polars", reason="pandas_to_polars conversion", extras="polars")
+    import polars as pl
+
+    try:
+        # Try using from_pandas first (most efficient, preserves types)
+        return pl.from_pandas(df)
+    except ImportError:
+        # Fallback to manual conversion if pyarrow is not available
+        # This happens when pandas has nullable types but pyarrow is not installed
+        return pl.DataFrame({col: df[col].to_numpy() for col in df.columns})
