@@ -31,8 +31,8 @@ adaptive = ["adaptive", "adaptive-scheduler>=2.14.0"]
 autodoc = ["griffe", "rich"]
 cli = ["griffe", "rich", "pydantic", "rich-argparse"]
 mcp = ["fastmcp>=2.12.0", "rich", "griffe"]
-pandas = ["pandas"]
-polars = ["polars"]
+pandas = ["pandas", "xarray"]  # DataFrame loading requires xarray for conversion
+polars = ["polars", "pandas", "xarray"]  # Polars backend requires pandas+xarray for conversion
 # Prevent old holoviews resulting in broken env
 plotting = ["bokeh", "graphviz", "holoviews>=1.14.0", "matplotlib"]
 profiling = ["psutil"]
