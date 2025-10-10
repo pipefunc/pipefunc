@@ -6,6 +6,7 @@ import itertools
 import math
 import time
 import warnings
+from collections.abc import Callable
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -1080,6 +1081,21 @@ def _get_optimal_chunk_size(
     return max(1, chunk_size)
 
 
+def _all_indices_propagate_errors(
+    process_index: functools.partial[tuple[Any, ...]],
+    indices: list[int],
+) -> bool:
+    kw = process_index.keywords
+    if kw["error_handling"] != "continue":
+        return False
+    func = kw["func"]
+    for idx in indices:
+        selected = _select_kwargs(func, kw["kwargs"], kw["shape"], kw["shape_mask"], idx)
+        if not check_for_error_inputs(selected):
+            return False
+    return True
+
+
 def _maybe_parallel_map(
     func: PipeFunc,
     process_index: functools.partial[tuple[Any, ...]],
@@ -1094,6 +1110,12 @@ def _maybe_parallel_map(
     ex = _executor_for_func(func, executor)
     if ex is not None:
         assert executor is not None
+        if _all_indices_propagate_errors(process_index, indices):
+            if status is not None:
+                assert progress is not None
+                process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
+            return [_ChunkTask((process_index(i),), chunk_indices=(i,)) for i in indices]
+
         ex = maybe_update_slurm_executor_map(func, ex, executor, process_index, indices)
         chunksize = _chunksize_for_func(func, chunksizes, len(indices), ex)
         chunks = list(_chunk_indices(indices, chunksize))
