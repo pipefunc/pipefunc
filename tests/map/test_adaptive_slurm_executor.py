@@ -436,6 +436,52 @@ async def test_map_scope_all_error_inputs_skip_executor_submission() -> None:
 
 
 @pytest.mark.asyncio
+async def test_map_scope_all_error_inputs_with_progress_avoids_executor() -> None:
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def always_fail(x: int) -> int:  # pragma: no cover - executed via pipeline
+        msg = "boom"
+        raise RuntimeError(msg)
+
+    @pipefunc(
+        output_name="z",
+        mapspec="y[i] -> z[i]",
+        resources=lambda kw: {"cpus": 1},  # noqa: ARG005
+        resources_scope="map",
+    )
+    def passthrough(y: int) -> int:  # pragma: no cover - executed via pipeline
+        return y
+
+    pipeline = Pipeline([always_fail, passthrough])
+    executor = MockSlurmExecutor(cores_per_node=1)
+
+    from pipefunc.map import _run as map_run
+
+    original_submit = map_run._submit
+    submission_funcs: list[str] = []
+
+    def wrapped_submit(func, *args, **kwargs):
+        process_index_callable = func.keywords.get("process_index")
+        if process_index_callable is not None:
+            captured_func = process_index_callable.keywords.get("func")
+            if captured_func is not None:
+                submission_funcs.append(captured_func.__name__)
+        return original_submit(func, *args, **kwargs)
+
+    with mock.patch("pipefunc.map._run._submit", side_effect=wrapped_submit):
+        runner = pipeline.map_async(
+            {"x": [0, 1]},
+            executor=executor,
+            error_handling="continue",
+            show_progress="headless",
+        )
+
+        result = await runner.task
+
+    assert isinstance(result, ResultDict)
+    assert "passthrough" not in submission_funcs
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("resources_scope", ["element", "map"])
 @pytest.mark.parametrize("use_mock", [True, False])
 async def test_with_nested_pipefunc(
