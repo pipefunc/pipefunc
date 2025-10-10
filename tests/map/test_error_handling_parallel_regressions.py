@@ -92,6 +92,48 @@ def test_parallel_continue_preserves_alignment_with_chunk_errors() -> None:
     assert all(entry is not None for entry in outputs)
 
 
+def test_chunk_exception_preserves_prior_successes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Chunk failures must not clobber earlier successful indices."""
+
+    from pipefunc.map import _run as run_mod
+
+    chunk_size = 4
+    fail_value = chunk_size - 1
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def double_except_last(x: int) -> int:
+        if x == fail_value:
+            msg = "boom at chunk tail"
+            raise ValueError(msg)
+        return x * 2
+
+    pipeline = Pipeline([double_except_last])
+    original = run_mod._run_iteration_and_process
+
+    def wrapped(index: int, *args, **kwargs):  # type: ignore[override]
+        result = original(index, *args, **kwargs)
+        if index == fail_value:
+            msg = "chunk should surface only failing index"
+            raise RuntimeError(msg)
+        return result
+
+    monkeypatch.setattr(run_mod, "_run_iteration_and_process", wrapped)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        result = pipeline.map(
+            {"x": list(range(chunk_size))},
+            error_handling="continue",
+            parallel=True,
+            executor=executor,
+            chunksizes=chunk_size,
+        )
+
+    outputs = list(result["y"].output)
+    for idx in range(chunk_size - 1):
+        assert outputs[idx] == idx * 2
+    assert isinstance(outputs[-1], ErrorSnapshot)
+
+
 def test_continue_headless_counts_failures_without_results(monkeypatch: pytest.MonkeyPatch) -> None:
     """Continue-mode must surface failures in progress when results are dropped."""
 
