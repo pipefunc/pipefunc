@@ -367,6 +367,68 @@ async def test_map_scope_resources_populated_with_error_inputs():
 
 
 @pytest.mark.asyncio
+async def test_map_scope_all_error_inputs_skip_executor_submission() -> None:
+    """Document current behaviour when every map index already has an error.
+
+    Context (October 2025): a prior failure report showed that when upstream map
+    entries produce `ErrorSnapshot` / `PropagatedErrorSnapshot` objects and the
+    downstream `PipeFunc` uses map-scope resources, we still submit work to the
+    executor—even though every element will immediately propagate the error.
+    The minimal test below recreates that situation using the in-test
+    `MockSlurmExecutor` (no actual Slurm cluster required):
+
+    1. `always_fail` guarantees both items raise, so the downstream map receives
+       only propagated errors when `error_handling="continue"`.
+    2. `passthrough` declares map-scope resources, which is where the bug was
+       originally reported.
+    3. We patch `_submit` (shared by all executors) so we can count how many
+       pieces of work are actually scheduled. In the desired behaviour this
+       should remain zero; today it still increments, so we hard-fail with a
+       descriptive assertion message.
+
+    Keep this test failing until the executor submission logic short-circuits
+    the all-error case.
+    """
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def always_fail(x: int) -> int:  # pragma: no cover - executed via pipeline
+        msg = "boom"
+        raise RuntimeError(msg)
+
+    @pipefunc(
+        output_name="z",
+        mapspec="y[i] -> z[i]",
+        resources=lambda kw: {"cpus": 1},  # noqa: ARG005
+        resources_scope="map",
+    )
+    def passthrough(y: int) -> int:  # pragma: no cover - executed via pipeline
+        return y
+
+    pipeline = Pipeline([always_fail, passthrough])
+    executor = MockSlurmExecutor(cores_per_node=1)
+
+    from pipefunc.map import _run as map_run
+
+    with mock.patch(
+        "pipefunc.map._run._submit",
+        wraps=map_run._submit,
+    ) as submit_mock:
+        runner = pipeline.map_async(
+            {"x": [0, 1]},
+            executor=executor,
+            error_handling="continue",
+        )
+
+        result = await runner.task
+
+    assert isinstance(result, ResultDict)
+    # Known issue: today `_submit` still fires four times, meaning each
+    # propagated-error element gets scheduled on the executor anyway. Leave as a
+    # failing expectation so the regression is visible during CI.
+    assert submit_mock.call_count == 0
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("resources_scope", ["element", "map"])
 @pytest.mark.parametrize("use_mock", [True, False])
 async def test_with_nested_pipefunc(

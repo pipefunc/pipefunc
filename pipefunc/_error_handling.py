@@ -140,6 +140,7 @@ def handle_error_inputs(
     kwargs: dict[str, Any],
     func: Callable[..., Any],
     error_handling: str,
+    error_info: dict[str, ErrorInfo] | None = None,
 ) -> PropagatedErrorSnapshot | None:
     """Check for error inputs and create PropagatedErrorSnapshot if needed.
 
@@ -151,6 +152,8 @@ def handle_error_inputs(
         The function that would be called.
     error_handling
         The error handling mode ("raise" or "continue").
+    error_info
+        Optional precomputed error information.
 
     Returns
     -------
@@ -161,7 +164,8 @@ def handle_error_inputs(
     if error_handling != "continue":
         return None
 
-    error_info = check_for_error_inputs(kwargs)
+    if error_info is None:
+        error_info = check_for_error_inputs(kwargs)
     if error_info:
         return create_propagated_error(error_info, func, kwargs)
     return None
