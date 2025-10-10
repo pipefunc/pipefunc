@@ -409,10 +409,18 @@ async def test_map_scope_all_error_inputs_skip_executor_submission() -> None:
 
     from pipefunc.map import _run as map_run
 
-    with mock.patch(
-        "pipefunc.map._run._submit",
-        wraps=map_run._submit,
-    ) as submit_mock:
+    original_submit = map_run._submit
+    submission_funcs: list[str] = []
+
+    def wrapped_submit(func, *args, **kwargs):
+        process_index_callable = func.keywords.get("process_index")
+        if process_index_callable is not None:
+            captured_func = process_index_callable.keywords.get("func")
+            if captured_func is not None:
+                submission_funcs.append(captured_func.__name__)
+        return original_submit(func, *args, **kwargs)
+
+    with mock.patch("pipefunc.map._run._submit", side_effect=wrapped_submit):
         runner = pipeline.map_async(
             {"x": [0, 1]},
             executor=executor,
@@ -422,10 +430,9 @@ async def test_map_scope_all_error_inputs_skip_executor_submission() -> None:
         result = await runner.task
 
     assert isinstance(result, ResultDict)
-    # Known issue: today `_submit` still fires four times, meaning each
-    # propagated-error element gets scheduled on the executor anyway. Leave as a
-    # failing expectation so the regression is visible during CI.
-    assert submit_mock.call_count == 0
+    # Upstream `always_fail` must still be submitted, but downstream `passthrough`
+    # should short-circuit instead of enqueuing work on the executor.
+    assert "passthrough" not in submission_funcs
 
 
 @pytest.mark.asyncio
