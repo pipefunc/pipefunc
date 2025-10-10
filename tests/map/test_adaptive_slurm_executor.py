@@ -16,6 +16,7 @@ from adaptive_scheduler import RunManager, SlurmExecutor, SlurmTask
 from adaptive_scheduler._executor import TaskID
 
 from pipefunc import NestedPipeFunc, Pipeline, pipefunc
+from pipefunc.exceptions import PropagatedErrorSnapshot
 from pipefunc.map._result import ResultDict
 from pipefunc.map._storage_array._file import FileArray
 
@@ -330,6 +331,39 @@ async def test_number_of_jobs_created_with_resources(resources, resources_scope)
     result = await runner.task
     assert isinstance(result, ResultDict)
     assert len(result["z"].output) == 10
+
+
+@pytest.mark.asyncio
+async def test_map_scope_resources_populated_with_error_inputs():
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def invert(x: int) -> float:
+        if x == 0:
+            raise ZeroDivisionError
+        return 1 / x
+
+    @pipefunc(
+        output_name="z",
+        mapspec="y[i] -> z[i]",
+        resources=lambda kw: {"cpus": 1},  # noqa: ARG005
+        resources_scope="map",
+    )
+    def passthrough(y: float) -> float:
+        return y
+
+    pipeline = Pipeline([invert, passthrough])
+    executor = MockSlurmExecutor(cores_per_node=1)
+
+    runner = pipeline.map_async(
+        {"x": [0, 1]},
+        executor=executor,
+        error_handling="continue",
+    )
+
+    result = await runner.task
+
+    assert isinstance(result, ResultDict)
+    assert isinstance(result["z"].output[0], PropagatedErrorSnapshot)
+    assert result["z"].output[1] == 1.0
 
 
 @pytest.mark.asyncio
