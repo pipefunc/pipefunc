@@ -112,17 +112,17 @@ _Because frequent comparisons are made between the two projects, it gets its own
 
 **Where `pipefunc` leans in**
 
-- **Scientific + HPC workflows:** Minimal runtime overhead with [`mapspec`](./concepts/mapspec.md) driven scheduling, executor-agnostic parallelism (any `concurrent.futures.Executor`, from `ProcessPoolExecutor` to Dask, ipyparallel, mpi4py, etc.), and first-class support for job schedulers such as SLURM and PBS (see [Execution and Parallelism](./concepts/execution-and-parallelism.md)).
+- **Scientific + HPC workflows:** Minimal runtime overhead (<10 µs) with [`mapspec`](./concepts/mapspec.md) driven scheduling, executor-agnostic parallelism (any `concurrent.futures.Executor`, from `ProcessPoolExecutor` to Dask, ipyparallel, mpi4py, etc.), and first-class support for job schedulers such as SLURM and PBS (see [Execution and Parallelism](./concepts/execution-and-parallelism.md)).
 - **N-dimensional parameter sweeps:** Built-in sweep tooling ([`pipeline.map`](./concepts/parameter-sweeps.md)) stores intermediate artifacts, supports eager or queued execution, and works with structured outputs like `xarray`.
 - **Fine-grained resource policies:** Per-function constraints for CPU, memory, GPUs, wall-time, and custom selectors ([Resource Management](./concepts/resource-management.md)).
 - **Type-aware validation:** Type hints are checked when pipelines are constructed (with optional runtime checks for `Array[...]` outputs), and pipelines can emit [Pydantic models](./concepts/function-io.md#dataclasses-and-pydanticbasemodel-as-pipefunc) for CLIs, agents, or user interfaces ([CLI](./concepts/cli.md) and [MCP](./concepts/mcp.md)).
 
-**Where Hamilton shines**
+**Where Hamilton focuses**
 
 - **Column-first dataflows:** Decorators such as `@extract_columns`, `@parameterize_extract_columns`, and `@with_columns` specialize in expanding and transforming DataFrame columns while preserving lineage.
-- **Opinionated code organization:** Hamilton encourages grouping domain functions into modules so collaborators can swap implementations and navigate pipelines easily.
 - **Data quality & observability:** Hamilton’s first-party decorators (`@check_output`, etc.) and plugins integrate with pandera/pydantic, emit OpenLineage metadata, and surface lineage/telemetry through the Hamilton UI.
-- **Execution backends without rewrites:** Graph adapters exist for Ray, Dask, Spark, thread pools, and more, so teams can scale the same functions from laptops to clusters.
+- **Adapter-driven execution:** Hamilton provides its own `GraphAdapter` API for Ray, Dask, Spark, async/thread pools, etc. Switching backends means selecting or implementing the matching adapter rather than swapping a standard executor.
+- **Structured module layout:** Drivers crawl Python modules to assemble the DAG; teams wanting strong conventions appreciate that, while others may find the enforced module boundaries restrictive compared to ad-hoc wiring.
 
 **How to choose**
 
