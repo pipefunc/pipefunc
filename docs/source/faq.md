@@ -106,26 +106,28 @@ Unlike pipefunc, Snakemake primarily works with serialized data and may require 
 
 ## How is this different from Hamilton?
 
-`pipefunc` and [Hamilton](https://github.com/dagworks-inc/hamilton) both generate DAGs from plain Python functions, but they aim at different sweet spots.
+`pipefunc` and [Hamilton](https://github.com/dagworks-inc/hamilton) both generate DAGs from plain Python functions, but they target different pain points.
 
 **Where `pipefunc` leans in**
 
 - **Scientific + HPC workflows:** Minimal runtime overhead with [`mapspec`](./concepts/mapspec.md) driven scheduling, executor-agnostic parallelism, and first-class support for job schedulers such as SLURM and PBS (see [Execution and Parallelism](./concepts/execution-and-parallelism.md)).
 - **N-dimensional parameter sweeps:** Built-in sweep tooling ([`pipeline.map`](./concepts/parameter-sweeps.md)) stores intermediate artifacts, supports eager or queued execution, and works with structured outputs like `xarray`.
 - **Fine-grained resource policies:** Per-function constraints for CPU, memory, GPUs, wall-time, and custom selectors ([Resource Management](./concepts/resource-management.md)).
+- **Type-aware validation:** Type annotations can be enforced at runtime, and pipelines can emit [Pydantic models](./concepts/function-io.md#dataclasses-and-pydanticbasemodel-as-pipefunc) for CLIs, agents, or user interfaces ([CLI](./concepts/cli.md) and [MCP](./concepts/mcp.md)).
 
 **Where Hamilton shines**
 
-- **Column-centric data engineering:** Functions map directly to dataframe or feature columns, and modifiers such as `@with_columns` help author reusable transformations.
-- **Governance & validation baked in:** `@check_output`, pandera, and pydantic integrations let teams enforce schema constraints; adapters emit OpenLineage events; the optional Hamilton UI/DAGWorks service tracks lineage, versions, and run telemetry.
-- **Team-friendly ergonomics:** Hamilton encourages organizing nodes by module, naming inputs after upstream outputs, and ships a UI for browsing DAG structure, comparing versions, and inspecting execution results.
+- **Column-first dataflows:** Decorators such as `@extract_columns`, `@parameterize_extract_columns`, and `@with_columns` specialize in expanding and transforming DataFrame columns while preserving lineage.
+- **Opinionated code organization:** Hamilton encourages grouping domain functions into modules so collaborators can swap implementations and navigate pipelines easily.
+- **Data quality & observability:** Hamilton’s first-party decorators (`@check_output`, etc.) and plugins integrate with pandera/pydantic, emit OpenLineage metadata, and surface lineage/telemetry through the Hamilton UI.
+- **Execution backends without rewrites:** Graph adapters exist for Ray, Dask, Spark, thread pools, and more, so teams can scale the same functions from laptops to clusters.
 
-**Picking between them**
+**How to choose**
 
-- Choose `pipefunc` when you need lightweight orchestration for numerically intensive or simulation-heavy workloads, multi-dimensional sweeps, or custom resource scheduling without leaving pure Python.
-- Choose Hamilton when your pipelines revolve around dataframe transformations, you want column-level lineage, rich validation, or observability tooling out of the box.
+- Reach for `pipefunc` when you need lightweight orchestration for numerically intensive or simulation-heavy workloads, multi-dimensional sweeps, or custom resource scheduling without leaving pure Python.
+- Reach for Hamilton when your pipelines revolve around DataFrame transformations, you need column-level lineage and validation baked in, or you want UI-driven observability out of the box.
 
-You can mix them too: Hamilton-produced functions can be wrapped with `@pipefunc`, and `pipefunc` stages can call Hamilton drivers for teams that already invest in Hamilton’s ecosystem.
+You can mix them too: Hamilton-produced functions can be wrapped with `@pipefunc`, and `pipefunc` stages can call Hamilton drivers for teams already invested in Hamilton’s ecosystem.
 
 ## How to use `adaptive` with `pipefunc`?
 
