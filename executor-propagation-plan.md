@@ -19,15 +19,14 @@
 - `handle_error_inputs` accepts precomputed error info so early error detection stays cheap.
 
 ## Plan of Attack
-1. Extend `_maybe_parallel_map` to reuse the precomputed `error_info` for each index.
-2. If all indices are already errors, resolve them in-process (using `process_index(i)`) and skip `_submit` entirely.
-3. Ensure progress/status trackers still receive accurate updates when short-circuiting.
-4. Add mixed-case tests (some error, some healthy) to confirm only healthy indices hit the executor.
+1. ✅ Extend `_maybe_parallel_map` to reuse the precomputed `error_info` for each index.
+2. ✅ If all indices are already errors, resolve them in-process (using `process_index(i)`) and skip `_submit` entirely.
+3. ✅ Ensure progress/status trackers still receive accurate updates when short-circuiting.
+4. ✅ Add mixed-case tests (some error, some healthy) to confirm only healthy indices hit the executor.
 
 ## Open Questions
 - Should we reuse the original executor when no overrides exist, or leave it untouched when we skip submission altogether?
 - Do we want to stash the per-index kwargs/error metadata somewhere to avoid recomputing when we do submit work?
 
 ## Next Steps
-- Implement the short-circuit logic behind a small helper so both sync/async map runners can share it.
-- Update the new failing test to assert the expected zero submissions once the fix lands.
+- Evaluate whether `MockSlurmExecutor` should expose submission metadata directly so future tests can avoid patching internals.
