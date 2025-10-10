@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipefunc import Pipeline, pipefunc
+from pipefunc._widgets.progress_base import ProgressTrackerBase
 from pipefunc.exceptions import ErrorSnapshot
 
 if TYPE_CHECKING:
@@ -27,6 +28,36 @@ def _double_or_fail(x: int) -> int:
         msg = f"boom at {x}"
         raise ValueError(msg)
     return x * 2
+
+
+@pipefunc(output_name="yfail", mapspec="x[i] -> yfail[i]")
+def _always_fail(x: int) -> int:
+    """Always raise to exercise continue-mode progress accounting."""
+
+    msg = "boom"
+    raise ValueError(msg)
+
+
+def _capture_headless_tracker(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
+    from pipefunc.map import _prepare as prepare_mod
+
+    captured: dict[str, object] = {}
+    original = prepare_mod.init_tracker
+
+    def fake_init_tracker(*args, **kwargs):  # type: ignore[override]
+        args = list(args)
+        if len(args) >= 3:
+            args[2] = "headless"
+        elif "show_progress" in kwargs:
+            kwargs["show_progress"] = "headless"
+        else:
+            args.append("headless")
+        tracker = original(*args, **kwargs)
+        captured["tracker"] = tracker
+        return tracker
+
+    monkeypatch.setattr(prepare_mod, "init_tracker", fake_init_tracker)
+    return captured
 
 
 def _assert_expected_outputs(raw_outputs: Sequence) -> None:
@@ -59,6 +90,32 @@ def test_parallel_continue_preserves_alignment_with_chunk_errors() -> None:
     outputs = result["y"].output
     _assert_expected_outputs(outputs)
     assert all(entry is not None for entry in outputs)
+
+
+def test_continue_headless_counts_failures_without_results(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Continue-mode must surface failures in progress when results are dropped."""
+
+    captured = _capture_headless_tracker(monkeypatch)
+    pipeline = Pipeline([_always_fail])
+    inputs = {"x": [0, 1, 2, 3]}
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        pipeline.map(
+            inputs,
+            error_handling="continue",
+            parallel=True,
+            executor=executor,
+            chunksizes=2,
+            return_results=False,
+            show_progress=True,
+        )
+
+    tracker_obj = captured.get("tracker")
+    assert isinstance(tracker_obj, ProgressTrackerBase)
+    status = tracker_obj.progress_dict["yfail"]
+    assert status.n_total == len(inputs["x"])
+    assert status.n_failed == len(inputs["x"])
+    assert status.n_completed == 0
 
 
 class _NoAttrFuture(Future):
