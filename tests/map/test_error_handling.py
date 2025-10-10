@@ -737,3 +737,38 @@ def test_resources_callback_not_evaluated_on_error_input() -> None:
     assert z_output[0] == 0
     assert isinstance(z_output[1], PropagatedErrorSnapshot)
     assert z_output[2] == 4
+
+
+def test_map_scope_resources_skipped_on_error_input() -> None:
+    """Regression: map-scope resources must be skipped when inputs contain errors."""
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def fail_for_one(x: int) -> int:
+        if x == 1:
+            msg = "boom"
+            raise ValueError(msg)
+        return x
+
+    @pipefunc(
+        output_name="z",
+        mapspec="y[i] -> z[i]",
+        resources=lambda kw: {"cpus": int(np.sum(kw["y"].to_array()))},
+        resources_scope="map",
+    )
+    def downstream(y: int) -> int:
+        return y * 2
+
+    pipeline = Pipeline([fail_for_one, downstream])
+
+    result = pipeline.map({"x": [0, 1, 2]}, error_handling="continue", parallel=False)
+
+    y_output = result["y"].output
+    z_output = result["z"].output
+
+    assert y_output[0] == 0
+    assert isinstance(y_output[1], ErrorSnapshot)
+    assert y_output[2] == 2
+
+    assert z_output[0] == 0
+    assert isinstance(z_output[1], PropagatedErrorSnapshot)
+    assert z_output[2] == 4
