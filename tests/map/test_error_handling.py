@@ -702,3 +702,38 @@ def test_edge_case_single_error_in_tuple():
     assert out2[0] == 0
     assert isinstance(out2[1], ErrorSnapshot)  # Same error for both outputs
     assert out2[2] == 4
+
+
+def test_resources_callback_not_evaluated_on_error_input() -> None:
+    """Regression: resources callable must not run when upstream inputs are errors."""
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def fail_for_one(x: int) -> int:
+        if x == 1:
+            msg = "boom"
+            raise ValueError(msg)
+        return x
+
+    @pipefunc(
+        output_name="z",
+        mapspec="y[i] -> z[i]",
+        resources=lambda kw: {"cpus": kw["y"] + 1},
+        resources_scope="element",
+    )
+    def downstream(y: int) -> int:
+        return y * 2
+
+    pipeline = Pipeline([fail_for_one, downstream])
+
+    result = pipeline.map({"x": [0, 1, 2]}, error_handling="continue", parallel=False)
+
+    y_output = result["y"].output
+    z_output = result["z"].output
+
+    assert y_output[0] == 0
+    assert isinstance(y_output[1], ErrorSnapshot)
+    assert y_output[2] == 2
+
+    assert z_output[0] == 0
+    assert isinstance(z_output[1], PropagatedErrorSnapshot)
+    assert z_output[2] == 4
