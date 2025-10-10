@@ -140,3 +140,138 @@ parallel_err, async_err
 
 This means downstream pipeline steps can trust that per-index error metadata is
 aligned, regardless of the execution strategy or chunk size.
+
+## Basic Continue Mode Example
+
+The same guarantees apply in simpler element-wise pipelines. When
+`error_handling="continue"`, failures turn into
+{class}`~pipefunc.ErrorSnapshot` objects and downstream map steps receive the
+snapshots instead of hard failures.
+
+```{code-cell} ipython3
+from pipefunc import Pipeline, pipefunc
+
+@pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+def may_fail(x: int) -> int:
+    if x == 3:
+        raise ValueError("Cannot process 3")
+    return x * 2
+
+@pipefunc(output_name="z", mapspec="y[i] -> z[i]")
+def add_ten(y: int) -> int:
+    return y + 10
+
+pipeline_basic = Pipeline([may_fail, add_ten])
+
+result_basic = pipeline_basic.map(
+    {"x": [1, 2, 3, 4, 5]},
+    error_handling="continue",
+)
+
+result_basic["y"].output, result_basic["z"].output
+```
+
+```{code-cell} ipython3
+from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
+
+y_outputs = result_basic["y"].output
+z_outputs = result_basic["z"].output
+
+type(y_outputs[2]), type(z_outputs[2])
+```
+
+## ErrorSnapshot capabilities
+
+{class}`~pipefunc.ErrorSnapshot` instances store rich debugging context.
+
+```{code-cell} ipython3
+snapshot = y_outputs[2]
+print(snapshot)
+print("\nReproduce raises the same exception:")
+try:
+    snapshot.reproduce()
+except Exception as exc:  # noqa: BLE001
+    print(type(exc), exc)
+```
+
+## PropagatedErrorSnapshot overview
+
+Functions downstream of an error receive
+{class}`~pipefunc.PropagatedErrorSnapshot` objects describing what inputs were
+problematic.
+
+```{code-cell} ipython3
+propagated = z_outputs[2]
+print(propagated)
+propagated.get_root_causes()
+```
+
+## Error propagation patterns
+
+### Element-wise operations
+
+```{code-cell} ipython3
+import numpy as np
+
+@pipefunc(output_name="doubled", mapspec="x[i] -> doubled[i]")
+def double(x: int) -> int:
+    if x < 0:
+        raise ValueError(f"Negative value: {x}")
+    return x * 2
+
+@pipefunc(output_name="squared", mapspec="doubled[i] -> squared[i]")
+def square(doubled: int) -> int:
+    return doubled**2
+
+pipeline_elements = Pipeline([double, square])
+result_elements = pipeline_elements.map(
+    {"x": [1, -2, 3, -4, 5]},
+    error_handling="continue",
+)
+
+result_elements["doubled"].output, result_elements["squared"].output
+```
+
+### Reduction operations
+
+```{code-cell} ipython3
+@pipefunc(output_name="matrix", mapspec="x[i], y[j] -> matrix[i, j]")
+def compute(x: int, y: int) -> int:
+    if x == 2 and y == 2:
+        raise ValueError("Cannot compute (2, 2)")
+    return x * y
+
+@pipefunc(output_name="row_sums", mapspec="matrix[i, :] -> row_sums[i]")
+def sum_row(matrix: np.ndarray) -> int:
+    return int(np.sum(matrix))
+
+pipeline_rows = Pipeline([compute, sum_row])
+result_rows = pipeline_rows.map(
+    {"x": [1, 2, 3], "y": [1, 2, 3]},
+    error_handling="continue",
+)
+
+result_rows["matrix"].output, result_rows["row_sums"].output
+```
+
+### Full array operations
+
+```{code-cell} ipython3
+@pipefunc(output_name="values", mapspec="x[i] -> values[i]")
+def process(x: int) -> int:
+    if x == 3:
+        raise ValueError("Bad value")
+    return x * 10
+
+@pipefunc(output_name="total")
+def sum_all(values: np.ndarray) -> int:
+    return int(np.sum(values))
+
+pipeline_total = Pipeline([process, sum_all])
+result_total = pipeline_total.map(
+    {"x": [1, 2, 3, 4]},
+    error_handling="continue",
+)
+
+result_total["values"].output, result_total["total"].output
+```

@@ -654,7 +654,7 @@ def _run_iteration(
             handle_pipefunc_error(e, func, selected, error_handling)
             if error_handling == "continue":
                 return func.error_snapshot
-            raise
+            raise  # pragma: no cover
 
     return _get_or_set_cache(func, selected, cache, compute_fn)
 
