@@ -1,20 +1,23 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+import pytest
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc.map import load_outputs
+from pipefunc.map import load_dataframe, load_outputs, load_xarray_dataset
 from pipefunc.map.xarray import DimensionlessArray, load_xarray, xarray_dataset_from_results
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from pipefunc.typing import Array
 
-def test_to_xarray_1_dim(tmp_path: Path):
+
+def test_to_xarray_1_dim(tmp_path: Path) -> None:
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def double_it(x: int) -> int:
         return 2 * x
@@ -33,7 +36,7 @@ def test_to_xarray_1_dim(tmp_path: Path):
     assert da.to_numpy().tolist() == [2, 4, 6]
 
 
-def test_to_xarray_2_dim(tmp_path: Path):
+def test_to_xarray_2_dim(tmp_path: Path) -> None:
     @pipefunc(output_name="z", mapspec="x[i], y[j] -> z[i, j]")
     def f(x: int, y: int) -> int:
         return x + y
@@ -54,7 +57,7 @@ def test_to_xarray_2_dim(tmp_path: Path):
     assert da.to_numpy().tolist() == [[5, 6], [6, 7], [7, 8]]
 
 
-def test_to_xarray_2_dim_zipped(tmp_path: Path):
+def test_to_xarray_2_dim_zipped(tmp_path: Path) -> None:
     @pipefunc(output_name="r", mapspec="x[i], y[i], z[j] -> r[i, j]")
     def f(x: int, y: int, z: int) -> int:
         return x + y + z
@@ -75,7 +78,7 @@ def test_to_xarray_2_dim_zipped(tmp_path: Path):
     assert da.to_numpy().tolist() == [[12, 13], [14, 15], [16, 17]]
 
 
-def test_to_xarray_1_dim_2_funcs(tmp_path: Path):
+def test_to_xarray_1_dim_2_funcs(tmp_path: Path) -> None:
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def f(x: int) -> int:
         return 2 * x
@@ -100,7 +103,7 @@ def test_to_xarray_1_dim_2_funcs(tmp_path: Path):
     assert da.to_numpy().tolist() == [3, 5, 7]
 
 
-def test_to_xarray_from_step(tmp_path: Path):
+def test_to_xarray_from_step(tmp_path: Path) -> None:
     @pipefunc(output_name="x")
     def generate_ints(n: int) -> list[int]:
         """Generate a list of integers from 0 to n-1."""
@@ -137,7 +140,7 @@ def test_to_xarray_from_step(tmp_path: Path):
     assert da.coords["x"].to_numpy().tolist() == expected_coords["x"]
 
 
-def test_xarray_from_result(tmp_path: Path):
+def test_xarray_from_result(tmp_path: Path) -> None:
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def double_it(x: int) -> int:
         return 2 * x
@@ -152,7 +155,8 @@ def test_xarray_from_result(tmp_path: Path):
     inputs = {"x": [1, 2, 3], "a": 10}
     results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, storage="dict")
     ds = xarray_dataset_from_results(inputs, results, pipeline)
-    assert "returns_array" in ds.coords
+    # Both single outputs (not part of mapspec) should be data variables, not coordinates
+    assert "returns_array" in ds.data_vars
     assert "returns_custom_object" in ds.data_vars
 
 
@@ -347,6 +351,229 @@ def test_1d_mapspec_returns_2d_list_of_lists() -> None:
     ds = results.to_xarray()
     assert "y" in ds.coords
     assert "z" in ds.data_vars
+
+
+def test_single_output_2d_numpy_array(tmp_path: Path) -> None:
+    """Test single output (not in mapspec) returning 2D numpy array."""
+
+    @pipefunc(output_name="matrix")
+    def generate_matrix() -> npt.NDArray[np.int_]:
+        return np.array([[1, 2, 3], [4, 5, 6]])
+
+    pipeline = Pipeline([generate_matrix])
+    results = pipeline.map({}, run_folder=tmp_path, parallel=False, storage="dict")
+
+    # Check raw output
+    expected = np.array([[1, 2, 3], [4, 5, 6]])
+    np.testing.assert_array_equal(results["matrix"].output, expected)
+
+    # Check xarray structure
+    ds = results.to_xarray()
+    assert "matrix" in ds.data_vars, "matrix should be data variable"
+    assert "matrix" not in ds.coords, "matrix should not be coordinate"
+
+    # The value should be wrapped in DimensionlessArray
+    assert isinstance(ds["matrix"].to_numpy().item(), DimensionlessArray)
+    np.testing.assert_array_equal(ds["matrix"].to_numpy().item().arr, expected)
+
+    # Check DataFrame
+
+    df = load_dataframe("matrix", run_folder=tmp_path)
+    assert df.shape == (1, 1), "Should have 1 row, 1 column"
+    assert "matrix" in df.columns
+
+    matrix_value = df["matrix"].iloc[0]
+    assert isinstance(matrix_value, np.ndarray)
+    assert matrix_value.shape == (2, 3)
+    np.testing.assert_array_equal(matrix_value, expected)
+
+
+def test_single_output_2d_list(tmp_path: Path) -> None:
+    """Test single output (not in mapspec) returning 2D list."""
+
+    @pipefunc(output_name="matrix")
+    def generate_matrix() -> list[list[int]]:
+        return [[1, 2, 3], [4, 5, 6]]
+
+    pipeline = Pipeline([generate_matrix])
+    results = pipeline.map({}, run_folder=tmp_path, parallel=False, storage="dict")
+
+    # Check raw output
+    expected = [[1, 2, 3], [4, 5, 6]]
+    assert results["matrix"].output == expected
+
+    # Check xarray structure
+    ds = results.to_xarray()
+    assert "matrix" in ds.data_vars, "matrix should be data variable"
+    assert "matrix" not in ds.coords, "matrix should not be coordinate"
+
+    # Check DataFrame
+
+    df = load_dataframe("matrix", run_folder=tmp_path)
+    assert df.shape == (1, 1), "Should have 1 row, 1 column"
+    assert "matrix" in df.columns
+
+    matrix_value = df["matrix"].iloc[0]
+    assert isinstance(matrix_value, np.ndarray)
+    assert matrix_value.shape == (2, 3)
+    np.testing.assert_array_equal(matrix_value, np.array(expected, dtype=object))
+
+
+@pytest.mark.parametrize("dtype", [np.int16, np.float32, np.complex64])
+def test_single_output_numpy_dtype_preserved(tmp_path: Path, dtype: Any) -> None:
+    """Single-output numpy arrays keep dtype in xarray Dataset and DataFrame."""
+
+    values = np.array([1, 2, 3], dtype=dtype)
+    if np.issubdtype(dtype, np.complexfloating):  # pragma: no branch - limited branch
+        values = np.array([1 + 1j, 2 + 2j, 3 + 3j], dtype=dtype)
+
+    @pipefunc(output_name="typed")
+    def make_array() -> npt.NDArray:
+        return values
+
+    pipeline = Pipeline([make_array])
+    results = pipeline.map({}, run_folder=tmp_path, parallel=False, storage="dict")
+
+    ds = results.to_xarray()
+    dimless = ds["typed"].to_numpy().item()
+    assert isinstance(dimless, DimensionlessArray)
+    np.testing.assert_array_equal(dimless.arr, values)
+    assert dimless.arr.dtype == dtype
+
+    df = load_dataframe("typed", run_folder=tmp_path)
+    typed_value = df["typed"].iloc[0]
+    assert isinstance(typed_value, np.ndarray)
+    np.testing.assert_array_equal(typed_value, values)
+    assert typed_value.dtype == dtype
+
+
+@pytest.mark.parametrize("dtype", [np.int16, np.float32, np.float64])
+def test_scalar_numpy_dtype_preserved(tmp_path: Path, dtype: Any) -> None:
+    """Zero-dimensional numpy outputs keep dtype when materialized."""
+
+    scalar = np.array(5, dtype=dtype)
+
+    @pipefunc(output_name="scalar_val")
+    def make_scalar() -> npt.NDArray:
+        return scalar
+
+    pipeline = Pipeline([make_scalar])
+    pipeline.map({}, run_folder=tmp_path, parallel=False, storage="dict")
+
+    ds = load_xarray_dataset(
+        "scalar_val",
+        run_folder=tmp_path,
+        load_intermediate=True,
+    )
+    dimless = ds["scalar_val"].to_numpy().item()
+    assert isinstance(dimless, DimensionlessArray)
+    np.testing.assert_array_equal(dimless.arr, scalar)
+    assert dimless.arr.dtype == dtype
+
+    df = load_dataframe("scalar_val", run_folder=tmp_path)
+    scalar_value = df["scalar_val"].iloc[0]
+    assert isinstance(scalar_value, np.ndarray)
+    np.testing.assert_array_equal(scalar_value, scalar)
+    assert scalar_value.dtype == dtype
+
+
+@pytest.mark.parametrize("coord_dtype", [np.int8, np.float16])
+def test_mapspec_coordinate_dtype_preserved(tmp_path: Path, coord_dtype: Any) -> None:
+    """Coordinates derived from mapspec inputs retain their numpy dtype."""
+
+    coord_values = np.array([1, 2, 3], dtype=coord_dtype)
+
+    @pipefunc(output_name="axis", mapspec="... -> axis[i]")
+    def axis() -> npt.NDArray:
+        return coord_values
+
+    @pipefunc(output_name="values", mapspec="axis[i] -> values[i]")
+    def values(axis: Any) -> float:
+        return float(axis * 2)
+
+    pipeline = Pipeline([axis, values])
+    results = pipeline.map({}, run_folder=tmp_path, parallel=False, storage="dict")
+
+    ds = results.to_xarray()
+    coord = ds.coords["axis"].to_numpy()
+    np.testing.assert_array_equal(coord, coord_values)
+    assert coord.dtype == coord_dtype
+
+    df = results.to_dataframe()
+    assert df["axis"].dtype == coord_dtype
+
+
+def test_aggregation_to_scalar(tmp_path: Path) -> None:
+    """Test aggregation/reduction from mapped output to scalar single output."""
+
+    @pipefunc(output_name="x", mapspec="... -> x[i]")
+    def generate_ints(n: int) -> list[int]:
+        return list(range(n))
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def double_it(x: int) -> int:
+        return 2 * x
+
+    @pipefunc(output_name="total")
+    def sum_all(y: Array[int]) -> int:
+        """Aggregate mapped values to scalar."""
+        return int(np.sum(y))
+
+    pipeline = Pipeline([generate_ints, double_it, sum_all])
+    results = pipeline.map({"n": 5}, run_folder=tmp_path, parallel=False, storage="dict")
+
+    # Check outputs
+    assert results["x"].output == [0, 1, 2, 3, 4]
+    assert results["y"].output.tolist() == [0, 2, 4, 6, 8]
+    assert results["total"].output == 20  # sum([0, 2, 4, 6, 8])
+
+    # Check xarray structure
+    ds = results.to_xarray()
+    assert "total" in ds.data_vars, "total should be data variable"
+    assert "total" not in ds.coords, "total should not be coordinate"
+    assert ds["total"].shape == (), "Scalar should have empty shape"
+
+    # Check DataFrame
+    df = load_dataframe("total", run_folder=tmp_path)
+    assert df.shape == (1, 1), "Should have 1 row for scalar output"
+    assert df["total"].iloc[0] == 20
+
+
+def test_aggregation_to_array(tmp_path: Path) -> None:
+    """Test aggregation/reduction from mapped output to array single output."""
+
+    @pipefunc(output_name="matrices", mapspec="i[i] -> matrices[i]")
+    def generate_matrices(i: int) -> npt.NDArray[np.int_]:
+        """Generate different matrices."""
+        return np.ones((3, 3), dtype=int) * i
+
+    @pipefunc(output_name="row_sums")
+    def compute_row_sums(matrices: Array[npt.NDArray]) -> npt.NDArray[np.int_]:
+        """Aggregate matrices by computing sum of first row from each."""
+        return np.array([m[0, :].sum() for m in matrices])
+
+    pipeline = Pipeline([generate_matrices, compute_row_sums])
+    inputs = {"i": [1, 2, 3]}
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, storage="dict")
+
+    # Check outputs
+    expected_row_sums = np.array([3, 6, 9])  # [1*3, 2*3, 3*3]
+    np.testing.assert_array_equal(results["row_sums"].output, expected_row_sums)
+
+    # Check xarray structure
+    ds = results.to_xarray()
+    assert "row_sums" in ds.data_vars, "row_sums should be data variable"
+    assert "row_sums" not in ds.coords, "row_sums should not be coordinate"
+
+    # Check DataFrame
+
+    df = load_dataframe("row_sums", run_folder=tmp_path)
+    assert df.shape == (1, 1), "Should have 1 row for single output"
+
+    row_sums_value = df["row_sums"].iloc[0]
+    assert isinstance(row_sums_value, np.ndarray)
+    assert row_sums_value.shape == (3,)
+    np.testing.assert_array_equal(row_sums_value, expected_row_sums)
 
 
 def test_unhashable_types() -> None:

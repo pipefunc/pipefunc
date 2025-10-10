@@ -202,12 +202,9 @@ def _xarray_dataset(
         array = data_loader(name)
         array = _maybe_to_array(array)
         if isinstance(array, np.ndarray):
-            if array.ndim == 1:
-                ds[name] = array
-            else:
-                # Wrap in DimensionlessArray to avoid xarray trying to interpret
-                # the data and requiring dimensions, resulting in an error
-                ds[name] = ((), DimensionlessArray(array))
+            # Wrap in DimensionlessArray to avoid xarray trying to interpret
+            # the data and requiring dimensions, resulting in an error
+            ds[name] = ((), DimensionlessArray(array))
         else:
             ds[name] = ((), array)
     return ds
