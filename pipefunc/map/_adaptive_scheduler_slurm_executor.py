@@ -260,6 +260,7 @@ def _resources_from_process_index(
         kw["shape"],
         kw["shape_mask"],
         index,
+        kw["error_handling"],
     )
     return selected[_EVALUATED_RESOURCES]
 

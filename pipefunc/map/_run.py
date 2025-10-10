@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 import numpy as np
 import numpy.typing as npt
 
-from pipefunc._error_handling import handle_error_inputs
+from pipefunc._error_handling import check_for_error_inputs, handle_error_inputs
 from pipefunc._pipefunc_utils import handle_pipefunc_error
 from pipefunc._utils import (
     at_least_tuple,
@@ -574,9 +574,13 @@ def _maybe_eval_resources_in_selected(
     kwargs: dict[str, Any],
     selected: dict[str, Any],
     func: PipeFunc,
+    *,
+    error_handling: Literal["raise", "continue"],
 ) -> None:
     if callable(func.resources):  # type: ignore[has-type]
         kw = kwargs if func.resources_scope == "map" else selected
+        if error_handling == "continue" and check_for_error_inputs(kw):
+            return
         selected[_EVALUATED_RESOURCES] = func.resources(kw)  # type: ignore[has-type]
 
 
@@ -586,9 +590,15 @@ def _select_kwargs_and_eval_resources(
     shape: ShapeTuple,
     shape_mask: tuple[bool, ...],
     index: int,
+    error_handling: Literal["raise", "continue"],
 ) -> dict[str, Any]:
     selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
-    _maybe_eval_resources_in_selected(kwargs, selected, func)
+    _maybe_eval_resources_in_selected(
+        kwargs,
+        selected,
+        func,
+        error_handling=error_handling,
+    )
     return selected
 
 
@@ -709,7 +719,14 @@ def _run_iteration_and_process(
     return_results: bool = True,
     force_dump: bool = False,
 ) -> tuple[Any, ...]:
-    selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
+    selected = _select_kwargs_and_eval_resources(
+        func,
+        kwargs,
+        shape,
+        shape_mask,
+        index,
+        error_handling,
+    )
     output = _run_iteration(func, selected, cache, error_handling)
     outputs = _pick_output(func, output)
     has_dumped = _update_array(
@@ -1446,7 +1463,14 @@ def _raise_and_set_error_snapshot(
         assert run_info is not None, "run_info required when index is provided"
         shape = run_info.resolved_shapes[func.output_name]
         mask = run_info.shape_masks[func.output_name]
-        kwargs = _select_kwargs_and_eval_resources(func, kwargs, shape, mask, index)
+        kwargs = _select_kwargs_and_eval_resources(
+            func,
+            kwargs,
+            shape,
+            mask,
+            index,
+            run_info.error_handling,
+        )
     kwargs = func._rename_to_native(kwargs)
     handle_pipefunc_error(exc, func, kwargs, run_info.error_handling)
     # handle_pipefunc_error raises if error_handling == "raise"
