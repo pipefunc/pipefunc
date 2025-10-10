@@ -110,7 +110,7 @@ Unlike pipefunc, Snakemake primarily works with serialized data and may require 
 
 **Where `pipefunc` leans in**
 
-- **Scientific + HPC workflows:** Minimal runtime overhead with [`mapspec`](./concepts/mapspec.md) driven scheduling, executor-agnostic parallelism, and first-class support for job schedulers such as SLURM and PBS (see [Execution and Parallelism](./concepts/execution-and-parallelism.md)).
+- **Scientific + HPC workflows:** Minimal runtime overhead with [`mapspec`](./concepts/mapspec.md) driven scheduling, executor-agnostic parallelism (any `concurrent.futures.Executor`, from `ProcessPoolExecutor` to Dask, ipyparallel, mpi4py, etc.), and first-class support for job schedulers such as SLURM and PBS (see [Execution and Parallelism](./concepts/execution-and-parallelism.md)).
 - **N-dimensional parameter sweeps:** Built-in sweep tooling ([`pipeline.map`](./concepts/parameter-sweeps.md)) stores intermediate artifacts, supports eager or queued execution, and works with structured outputs like `xarray`.
 - **Fine-grained resource policies:** Per-function constraints for CPU, memory, GPUs, wall-time, and custom selectors ([Resource Management](./concepts/resource-management.md)).
 - **Type-aware validation:** Type annotations can be enforced at runtime, and pipelines can emit [Pydantic models](./concepts/function-io.md#dataclasses-and-pydanticbasemodel-as-pipefunc) for CLIs, agents, or user interfaces ([CLI](./concepts/cli.md) and [MCP](./concepts/mcp.md)).
