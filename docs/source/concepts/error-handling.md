@@ -128,38 +128,25 @@ propagated.get_root_causes()
 across executors or awaited asynchronously.
 
 ```{code-cell} ipython3
-import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 inputs = {"x": list(range(10))}
+parallel_outputs = pipeline_basic.map(
+    inputs,
+    parallel=True,
+    executor=ThreadPoolExecutor(),
+    chunksizes=4,
+    error_handling="continue",
+)
 
-with ThreadPoolExecutor(max_workers=4) as executor:
-    parallel_outputs = pipeline_basic.map(
-        inputs,
-        parallel=True,
-        executor=executor,
-        chunksizes=4,
-        error_handling="continue",
-    )
-
-
-async def run_async() -> list[object]:
-    with ThreadPoolExecutor(max_workers=4) as async_executor:
-        async_result = pipeline_basic.map_async(
-            inputs,
-            executor=async_executor,
-            chunksizes=4,
-            error_handling="continue",
-        )
-        return (await async_result.task)["y"].output
-
-
-try:
-    async_outputs = asyncio.run(run_async())
-except RuntimeError:
-    async_outputs = await run_async()
-
-parallel_outputs["y"].output[3], async_outputs[3]
+async_result = pipeline_basic.map_async(
+    inputs,
+    executor=ThreadPoolExecutor(),
+    chunksizes=4,
+    error_handling="continue",
+)
+results = await async_result.task
+async_outputs = results["y"].output
 ```
 
 ## Recap
