@@ -1144,10 +1144,11 @@ def _execute_single(
 
     # Otherwise, run the function
     _load_data(kwargs)
+    error_info = check_for_error_inputs(kwargs)
 
     def compute_fn() -> Any:
         # Early error detection for non-mapspec operations
-        propagated_error = handle_error_inputs(kwargs, func, error_handling)
+        propagated_error = handle_error_inputs(kwargs, func, error_handling, error_info)
         if propagated_error is not None:
             return propagated_error
 

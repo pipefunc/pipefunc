@@ -10,6 +10,7 @@ import pytest
 
 from pipefunc._error_handling import (
     ErrorInfo,
+    check_for_error_inputs,
     cloudpickle_function_state,
     cloudunpickle_function_state,
     create_propagated_error,
@@ -70,7 +71,8 @@ def test_handle_error_inputs_with_raise_mode():
     kwargs = {"x": 5}
     func = lambda x: x * 2  # noqa: E731
 
-    result = handle_error_inputs(kwargs, func, "raise")
+    error_info = check_for_error_inputs(kwargs)
+    result = handle_error_inputs(kwargs, func, "raise", error_info=error_info)
     assert result is None
 
 
