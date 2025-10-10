@@ -262,7 +262,7 @@ def _resources_from_process_index(
         index,
         kw["error_handling"],
     )
-    return selected[_EVALUATED_RESOURCES]
+    return selected.get(_EVALUATED_RESOURCES)  # not present if PropagatedErrorSnapshot
 
 
 T = TypeVar("T")
