@@ -672,8 +672,13 @@ class _InternalShape:
     shape: tuple[int, ...]
 
     @classmethod
-    def from_outputs(cls, outputs: tuple[Any]) -> tuple[_InternalShape, ...]:
-        return tuple(cls(_try_shape(output)) for output in outputs)
+    def from_outputs(cls, outputs: tuple[Any]) -> tuple[Any, ...]:
+        return tuple(
+            output
+            if isinstance(output, (ErrorSnapshot, PropagatedErrorSnapshot))
+            else cls(_try_shape(output))
+            for output in outputs
+        )
 
 
 def _entry_contains_error(entry: Any) -> bool:
