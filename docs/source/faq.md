@@ -106,6 +106,8 @@ Unlike pipefunc, Snakemake primarily works with serialized data and may require 
 
 ## How is this different from Hamilton?
 
+_Because frequent comparisons are made between the two projects, it gets its own section._
+
 `pipefunc` and [Hamilton](https://github.com/dagworks-inc/hamilton) both generate DAGs from plain Python functions, but they target different pain points.
 
 **Where `pipefunc` leans in**
