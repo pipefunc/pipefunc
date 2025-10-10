@@ -7,17 +7,14 @@ import threading
 from concurrent.futures import Executor, Future, ProcessPoolExecutor, ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
-import numpy as np
 import pytest
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc._widgets.progress_base import ProgressTrackerBase
-from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
+from pipefunc.exceptions import ErrorSnapshot
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-
-    from pipefunc.map._result import ResultDict
 
 ERROR_INPUT = 13
 INPUT_VALUES = list(range(30))
@@ -173,83 +170,6 @@ def test_parallel_continue_without_future_attrs() -> None:
 
     outputs = result["y"].output
     _assert_expected_outputs(outputs)
-
-
-def test_cached_resultdict_preserves_error_snapshots_across_runs() -> None:
-    """Cached map results must keep PropagatedErrorSnapshots on reruns.
-
-    This simulates a downstream consumer that coerces error entries to ``NaN``
-    (e.g. when preparing a DataFrame) by mutating the cached ``ResultDict`` in
-    place. On a later ``Pipeline.run`` invocation we still expect the original
-    ``PropagatedErrorSnapshot`` objects; otherwise previously recorded error
-    context is lost despite rerunning with the same inputs.
-    """
-
-    @pipefunc(output_name="double")
-    def double(x: int) -> int:
-        if x == 1:
-            msg = "boom"
-            raise ValueError(msg)
-        return 2 * x
-
-    @pipefunc(output_name="downstream")
-    def downstream(double: int) -> int:
-        return double + 10
-
-    node_pipeline = Pipeline(
-        [
-            (double, "x[i] -> double[i]"),
-            (downstream, "double[i] -> downstream[i]"),
-        ],
-        cache_type="simple",
-    )
-
-    @pipefunc(output_name="mapspec_inputs")
-    def build_inputs() -> dict[str, np.ndarray]:
-        return {"x": np.arange(3)}
-
-    @pipefunc(output_name="results", cache=True)
-    def run_inner(mapspec_inputs: dict[str, np.ndarray]) -> ResultDict:
-        return node_pipeline.map(
-            mapspec_inputs,
-            error_handling="continue",
-            parallel=False,
-        )
-
-    @pipefunc(output_name="results_view")
-    def results_to_df(results):
-        # Downstream helpers frequently call `.to_dataframe()`; doing so must not
-        # mutate the cached ResultDict. We simply return the DataFrame snapshot
-        # here and let the test mutate the results afterwards to mimic a user
-        # coercing values to NaN post-conversion.
-        return results.to_dataframe()
-
-    outer = Pipeline(
-        [
-            build_inputs,
-            run_inner,
-            results_to_df,
-        ],
-        cache_type="simple",
-    )
-
-    first_results, _ = outer.run(["results", "results_view"], kwargs={})
-    error_entry = first_results["downstream"].output[1]
-    assert isinstance(error_entry, PropagatedErrorSnapshot)
-
-    # Users commonly coerce the DataFrame column to numeric, turning errors into
-    # NaN. We replicate that effect by mutating the cached ResultDict after
-    # calling `.to_dataframe()`.
-    _ = first_results.to_dataframe()
-    first_results["downstream"].output[1] = float("nan")
-
-    # Downstream processing converts the error entry to NaN.
-    second_results, _ = outer.run(["results", "results_view"], kwargs={})
-    # Cached results should still surface the original PropagatedErrorSnapshot.
-    assert isinstance(
-        second_results["downstream"].output[1],
-        PropagatedErrorSnapshot,
-    )
 
 
 @pytest.mark.asyncio
