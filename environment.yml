@@ -37,7 +37,7 @@ dependencies:
   - ipywidgets
   # optional-dependencies: zarr
   - zarr>=2,<3
-  - numcodecs<0.16.0
+  - numcodecs<0.16.1
   # optional-dependencies: test
   - coverage
   - pytest-asyncio
