@@ -61,11 +61,26 @@ def check_for_error_inputs(
         Empty if no errors are found.
 
     """
+    from pipefunc.map._storage_array._base import StorageBase
+
     error_info = {}
     for param_name, value in kwargs.items():
         if isinstance(value, (ErrorSnapshot, PropagatedErrorSnapshot)):
             # Input parameter is itself an error
             error_info[param_name] = ErrorInfo.from_full_error(value)
+        elif isinstance(value, StorageBase):
+            array = value.to_array()
+            error_mask = np.fromiter(
+                (isinstance(v, (ErrorSnapshot, PropagatedErrorSnapshot)) for v in array.flat),
+                dtype=bool,
+                count=array.size,
+            )
+            if error_mask.any():
+                error_info[param_name] = ErrorInfo.from_partial_error(
+                    shape=array.shape,
+                    error_indices=np.where(error_mask.reshape(array.shape)),
+                    error_count=int(error_mask.sum()),
+                )
         elif isinstance(value, np.ndarray) and value.dtype == object:
             # Check if array contains any ErrorSnapshot objects
             error_mask = np.array(

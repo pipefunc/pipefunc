@@ -579,11 +579,7 @@ def _maybe_eval_resources_in_selected(
 ) -> None:
     if callable(func.resources):  # type: ignore[has-type]
         kw = kwargs if func.resources_scope == "map" else selected
-        if (
-            func.resources_scope == "element"
-            and error_handling == "continue"
-            and check_for_error_inputs(kw)
-        ):
+        if error_handling == "continue" and check_for_error_inputs(kw):
             return
         selected[_EVALUATED_RESOURCES] = func.resources(kw)  # type: ignore[has-type]
 
