@@ -4,7 +4,7 @@ jupytext:
     extension: .md
     format_name: myst
     format_version: 0.13
-    jupytext_version: 1.16.4
+    jupytext_version: 1.17.3
 kernelspec:
   display_name: Python 3 (ipykernel)
   language: python
@@ -120,17 +120,21 @@ with ThreadPoolExecutor(max_workers=4) as executor:
 
 
 async def run_async() -> tuple[object, object]:
-    async_result = pipeline.map_async(
-        inputs,
-        executor=ThreadPoolExecutor(max_workers=4),
-        chunksizes=5,
-        error_handling="continue",
-    )
-    async_outputs = await async_result.task
+    with ThreadPoolExecutor(max_workers=4) as async_executor:
+        async_result = pipeline.map_async(
+            inputs,
+            executor=async_executor,
+            chunksizes=5,
+            error_handling="continue",
+        )
+        async_outputs = await async_result.task
     return parallel_result["y"].output[13], async_outputs["y"].output[13]
 
 
-parallel_err, async_err = asyncio.run(run_async())
+try:
+    parallel_err, async_err = asyncio.run(run_async())
+except RuntimeError:
+    parallel_err, async_err = await run_async()
 parallel_err, async_err
 ```
 
