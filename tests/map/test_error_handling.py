@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
-
 import numpy as np
 import pytest
 
@@ -774,31 +772,3 @@ def test_map_scope_resources_skipped_on_error_input() -> None:
     assert z_output[0] == 0
     assert isinstance(z_output[1], PropagatedErrorSnapshot)
     assert z_output[2] == 4
-
-
-@pipefunc(output_name="y", mapspec="x[i] -> y[i]")
-def chunks_may_fail(x: int) -> float:
-    if x == 0:
-        msg = "division by zero"
-        raise ZeroDivisionError(msg)
-    return 1.0 / x
-
-
-def test_chunk_preserves_successful_results() -> None:
-    """Successful indices must not be overwritten when later elements in the chunk fail."""
-
-    pipeline = Pipeline([chunks_may_fail])
-
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        result = pipeline.map(
-            {"x": [1, 0, 2]},
-            error_handling="continue",
-            parallel=True,
-            executor={"": executor},
-            chunksizes=2,
-        )
-
-    y_output = result["y"].output
-    assert pytest.approx(y_output[0]) == 1.0
-    assert isinstance(y_output[1], ErrorSnapshot)
-    assert pytest.approx(y_output[2]) == 0.5

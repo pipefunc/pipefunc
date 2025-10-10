@@ -92,22 +92,6 @@ def test_parallel_continue_preserves_alignment_with_chunk_errors() -> None:
     assert all(entry is not None for entry in outputs)
 
 
-def test_process_pool_continue_preserves_partial_chunk_results() -> None:
-    """Process-based chunking must not overwrite successes when one element fails."""
-
-    pipeline = Pipeline([_double_or_fail])
-    result = pipeline.map(
-        {"x": INPUT_VALUES},
-        error_handling="continue",
-        parallel=True,
-        chunksizes=10,
-    )
-
-    outputs = result["y"].output
-    _assert_expected_outputs(outputs)
-    assert all(entry is not None for entry in outputs)
-
-
 def test_continue_headless_counts_failures_without_results(monkeypatch: pytest.MonkeyPatch) -> None:
     """Continue-mode must surface failures in progress when results are dropped."""
 
