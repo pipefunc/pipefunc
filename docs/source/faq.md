@@ -104,6 +104,33 @@ Unlike pipefunc, Snakemake primarily works with serialized data and may require 
 
 `pipefunc` provides a simpler, more Pythonic approach for workflows primarily based on Python functions. It excels at streamlining development, reducing boilerplate, and automatically handling parallelization within the familiar Python ecosystem. While other tools may be better suited for production ETL pipelines, managing complex dependencies, or workflows involving diverse non-Python tools, `pipefunc` is ideal for flexible scientific computing workflows where rapid development and easy parameter exploration are priorities.
 
+## How is this different from Hamilton?
+
+_Because frequent comparisons are made between the two projects, it gets its own section._
+
+`pipefunc` and [Hamilton](https://github.com/dagworks-inc/hamilton) both generate DAGs from plain Python functions, but they target different pain points.
+
+**Where `pipefunc` leans in**
+
+- **Scientific + HPC workflows:** Minimal runtime overhead (<10 µs) with [`mapspec`](./concepts/mapspec.md) driven scheduling, executor-agnostic parallelism (any `concurrent.futures.Executor`, from `ProcessPoolExecutor` to Dask, ipyparallel, mpi4py, etc.), and first-class support for job schedulers such as SLURM and PBS (see [Execution and Parallelism](./concepts/execution-and-parallelism.md)).
+- **N-dimensional parameter sweeps:** Built-in sweep tooling ([`pipeline.map`](./concepts/parameter-sweeps.md)) stores intermediate artifacts, supports eager or queued execution, and works with structured outputs like `xarray`.
+- **Fine-grained resource policies:** Per-function constraints for CPU, memory, GPUs, wall-time, and custom selectors ([Resource Management](./concepts/resource-management.md)).
+- **Type-aware validation:** Type hints are checked when pipelines are constructed (with optional runtime checks for `Array[...]` outputs), and pipelines can emit [Pydantic models](./concepts/function-io.md#dataclasses-and-pydanticbasemodel-as-pipefunc) for CLIs, agents, or user interfaces ([CLI](./concepts/cli.md) and [MCP](./concepts/mcp.md)).
+
+**Where Hamilton focuses**
+
+- **Column-first dataflows:** Decorators such as `@extract_columns`, `@parameterize_extract_columns`, and `@with_columns` specialize in expanding and transforming DataFrame columns while preserving lineage.
+- **Data quality & observability:** Hamilton’s first-party decorators (`@check_output`, etc.) and plugins integrate with pandera/pydantic, emit OpenLineage metadata, and surface lineage/telemetry through the Hamilton UI.
+- **Adapter-driven execution:** Hamilton provides its own `GraphAdapter` API for Ray, Dask, Spark, async/thread pools, etc. Switching backends means selecting or implementing the matching adapter rather than swapping a standard executor.
+- **Structured module layout:** Drivers crawl Python modules to assemble the DAG; teams wanting strong conventions appreciate that, while others may find the enforced module boundaries restrictive compared to ad-hoc wiring.
+
+**How to choose**
+
+- Reach for `pipefunc` when you need lightweight orchestration for numerically intensive or simulation-heavy workloads, multi-dimensional sweeps, or custom resource scheduling without leaving pure Python.
+- Reach for Hamilton when your pipelines revolve around DataFrame transformations, you need column-level lineage and validation baked in, or you want UI-driven observability out of the box.
+
+You can mix them too: Hamilton-produced functions can be wrapped with `@pipefunc`, and `pipefunc` stages can call Hamilton drivers for teams already invested in Hamilton’s ecosystem.
+
 ## How to use `adaptive` with `pipefunc`?
 
 This section has been moved to [SLURM integration](./concepts/slurm.md).
