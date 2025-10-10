@@ -1,6 +1,7 @@
 """Custom type hinting utilities for pipefunc."""
 
 import re
+import sys
 import warnings
 from collections.abc import Callable, Iterable
 from types import UnionType
@@ -54,9 +55,11 @@ class TypeCheckMemo(NamedTuple):
     self_type: type | None = None
 
 
-def _evaluate_forwardref(ref: ForwardRef, memo: TypeCheckMemo) -> Any:
+def _evaluate_forwardref(ref: ForwardRef, memo: TypeCheckMemo) -> Any:  # pragma: no cover
     """Evaluate a forward reference using the provided memo."""
-    return ref._evaluate(memo.globals, memo.locals, recursive_guard=frozenset())
+    if sys.version_info < (3, 13):
+        return ref._evaluate(memo.globals, memo.locals, recursive_guard=frozenset())
+    return ref._evaluate(memo.globals, memo.locals, recursive_guard=frozenset(), type_params={})
 
 
 def _resolve_type(type_: Any, memo: TypeCheckMemo) -> Any:
@@ -274,7 +277,7 @@ def is_object_array_type(tp: Any) -> bool:
     return False
 
 
-class Unresolvable:
+class Unresolvable:  # noqa: PLW1641
     """Class to represent an unresolvable type hint."""
 
     def __init__(self, type_str: str) -> None:
@@ -294,7 +297,7 @@ class Unresolvable:
 
 def safe_get_type_hints(
     func: Callable[..., Any],
-    include_extras: bool = False,  # noqa: FBT001, FBT002
+    include_extras: bool = False,  # noqa: FBT002
 ) -> dict[str, Any]:
     """Safely get type hints for a function, resolving forward references."""
     try:

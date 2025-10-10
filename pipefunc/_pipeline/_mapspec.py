@@ -16,6 +16,13 @@ def _axes_from_dims(p: str, dims: dict[str, int], axis: str) -> tuple[str | None
 
 def add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[PipeFunc]) -> None:
     # Modify the MapSpec of functions that depend on `p` to include the new axis
+    if "," in axis:
+        # If the axis is a comma-separated list of axes, add each axis separately.
+        for _axis in axis.split(","):
+            _axis = _axis.strip()
+            add_mapspec_axis(p, dims, _axis, functions)
+        return
+
     for f in functions:
         if p not in f.parameters or p in f._bound:
             continue

@@ -4,6 +4,7 @@ import importlib.util
 import re
 import sys
 from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
+from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -12,10 +13,10 @@ import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
-from pipefunc.map._load import load_outputs
+from pipefunc.map._load import load_all_outputs, load_dataframe, load_outputs, load_xarray_dataset
 from pipefunc.map._mapspec import trace_dependencies
 from pipefunc.map._prepare import _reduced_axes
-from pipefunc.map._run_info import RunInfo, map_shapes
+from pipefunc.map._run_info import RunInfo, _legacy_fix, map_shapes
 from pipefunc.map._storage_array._base import StorageBase, storage_registry
 from pipefunc.map._storage_array._dict import SharedMemoryDictArray
 from pipefunc.map._storage_array._file import FileArray
@@ -24,9 +25,13 @@ from pipefunc.typing import Array  # noqa: TC001
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from pipefunc.map._result import ResultDict
+
 has_xarray = importlib.util.find_spec("xarray") is not None
 has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
 has_zarr = importlib.util.find_spec("zarr") is not None
+has_psutil = importlib.util.find_spec("psutil") is not None
+has_polars = importlib.util.find_spec("polars") is not None
 
 storage_options = list(storage_registry)
 
@@ -45,13 +50,18 @@ def xarray_dataset_from_results(*args, **kwargs):
     return xarray_dataset_from_results(*args, **kwargs)
 
 
-def load_xarray_dataset(*args, **kwargs):
-    """Simple wrapper to avoid importing xarray in the global scope."""
+def data_conversions(
+    inputs: dict[str, Any],
+    results: ResultDict,
+    pipeline: Pipeline,
+    run_folder: Path,
+) -> None:
     if not has_xarray:
-        return None
-    from pipefunc.map._load import load_xarray_dataset
-
-    return load_xarray_dataset(*args, **kwargs)
+        return
+    xarray_dataset_from_results(inputs, results, pipeline)
+    load_xarray_dataset(run_folder=run_folder)
+    results.to_xarray()
+    results.to_dataframe()
 
 
 @pytest.fixture(params=storage_options)
@@ -78,7 +88,7 @@ def test_simple(storage, tmp_path: Path) -> None:
     )
 
     inputs = {"x": [0, 1, 2, 3]}
-    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, storage=storage)
     assert results["sum"].output == 12
     assert results["sum"].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 12
@@ -86,7 +96,13 @@ def test_simple(storage, tmp_path: Path) -> None:
     assert all(all(mask) for mask in masks.values())
     assert shapes == {"x": (4,), "y": (4,)}
     # Test `map` and a tmp run_folder
-    results2 = pipeline.map(inputs, run_folder=None, parallel=False, storage=storage)
+    ctx = (
+        nullcontext()
+        if storage in ("dict", "zarr_memory")
+        else pytest.warns(UserWarning, match="storage requires")
+    )
+    with ctx:
+        results2 = pipeline.map(inputs, run_folder=None, parallel=False, storage=storage)
     assert results2["sum"].output == 12
 
     axes = pipeline.mapspec_axes
@@ -133,18 +149,16 @@ def test_simple_2_dim_array(tmp_path: Path) -> None:
     )
 
     inputs = {"x": np.arange(12).reshape(3, 4)}
-    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, storage="dict")
     assert results["sum"].output_name == "sum"
     assert results["sum"].output.tolist() == [24, 30, 36, 42]
     assert load_outputs("sum", run_folder=tmp_path).tolist() == [24, 30, 36, 42]
     shapes, masks = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
     assert shapes == {"x": (3, 4), "y": (3, 4)}
-    results2 = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    results2 = pipeline.map(inputs, run_folder=tmp_path, parallel=False, storage="dict")
     assert results2["sum"].output.tolist() == [24, 30, 36, 42]
-    # Load the results as xarray
-    load_xarray_dataset(run_folder=tmp_path)
-    xarray_dataset_from_results(inputs, results, pipeline)
+    data_conversions(inputs, results, pipeline, tmp_path)
 
 
 def test_simple_2_dim_array_to_1_dim(tmp_path: Path) -> None:
@@ -166,7 +180,7 @@ def test_simple_2_dim_array_to_1_dim(tmp_path: Path) -> None:
     )
 
     inputs = {"x": np.arange(12).reshape(3, 4)}
-    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, storage="dict")
     assert results["sum"].output_name == "sum"
     assert results["sum"].output.tolist() == [12, 44, 76]
     assert load_outputs("sum", run_folder=tmp_path).tolist() == [12, 44, 76]
@@ -177,8 +191,7 @@ def test_simple_2_dim_array_to_1_dim(tmp_path: Path) -> None:
         "y": (3, 4),
         "sum": (3,),
     }
-    load_xarray_dataset(run_folder=tmp_path)
-    xarray_dataset_from_results(inputs, results, pipeline)
+    data_conversions(inputs, results, pipeline, tmp_path)
 
 
 def test_simple_2_dim_array_to_1_dim_to_0_dim(tmp_path: Path) -> None:
@@ -206,7 +219,7 @@ def test_simple_2_dim_array_to_1_dim_to_0_dim(tmp_path: Path) -> None:
     )
 
     inputs = {"x": np.arange(1, 13).reshape(3, 4)}
-    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, storage="dict")
     assert results["prod"].output_name == "prod"
     assert isinstance(results["prod"].output, np.int_)
     assert results["prod"].output == 1961990553600
@@ -218,15 +231,14 @@ def test_simple_2_dim_array_to_1_dim_to_0_dim(tmp_path: Path) -> None:
         "y": (3, 4),
         "sum": (3,),
     }
-    load_xarray_dataset(run_folder=tmp_path)
-    xarray_dataset_from_results(inputs, results, pipeline)
+    data_conversions(inputs, results, pipeline, tmp_path)
 
 
 def run_outer_product(pipeline: Pipeline, tmp_path: Path) -> None:
     """Run the outer product test for the given pipeline."""
     # Used in the next three tests where we use alternative ways of defining the same pipeline
     inputs = {"x": [1, 2, 3], "y": [1, 2, 3]}
-    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, storage="dict")
     assert results["z"].output_name == "z"
     expected = [[2, 3, 4], [3, 4, 5], [4, 5, 6]]
     assert results["z"].output.tolist() == expected
@@ -238,8 +250,7 @@ def run_outer_product(pipeline: Pipeline, tmp_path: Path) -> None:
     shapes, masks = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
     assert shapes == {"y": (3,), "x": (3,), "z": (3, 3)}
-    load_xarray_dataset(run_folder=tmp_path)
-    xarray_dataset_from_results(inputs, results, pipeline)
+    data_conversions(inputs, results, pipeline, tmp_path)
 
 
 def test_outer_product(tmp_path: Path) -> None:
@@ -326,6 +337,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
         run_folder=tmp_path,
         internal_shapes={"x": (4,)},
         parallel=False,
+        storage="dict",
     )
     assert results["sum"].output == 12
     assert results["sum"].output_name == "sum"
@@ -344,15 +356,37 @@ def test_simple_from_step(tmp_path: Path) -> None:
     # Load from the run folder
     if has_xarray:
         ds = load_xarray_dataset("y", run_folder=tmp_path)
+        df = load_dataframe("y", run_folder=tmp_path)
         assert "x" in ds.coords
+        assert "x" in df.columns
         ds = load_xarray_dataset("y", run_folder=tmp_path, load_intermediate=False)
+        df = load_dataframe("y", run_folder=tmp_path, load_intermediate=False)
         assert "x" not in ds.coords
+        assert "x" not in df.columns
 
         # Load from the results
         ds = xarray_dataset_from_results(inputs, results, pipeline)
         assert "x" in ds.coords
+        ds = results.to_xarray()
+        assert "x" in ds.coords
+
         ds = xarray_dataset_from_results(inputs, results, pipeline, load_intermediate=False)
         assert "x" not in ds.coords
+        ds = results.to_xarray(load_intermediate=False)
+        assert "x" not in ds.coords
+
+        df = results.to_dataframe()
+        assert df["x"].tolist() == [0, 1, 2, 3]
+        if has_polars:
+            import polars as pl
+
+            df_polars = load_dataframe("y", run_folder=tmp_path, backend="polars")
+            assert isinstance(df_polars, pl.DataFrame)
+            assert df_polars["x"].to_list() == [0, 1, 2, 3]
+
+            df_polars_results = results.to_dataframe(backend="polars")
+            assert isinstance(df_polars_results, pl.DataFrame)
+            assert df_polars_results["x"].to_list() == [0, 1, 2, 3]
 
 
 @pipefunc(output_name=("single", "double"))
@@ -385,7 +419,7 @@ def test_simple_multi_output(tmp_path: Path, double_it) -> None:
     )
 
     inputs = {"x": [0, 1, 2, 3]}
-    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, storage="dict")
     assert results["sum"].output == 6
     assert results["sum"].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 6
@@ -397,8 +431,7 @@ def test_simple_multi_output(tmp_path: Path, double_it) -> None:
         "single": (4,),
         "double": (4,),
     }
-    load_xarray_dataset(run_folder=tmp_path)
-    xarray_dataset_from_results(inputs, results, pipeline)
+    data_conversions(inputs, results, pipeline, tmp_path)
 
 
 def test_simple_from_step_nd(tmp_path: Path) -> None:
@@ -414,7 +447,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
 
     @pipefunc(output_name="sum")
     def norm(vector: np.ndarray) -> np.float64:
-        return np.linalg.norm(vector)
+        return np.linalg.norm(vector)  # type: ignore[return-value]
 
     pipeline = Pipeline(
         [
@@ -434,6 +467,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
         run_folder=tmp_path,
         internal_shapes=internal_shapes,  # type: ignore[arg-type]
         parallel=False,
+        storage="dict",
     )
     assert results["sum"].output == 21.0
     assert results["sum"].output_name == "sum"
@@ -441,8 +475,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
     shapes, masks = map_shapes(pipeline, inputs, internal_shapes)  # type: ignore[arg-type]
     assert shapes == {"array": (1, 2, 3), "vector": (1,)}
     assert masks == {"array": (False, False, False), "vector": (True,)}
-    load_xarray_dataset(run_folder=tmp_path)
-    xarray_dataset_from_results(inputs, results, pipeline)
+    data_conversions(inputs, results, pipeline, tmp_path)
 
 
 @dataclass(frozen=True)
@@ -471,7 +504,7 @@ class Electrostatics:
 
 
 @pytest.mark.parametrize("with_multiple_outputs", [False, True])
-def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  # noqa: FBT001
+def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:
     @pipefunc(output_name="geo")
     def make_geometry(x: float, y: float) -> Geometry:
         return Geometry(x, y)
@@ -545,12 +578,11 @@ def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  #
         "electrostatics": (3, 2),
         "charge": (3, 2),
     }
-    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, storage="dict")
     assert results["average_charge"].output == 1.0
     assert results["average_charge"].output_name == "average_charge"
     assert load_outputs("average_charge", run_folder=tmp_path) == 1.0
-    load_xarray_dataset(run_folder=tmp_path)
-    xarray_dataset_from_results(inputs, results, pipeline)
+    data_conversions(inputs, results, pipeline, tmp_path)
 
     assert _reduced_axes(pipeline) == {"charge": {"b", "a"}}
     pipeline.add_mapspec_axis("x", axis="i")
@@ -588,11 +620,10 @@ def test_pipeline_with_defaults(tmp_path: Path, storage: str) -> None:
         assert sum_result.tolist() == [1, 2, 3, 4]  # type: ignore[union-attr]
 
     inputs = {"x": [0, 1, 2, 3], "y": 2}  # type: ignore[dict-item]
-    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, storage="dict")
     assert results["sum"].output == 2 + 3 + 4 + 5
     if storage == "file_array":
-        load_xarray_dataset(run_folder=tmp_path)
-    xarray_dataset_from_results(inputs, results, pipeline)
+        data_conversions(inputs, results, pipeline, tmp_path)
 
 
 def test_pipeline_loading_existing_results(tmp_path: Path) -> None:
@@ -615,26 +646,43 @@ def test_pipeline_loading_existing_results(tmp_path: Path) -> None:
     pipeline = Pipeline([(f, "x[i] -> z[i]"), g, h])
     inputs = {"x": [1, 2, 3]}
 
-    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
+    results = pipeline.map(
+        inputs,
+        run_folder=tmp_path,
+        cleanup=True,
+        parallel=False,
+        storage="dict",
+    )
     assert results["sum_"].output == 9
     assert results["r1"].output == -9
     assert results["sum_"].output_name == "sum_"
     assert counters["f"] == 3
     assert counters["g"] == 1
 
-    results2 = pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=False)
+    results2 = pipeline.map(
+        inputs,
+        run_folder=tmp_path,
+        cleanup=False,
+        parallel=False,
+        storage="dict",
+    )
     assert results2["sum_"].output == 9
     assert results2["sum_"].output_name == "sum_"
     assert counters["f"] == 3
     assert counters["g"] == 1
 
-    results3 = pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
+    results3 = pipeline.map(
+        inputs,
+        run_folder=tmp_path,
+        cleanup=True,
+        parallel=False,
+        storage="dict",
+    )
     assert results3["sum_"].output == 9
     assert results3["sum_"].output_name == "sum_"
     assert counters["f"] == 6
     assert counters["g"] == 2
-    load_xarray_dataset(run_folder=tmp_path)
-    xarray_dataset_from_results(inputs, results, pipeline)
+    data_conversions(inputs, results, pipeline, tmp_path)
 
 
 def test_run_info_compare(tmp_path: Path) -> None:
@@ -645,15 +693,20 @@ def test_run_info_compare(tmp_path: Path) -> None:
     pipeline = Pipeline([f])
     inputs = {"x": [1, 2, 3]}
 
-    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
+    results = pipeline.map(
+        inputs,
+        run_folder=tmp_path,
+        cleanup=True,
+        parallel=False,
+        storage="dict",
+    )
     assert results["z"].output.tolist() == [2, 3, 4]
     assert results["z"].output_name == "z"
-    load_xarray_dataset(run_folder=tmp_path)
-    xarray_dataset_from_results(inputs, results, pipeline)
+    data_conversions(inputs, results, pipeline, tmp_path)
 
     inputs = {"x": [1, 2, 3, 4]}
     with pytest.raises(ValueError, match="Shapes do not match previous run"):
-        pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=False)
+        pipeline.map(inputs, run_folder=tmp_path, cleanup=False, parallel=False, storage="dict")
 
 
 def test_nd_input_list(tmp_path: Path) -> None:
@@ -665,13 +718,13 @@ def test_nd_input_list(tmp_path: Path) -> None:
 
     inputs_list = {"x": [[1, 2], [3, 4]]}
     with pytest.raises(ValueError, match="Expected 2D"):
-        pipeline.map(inputs_list, tmp_path, parallel=False)
+        pipeline.map(inputs_list, tmp_path, parallel=False, storage="dict")
 
     inputs_arr = {k: np.array(v) for k, v in inputs_list.items()}
     shapes, masks = map_shapes(pipeline, inputs_arr)
     assert all(all(mask) for mask in masks.values())
     assert shapes == {"x": (2, 2), "y": (2, 2)}
-    results = pipeline.map(inputs_arr, tmp_path, parallel=False)
+    results = pipeline.map(inputs_arr, tmp_path, parallel=False, storage="dict")
     assert results["y"].output.tolist() == [[2, 4], [6, 8]]
 
     pipeline.add_mapspec_axis("x", axis="k")
@@ -679,10 +732,9 @@ def test_nd_input_list(tmp_path: Path) -> None:
     shapes, masks = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
     assert shapes == {"x": (2, 2, 2), "y": (2, 2, 2)}
-    results = pipeline.map(inputs, tmp_path, parallel=False)
+    results = pipeline.map(inputs, tmp_path, parallel=False, storage="dict")
     assert results["y"].output.tolist() == [[[0, 2], [4, 6]], [[8, 10], [12, 14]]]
-    load_xarray_dataset(run_folder=tmp_path)
-    xarray_dataset_from_results(inputs, results, pipeline)
+    data_conversions(inputs, results, pipeline, tmp_path)
 
 
 def test_add_mapspec_axis(tmp_path: Path) -> None:
@@ -707,7 +759,7 @@ def test_add_mapspec_axis(tmp_path: Path) -> None:
     shapes, masks = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
     assert shapes == expected
-    results = pipeline.map(inputs, tmp_path, parallel=False)
+    results = pipeline.map(inputs, tmp_path, parallel=False, storage="dict")
     assert results["three"].output == 4.0
 
     # Adding another axis to "one"
@@ -722,7 +774,7 @@ def test_add_mapspec_axis(tmp_path: Path) -> None:
     shapes, masks = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
     assert shapes == expected
-    results = pipeline.map(inputs, tmp_path, parallel=False)
+    results = pipeline.map(inputs, tmp_path, parallel=False, storage="dict")
     assert results["three"].output.tolist() == [4.0, 4.0, 4.0]
 
     # Adding another axis to "d"
@@ -738,10 +790,9 @@ def test_add_mapspec_axis(tmp_path: Path) -> None:
     shapes, masks = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
     assert shapes == expected
-    results = pipeline.map(inputs, tmp_path, parallel=False)
+    results = pipeline.map(inputs, tmp_path, parallel=False, storage="dict")
     assert results["three"].output.tolist() == [[4.0, 4.0], [4.0, 4.0], [4.0, 4.0]]
-    load_xarray_dataset(run_folder=tmp_path)
-    xarray_dataset_from_results(inputs, results, pipeline)
+    data_conversions(inputs, results, pipeline, tmp_path)
 
     assert pipeline.independent_axes_in_mapspecs("three") == {"k", "l"}
 
@@ -769,7 +820,7 @@ def test_mapspec_internal_shapes(tmp_path: Path) -> None:
 
     inputs = {"n": 4, "z": [1, 2]}
     internal_shapes = {"x": 4}
-    results = pipeline.map(inputs, tmp_path, internal_shapes, parallel=False)  # type: ignore[arg-type]
+    results = pipeline.map(inputs, tmp_path, internal_shapes, parallel=False, storage="dict")  # type: ignore[arg-type]
     assert load_outputs("x", run_folder=tmp_path) == list(range(4))
     assert load_outputs("y", run_folder=tmp_path).tolist() == [[1, 2], [2, 3], [3, 4], [4, 5]]
     assert load_outputs("sum", run_folder=tmp_path).tolist() == [10, 14]
@@ -780,8 +831,7 @@ def test_mapspec_internal_shapes(tmp_path: Path) -> None:
     assert shapes == expected  # type: ignore[arg-type]
     deps = trace_dependencies(pipeline.mapspecs())  # type: ignore[arg-type]
     assert deps == {"y": {"x": ("i",), "z": ("k",)}, "sum": {"z": ("k",)}}
-    load_xarray_dataset(run_folder=tmp_path)
-    xarray_dataset_from_results(inputs, results, pipeline)
+    data_conversions(inputs, results, pipeline, tmp_path)
 
 
 def test_disconnected_independent_axes() -> None:
@@ -816,8 +866,9 @@ def test_reusing_axis_names_and_double_map_reduce(tmp_path: Path) -> None:
     results = pipeline.map(
         {"x": [1, 2, 3], "z": 1},
         run_folder=tmp_path,
-        parallel=False,
         internal_shapes=internal_shapes,  # type: ignore[arg-type]
+        parallel=False,
+        storage="dict",
     )
     assert results["y"].output.tolist() == [1, 2, 3]
     assert results["yz"].output.tolist() == [2, 3, 4]
@@ -837,11 +888,10 @@ def test_from_step_2_dim_array(tmp_path: Path) -> None:
     shapes, masks = map_shapes(pipeline, inputs, internal_shapes)  # type: ignore[arg-type]
     assert shapes == {"x": (4,)}
     assert masks == {"x": (False,)}
-    results = pipeline.map(inputs, tmp_path, internal_shapes, parallel=False)  # type: ignore[arg-type]
+    results = pipeline.map(inputs, tmp_path, internal_shapes, parallel=False, storage="dict")  # type: ignore[arg-type]
     assert results["x"].output == list(range(4))
     assert load_outputs("x", run_folder=tmp_path) == list(range(4))
-    load_xarray_dataset(run_folder=tmp_path)
-    xarray_dataset_from_results(inputs, results, pipeline)
+    data_conversions(inputs, results, pipeline, tmp_path)
 
 
 def test_from_step_2_dim_array_2(storage: str, tmp_path: Path) -> None:
@@ -859,8 +909,8 @@ def test_from_step_2_dim_array_2(storage: str, tmp_path: Path) -> None:
         inputs,
         tmp_path,
         internal_shapes,  # type: ignore[arg-type]
-        storage=storage,
         parallel=False,
+        storage=storage,
     )
     assert results["c"].output.shape == (2, 2)
     assert results["c"].store is not None
@@ -868,11 +918,10 @@ def test_from_step_2_dim_array_2(storage: str, tmp_path: Path) -> None:
     assert isinstance(results["c"].store.dump_in_subprocess, bool)
     assert results["c"].output.tolist() == [[2, 0], [3, -1]]
     assert load_outputs("c", run_folder=tmp_path).tolist() == [[2, 0], [3, -1]]
-    load_xarray_dataset(run_folder=tmp_path)
-    xarray_dataset_from_results(inputs, results, pipeline)
+    data_conversions(inputs, results, pipeline, tmp_path)
 
 
-def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
+def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
     @pipefunc(output_name="x")
     def generate_ints(n: int) -> list[int]:
         return list(range(n))
@@ -909,7 +958,7 @@ def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
         tmp_path,
         internal_shapes=internal_shapes,  # type: ignore[arg-type]
         parallel=False,
-        storage=storage,
+        storage="dict",
     )
     assert results["sum"].output == 13
 
@@ -932,7 +981,7 @@ def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
         tmp_path,
         internal_shapes=internal_shapes_map,  # type: ignore[arg-type]
         parallel=False,
-        storage=storage,
+        storage="dict",
     )
     assert results["sum"].output.tolist() == [13]
 
@@ -949,11 +998,10 @@ def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
         tmp_path,
         internal_shapes=internal_shapes_map,  # type: ignore[arg-type]
         parallel=False,
-        storage=storage,
+        storage="dict",
     )
     assert results["sum"].output.tolist() == [13]
-    load_xarray_dataset(run_folder=tmp_path)
-    xarray_dataset_from_results(inputs_map, results, pipeline)
+    data_conversions(inputs_map, results, pipeline, tmp_path)
 
 
 def test_return_2d_from_step(tmp_path: Path) -> None:
@@ -973,12 +1021,17 @@ def test_return_2d_from_step(tmp_path: Path) -> None:
     pipeline = Pipeline([generate_ints, double_it, take_sum])
     assert pipeline.mapspecs_as_strings == ["... -> x[i, unnamed_0]", "x[i, :] -> y[i]"]
     inputs = {"n": 4}
-    r = pipeline.map(inputs, tmp_path, internal_shapes={"x": (4, 4)}, parallel=False)
+    r = pipeline.map(
+        inputs,
+        tmp_path,
+        internal_shapes={"x": (4, 4)},
+        parallel=False,
+        storage="dict",
+    )
     assert r["x"].output.tolist() == np.ones((4, 4)).tolist()
     assert r["y"].output.tolist() == [8, 8, 8, 8]
     assert r["sum"].output == 32
-    load_xarray_dataset(run_folder=tmp_path)
-    xarray_dataset_from_results(inputs, r, pipeline)
+    data_conversions(inputs, r, pipeline, tmp_path)
 
 
 def test_multi_output_from_step(tmp_path: Path) -> None:
@@ -1009,7 +1062,13 @@ def test_multi_output_from_step(tmp_path: Path) -> None:
         "z": (True,),
     }
     inputs = {"n": 4}
-    r = pipeline.map(inputs, tmp_path, internal_shapes={"x": (4, 4)}, parallel=False)
+    r = pipeline.map(
+        inputs,
+        tmp_path,
+        internal_shapes={"x": (4, 4)},
+        parallel=False,
+        storage="dict",
+    )
     assert r["x"].output_name == "x"
     assert r["x"].output.tolist() == np.ones((4, 4)).tolist()
     assert r["y"].output_name == "y"
@@ -1018,8 +1077,7 @@ def test_multi_output_from_step(tmp_path: Path) -> None:
     assert r["z"].output.tolist() == [8, 8, 8, 8]
     assert r["sum"].output_name == "sum"
     assert r["sum"].output.tolist() == 32
-    load_xarray_dataset(run_folder=tmp_path)
-    xarray_dataset_from_results(inputs, r, pipeline)
+    data_conversions(inputs, r, pipeline, tmp_path)
 
 
 @pytest.mark.xfail(reason="jagged/ragged arrays are not supported (yet?)")
@@ -1045,13 +1103,14 @@ def test_growing_axis(tmp_path: Path) -> None:
         internal_shapes=internal_shapes,  # type: ignore[arg-type]
         run_folder=tmp_path,
         parallel=False,
+        storage="dict",
     )
 
 
 def test_storage_options_invalid():
     f = PipeFunc(lambda x: x, "y")
     with pytest.raises(ValueError, match="Storage class `invalid` not found"):
-        Pipeline([f]).map({"x": 1}, None, storage="invalid")
+        Pipeline([f]).map({"x": 1}, None, parallel=False, storage="invalid")
 
 
 @pytest.mark.skipif(not has_zarr, reason="zarr not installed")
@@ -1068,7 +1127,13 @@ def test_custom_executor():
         return x
 
     pipeline = Pipeline([f])
-    results = pipeline.map({"x": [1, 2]}, None, executor=ThreadPoolExecutor())
+    results = pipeline.map(
+        {"x": [1, 2]},
+        None,
+        executor=ThreadPoolExecutor(),
+        parallel=True,
+        storage="dict",
+    )
     assert results["y"].output.tolist() == [1, 2]
 
 
@@ -1098,7 +1163,12 @@ def test_independent_axes_2():
     pipeline = Pipeline([f, g])
     inputs = {"x": [1, 2, 3], "z": [3, 4, 5]}
     internal_shapes = {"y": (3,)}
-    r = pipeline.map(inputs, internal_shapes=internal_shapes, parallel=False)
+    r = pipeline.map(
+        inputs,
+        internal_shapes=internal_shapes,
+        parallel=False,
+        storage="dict",
+    )
     assert r["y"].output == [1, 2, 3]
     assert r["r"].output.tolist() == [4, 6, 8]
     assert pipeline.independent_axes_in_mapspecs("r") == set()
@@ -1142,7 +1212,13 @@ def test_fixed_indices(tmp_path: Path) -> None:
 
     pipeline = Pipeline([f])
     inputs = {"x": [1, 2, 3], "y": [4, 5, 6]}
-    results = pipeline.map(inputs, tmp_path, fixed_indices={"i": slice(1, None)}, parallel=False)
+    results = pipeline.map(
+        inputs,
+        tmp_path,
+        fixed_indices={"i": slice(1, None)},
+        parallel=False,
+        storage="dict",
+    )
     assert results["z"].output.tolist() == [None, 7, 9]
     assert results["z"].store is not None
     assert isinstance(results["z"].store, StorageBase)
@@ -1162,6 +1238,7 @@ def test_fixed_indices(tmp_path: Path) -> None:
         tmp_path,
         fixed_indices={"i": slice(1, None), "j": 0},
         parallel=False,
+        storage="dict",
     )
     assert y[slice(1, None), 0].tolist() == [6, 8]
     assert results["z"].output.tolist() == [
@@ -1175,6 +1252,7 @@ def test_fixed_indices(tmp_path: Path) -> None:
         tmp_path,
         fixed_indices={"i": slice(2, 0, -1), "j": slice(1, None)},
         parallel=False,
+        storage="dict",
     )
     assert y[slice(2, 0, -1), slice(1, None)].tolist() == [[9], [7]]
     assert results["z"].output.tolist() == [
@@ -1188,6 +1266,7 @@ def test_fixed_indices(tmp_path: Path) -> None:
         tmp_path,
         fixed_indices={"i": 2, "j": 0},
         parallel=False,
+        storage="dict",
     )
     assert results["z"].output.tolist() == [[None, None], [None, None], [(3, 8), None]]
 
@@ -1197,6 +1276,7 @@ def test_fixed_indices(tmp_path: Path) -> None:
             tmp_path,
             fixed_indices={"i": 2000, "j": 1},
             parallel=False,
+            storage="dict",
         )
 
     with pytest.raises(
@@ -1208,6 +1288,7 @@ def test_fixed_indices(tmp_path: Path) -> None:
             tmp_path,
             fixed_indices={"not_an_index": 0},
             parallel=False,
+            storage="dict",
         )
 
 
@@ -1223,7 +1304,7 @@ def test_fixed_indices_with_reduction(tmp_path: Path) -> None:
     pipeline = Pipeline([f, g])
     inputs = {"x": [1, 2, 3]}
     with pytest.raises(ValueError, match="Axis `i` in `y` is reduced"):
-        pipeline.map(inputs, tmp_path, fixed_indices={"i": 1}, parallel=False)
+        pipeline.map(inputs, tmp_path, fixed_indices={"i": 1}, parallel=False, storage="dict")
 
 
 def test_missing_inputs():
@@ -1234,13 +1315,13 @@ def test_missing_inputs():
     pipeline = Pipeline([f])
     inputs = {}
     with pytest.raises(ValueError, match="Missing inputs"):
-        pipeline.map(inputs, parallel=False)
+        pipeline.map(inputs, parallel=False, storage="dict")
 
     with pytest.raises(
         ValueError,
         match="Got extra inputs: `not_used` that are not accepted by this pipeline",
     ):
-        pipeline.map({"x": 1, "not_used": 1}, None, parallel=False)
+        pipeline.map({"x": 1, "not_used": 1}, None, parallel=False, storage="dict")
 
 
 def test_map_without_mapspec(tmp_path: Path) -> None:
@@ -1250,7 +1331,7 @@ def test_map_without_mapspec(tmp_path: Path) -> None:
 
     pipeline = Pipeline([f])
     inputs = {"x": 1}
-    results = pipeline.map(inputs, tmp_path, parallel=False)
+    results = pipeline.map(inputs, tmp_path, parallel=False, storage="dict")
     assert results["y"].output == 1
 
 
@@ -1265,27 +1346,27 @@ def test_map_with_partial(tmp_path: Path) -> None:
 
     pipeline = Pipeline([f, g])
     inputs = {"x": [1, 2, 3]}
-    results = pipeline.map(inputs, tmp_path, parallel=False)
+    results = pipeline.map(inputs, tmp_path, parallel=False, storage="dict")
     assert results["y"].output.tolist() == [1, 2, 3]
     assert results["z"].output == 6
 
     # Run via subpipeline and map with partial inputs
     partial = pipeline.subpipeline({"y"})
     inputs1 = {"y": results["y"].output}
-    r = partial.map(inputs1, tmp_path, parallel=False)
+    r = partial.map(inputs1, tmp_path, parallel=False, storage="dict")
     assert len(r) == 1
     assert r["z"].output == 6
 
-    r = pipeline.map(inputs1, tmp_path, auto_subpipeline=True, parallel=False)
+    r = pipeline.map(inputs1, tmp_path, auto_subpipeline=True, parallel=False, storage="dict")
     assert len(r) == 1
     assert r["z"].output == 6
 
     partial = pipeline.subpipeline(output_names={"y"})
-    r = partial.map(inputs, tmp_path)
+    r = partial.map(inputs, tmp_path, parallel=False, storage="dict")
     assert len(r) == 1
     assert r["y"].output.tolist() == [1, 2, 3]
 
-    r = pipeline.map(inputs, tmp_path, output_names={"y"}, parallel=False)
+    r = pipeline.map(inputs, tmp_path, output_names={"y"}, parallel=False, storage="dict")
     assert len(r) == 1
     assert r["y"].output.tolist() == [1, 2, 3]
 
@@ -1304,7 +1385,7 @@ def test_bound():
         return c * d * x
 
     pipeline = Pipeline([f_c, f_d, f_e], debug=True)
-    r_map = pipeline.map({"a": 1, "b": 2}, None, parallel=False)
+    r_map = pipeline.map({"a": 1, "b": 2}, None, parallel=False, storage="dict")
     assert pipeline(a=1, b=2) == 36
     assert r_map["e"].output == 36
     assert pipeline.defaults == {"x": 1}  # "c" is bound, so it's not in the defaults
@@ -1322,7 +1403,7 @@ def test_bound_2():
     pipeline = Pipeline([f, g], debug=True)
     inputs = {"c": 2, "b": 3}
     r1 = pipeline("e", **inputs)
-    r2 = pipeline.map(inputs, parallel=False)
+    r2 = pipeline.map(inputs, parallel=False, storage="dict")
     assert r1 == r2["e"].output == 24
 
 
@@ -1337,7 +1418,7 @@ def test_bound_3():
 
     pipeline = Pipeline([f, g], debug=True)
     inputs = {"c": "c", "b": "b"}
-    r = pipeline.map(inputs, parallel=False)
+    r = pipeline.map(inputs, parallel=False, storage="dict")
     d = ("b", "c", "x_f")
     assert r["d"].output == d
     assert r["e"].output == ("c_fixed", d, "x_g")
@@ -1356,7 +1437,7 @@ def test_bound_4():
 
     pipeline = Pipeline([f, g], debug=True)
     inputs = {"a": "a"}
-    r = pipeline.map(inputs, parallel=False)
+    r = pipeline.map(inputs, parallel=False, storage="dict")
     assert r["x"].output == "a"
     assert r["y"].output == ("a_g", "a")
     assert pipeline("x", a="a") == "a"
@@ -1374,7 +1455,7 @@ def test_bound_5():
 
     pipeline = Pipeline([f, g], debug=True)
     inputs = {"a": "a", "b": "b"}
-    r = pipeline.map(inputs, parallel=False)
+    r = pipeline.map(inputs, parallel=False, storage="dict")
     assert r["c"].output == ("a", "b")
     assert r["d"].output == ("b", "c_bound", 1)
     assert pipeline("c", a="a", b="b") == ("a", "b")
@@ -1418,8 +1499,8 @@ def test_internal_shapes(storage: str, tmp_path: Path) -> None:
         inputs,
         tmp_path if storage == "file_array" else None,
         internal_shapes,  # type: ignore[arg-type]
-        storage=storage,
         parallel=False,
+        storage=storage,
     )
     assert results["r"].output.shape == (2, 4, 5)
 
@@ -1452,14 +1533,14 @@ def test_map_func_exception():
         ValueError,
         match=re.escape("Error occurred while executing function `f(x=1)`"),
     ):
-        pipeline.map({"x": [1, 2, 3]}, None, parallel=False)
+        pipeline.map({"x": [1, 2, 3]}, None, parallel=False, storage="dict")
 
     pipeline = Pipeline([f])
     with pytest.raises(
         ValueError,
         match=re.escape("Error occurred while executing function `f(x=1)`"),
     ):
-        pipeline.map({"x": 1}, None, parallel=False)
+        pipeline.map({"x": 1}, None, parallel=False, storage="dict")
 
 
 @pytest.mark.parametrize("dim", [3, "?"])
@@ -1474,22 +1555,23 @@ def test_internal_shape_in_pipefunc(dim: int | Literal["?"]):
 
     pipeline = Pipeline([f, g])
     inputs = {"x": 1}
-    r1 = pipeline.map(inputs, parallel=False)
+    r1 = pipeline.map(inputs, parallel=False, storage="dict")
     assert r1["y"].output == [1, 1, 1]
     assert r1["z"].output.tolist() == [1, 1, 1]
 
     f_no_shape = f.copy(internal_shape=None)
     pipeline = Pipeline([f_no_shape, g])
-    r2 = pipeline.map(inputs, internal_shapes={"y": 3}, parallel=False)
+    r2 = pipeline.map(inputs, internal_shapes={"y": 3}, parallel=False, storage="dict")
     assert r2["y"].output == [1, 1, 1]
     assert r2["z"].output.tolist() == [1, 1, 1]
 
 
-@pytest.mark.skipif(not has_gil, reason="Sometimes hang forever in 3.13t CI")
 @pytest.mark.parametrize("storage", ["dict", "zarr_memory"])
 def test_parallel_memory_storage(storage: str):
     if storage == "zarr_memory" and not has_zarr:
         pytest.skip("zarr not installed")
+    if storage == "zarr_memory" and sys.version_info >= (3, 13):
+        pytest.skip("zarr_memory seems to hang in 3.13(t) CI")
 
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def f(x):
@@ -1514,9 +1596,12 @@ def test_parallel_memory_storage(storage: str):
     assert r1["r"].output == r2["r"].output == 12
 
 
+@pytest.mark.parametrize("scheduling_strategy", ["generation", "eager"])
 @pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
 @pytest.mark.asyncio
-async def test_map_async_with_progress():
+async def test_map_async_with_progress(scheduling_strategy: Literal["generation", "eager"]) -> None:
+    from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
+
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def f(x):
         return x - 1
@@ -1534,12 +1619,26 @@ async def test_map_async_with_progress():
         return sum(w)
 
     pipeline = Pipeline([f, g, h, i])
-    async_map = pipeline.map_async({"x": [1, 2, 3]}, show_progress=True)
-    # Test that the progress tracket is working
-    async_map.progress.update_progress()
-    async_map.progress._first_auto_update_interval = 0.0
-    async_map.progress._toggle_auto_update()  # Turn off auto update
-    async_map.progress._toggle_auto_update()  # Turn on auto update
+    async_map = pipeline.map_async(
+        {"x": [1, 2, 3]},
+        show_progress="ipywidgets",
+        scheduling_strategy=scheduling_strategy,
+        executor=ThreadPoolExecutor(),
+        start=False,
+    )
+    with pytest.raises(RuntimeError, match="The task has not been started."):
+        async_map.task  # noqa: B018
+    async_map.start()
+    with pytest.warns(UserWarning, match="Task is already running"):
+        async_map.start()
+
+    # Test that the progress tracker is working
+    progress = async_map.progress
+    assert isinstance(progress, IPyWidgetsProgressTracker)
+    progress.update_progress()
+    progress._first_auto_update_interval = 0.0
+    progress._toggle_auto_update()  # Turn off auto update
+    progress._toggle_auto_update()  # Turn on auto update
     result = await async_map.task
     assert result["r"].output == 12
 
@@ -1561,9 +1660,9 @@ def test_pipeline_with_heterogeneous_storage(tmp_path: Path) -> None:
     }
     results = pipeline.map(
         inputs,
+        run_folder=tmp_path,
         parallel=False,
         storage=storage,
-        run_folder=tmp_path,
     )
     assert results["y1"].output.tolist() == [0, 1, 2]
     assert results["z"].output.tolist() == [2, 3, 4]
@@ -1590,6 +1689,7 @@ def test_pipeline_with_heterogeneous_storage(tmp_path: Path) -> None:
         )
 
 
+@pytest.mark.skipif(not has_gil, reason="Sometimes hang forever in 3.13t CI")
 def test_pipeline_with_heterogeneous_executor() -> None:
     @pipefunc(output_name=("y1", "y2"), mapspec="x[i] -> y1[i], y2[i]")
     def f(x):
@@ -1609,7 +1709,7 @@ def test_pipeline_with_heterogeneous_executor() -> None:
         ("y1", "y2"): ThreadPoolExecutor(max_workers=2),
         "": ProcessPoolExecutor(max_workers=2),
     }
-    results = pipeline.map(inputs, executor=executor, parallel=True)
+    results = pipeline.map(inputs, executor=executor, parallel=True, storage="dict")
 
     # Check if ThreadPoolExecutor was used for f
     thread_names = results["y1"].output.tolist()
@@ -1626,7 +1726,12 @@ def test_pipeline_with_heterogeneous_executor() -> None:
 
     # Test missing executor
     with pytest.raises(ValueError, match=re.escape("No executor found for output `('y1', 'y2')`.")):
-        pipeline.map(inputs, executor={"z": ProcessPoolExecutor(max_workers=2)})
+        pipeline.map(
+            inputs,
+            executor={"z": ProcessPoolExecutor(max_workers=2)},
+            parallel=True,
+            storage="dict",
+        )
 
     # Dict storage with different executors
     r = pipeline.map(
@@ -1635,6 +1740,7 @@ def test_pipeline_with_heterogeneous_executor() -> None:
             "z": ProcessPoolExecutor(max_workers=2),
             "": ThreadPoolExecutor(max_workers=2),
         },
+        parallel=True,
         storage={"": "dict"},
     )
     thread_names = r["y1"].output.tolist()
@@ -1668,7 +1774,13 @@ def test_pipeline_with_heterogeneous_chunksize(chunksizes):
 
     pipeline = Pipeline([f, g, h])
     inputs = {"x": [1, 2, 3]}
-    results = pipeline.map(inputs, chunksizes=chunksizes)
+    results = pipeline.map(
+        inputs,
+        chunksizes=chunksizes,
+        parallel=True,
+        storage="dict",
+        executor=ThreadPoolExecutor(),
+    )
     assert results["y1"].output.tolist() == [0, 1, 2]
     assert results["z"].output.tolist() == [2, 3, 4]
     assert results["y2"].output.tolist() == [2, 3, 4]
@@ -1677,7 +1789,13 @@ def test_pipeline_with_heterogeneous_chunksize(chunksizes):
         ValueError,
         match=re.escape("Invalid chunksize -1 for z"),
     ):
-        pipeline.map(inputs, chunksizes={"z": -1})
+        pipeline.map(
+            inputs,
+            chunksizes={"z": -1},
+            parallel=True,
+            storage="dict",
+            executor=ThreadPoolExecutor(),
+        )
 
 
 def test_map_range():
@@ -1687,7 +1805,7 @@ def test_map_range():
 
     pipeline = Pipeline([f])
     inputs = {"x": range(3)}
-    r = pipeline.map(inputs, parallel=False)
+    r = pipeline.map(inputs, parallel=False, storage="dict")
     assert r["y"].output.tolist() == [0, 1, 2]
     if has_xarray:
         ds = xarray_dataset_from_results(inputs, r, pipeline)
@@ -1716,14 +1834,289 @@ def test_pipeline_loading_existing_results_with_internal_shape(
     pipeline = Pipeline([f, g])
     inputs = {"x": 1}
 
-    pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
+    pipeline.map(inputs, run_folder=tmp_path, cleanup=True, parallel=False, storage="dict")
     assert counters["f"] == 1
     assert counters["g"] == 10
 
-    pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=False)
+    pipeline.map(inputs, run_folder=tmp_path, cleanup=False, parallel=False, storage="dict")
     assert counters["f"] == 1
     assert counters["g"] == 10
 
-    pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
+    pipeline.map(inputs, run_folder=tmp_path, cleanup=True, parallel=False, storage="dict")
     assert counters["f"] == 2
     assert counters["g"] == 20
+
+
+def test_nested_pipefunc_map_no_mapspec() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(b, c, x=1):
+        return b * c * x
+
+    @pipefunc(output_name="e")
+    def h(c, d, x=1):
+        return c * d * x
+
+    pipeline = Pipeline([f, g, h])
+    results_before = pipeline.map({"a": 1, "b": 2}, parallel=False, storage="dict")
+    pipeline.nest_funcs({"c", "d"})
+    results_after = pipeline.map({"a": 1, "b": 2}, parallel=False, storage="dict")
+    assert results_after["e"].output == results_before["e"].output
+
+
+def test_nested_pipefunc_map_with_mapspec() -> None:
+    @pipefunc(output_name="c", mapspec="a[i], b[i] -> c[i]")
+    def f(a: int, b: int, x: int = 0) -> int:
+        return a + b + x
+
+    @pipefunc(output_name="d", mapspec="b[i], c[i] -> d[i]")
+    def g(b: int, c: int) -> int:
+        return b * c
+
+    @pipefunc(output_name="e")
+    def h(c: Array[int], d: Array[int]):
+        return sum(c) + sum(d)
+
+    pipeline = Pipeline([f, g, h])
+    pipeline_copy = pipeline.copy()
+    results_before = pipeline.map(
+        {"a": [1, 2], "b": [3, 4]},
+        parallel=False,
+        storage="dict",
+    )
+    nested = pipeline.nest_funcs({"c", "d"})
+    results_after = pipeline.map(
+        {"a": [1, 2], "b": [3, 4]},
+        parallel=False,
+        storage="dict",
+    )
+    assert results_after["e"].output == results_before["e"].output
+    assert str(nested.mapspec) == "a[i], b[i] -> c[i], d[i]"
+    pipeline_copy.add_mapspec_axis("x", axis="j")
+    pipeline.add_mapspec_axis("x", axis="j")
+    results_before = pipeline_copy.map(
+        {"a": [1, 2], "b": [3, 4], "x": [5, 6]},
+        parallel=False,
+        storage="dict",
+    )
+    results_after = pipeline.map(
+        {"a": [1, 2], "b": [3, 4], "x": [5, 6]},
+        parallel=False,
+        storage="dict",
+    )
+    assert results_after["e"].output.tolist() == results_before["e"].output.tolist()
+
+
+@pytest.mark.skipif(not has_psutil, reason="psutil not installed")
+def test_profiling_and_parallel_unsupported_warning() -> None:
+    @pipefunc("a", mapspec="val[i] -> a[i]")
+    def a(val: int) -> int:
+        return val + 1
+
+    @pipefunc("a", mapspec="val[i] -> a[i]", profile=True)
+    def a_profile(val: int) -> int:
+        return val + 1
+
+    test_pipeline_with_profile_true = Pipeline([a], profile=True)
+    with pytest.warns(UserWarning, match="`profile=True` is not supported with `parallel=True`"):
+        test_pipeline_with_profile_true.map({"val": [1]}, parallel=True, storage="dict")
+
+    test_pipeline_with_profile_none = Pipeline([a_profile], profile=None)
+    with pytest.warns(UserWarning, match="`profile=True` is not supported with `parallel=True`"):
+        test_pipeline_with_profile_none.map({"val": [1]}, parallel=True, storage="dict")
+
+
+def test_map_with_auto_subpipeline(tmp_path: Path):
+    """Test that the eager scheduler works with auto_subpipeline."""
+
+    @pipefunc(output_name="intermediate")
+    def create_intermediate():
+        return "intermediate_value"
+
+    @pipefunc(output_name="final")
+    def use_intermediate(intermediate):
+        return f"Used {intermediate}"
+
+    pipeline = Pipeline([create_intermediate, use_intermediate])
+    run_folder = tmp_path / "auto_subpipeline"
+
+    # Provide the intermediate result directly
+    result = pipeline.map(
+        inputs={"intermediate": "direct_value"},
+        run_folder=run_folder,
+        auto_subpipeline=True,
+        show_progress=False,
+        parallel=False,
+        storage="dict",
+    )
+
+    assert result["final"].output == "Used direct_value"
+    # Check result from disk
+    assert load_outputs("final", run_folder=run_folder) == "Used direct_value"
+
+    # Without auto_subpipeline, this would fail because create_intermediate wouldn't be called
+    with pytest.raises(ValueError, match="Got extra inputs: `intermediate` that"):
+        pipeline.map(
+            inputs={"intermediate": "direct_value"},
+            run_folder=run_folder,
+            auto_subpipeline=False,
+            show_progress=False,
+            parallel=False,
+            storage="dict",
+        )
+
+
+def test_pipeline_map_single_output_load_all_outputs(tmp_path: Path) -> None:
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def f(x: int) -> int:
+        return x + 1
+
+    pipeline = Pipeline([f])
+    inputs = {"x": [1, 2, 3]}
+    r = pipeline.map(
+        inputs,
+        run_folder=tmp_path,
+        parallel=False,
+        storage="dict",
+    )
+    assert r["y"].output.tolist() == [2, 3, 4]
+    outputs = load_all_outputs(run_folder=tmp_path)
+    assert outputs["y"].tolist() == [2, 3, 4]
+
+
+def test_error_snapshot_in_parallel_map():
+    @pipefunc(output_name="c", renames={"a": "b"})
+    def f(a):
+        if a < 0:
+            msg = "a cannot be negative"
+            raise ValueError(msg)
+        return a * 2
+
+    pipeline = Pipeline([f])
+    for parallel in [True, False]:
+        with pytest.raises(ValueError, match="a cannot be negative"):
+            pipeline.map(
+                {"b": -1},
+                parallel=parallel,
+                executor=ThreadPoolExecutor() if parallel else None,
+                storage="dict",
+            )
+        with pytest.raises(ValueError, match="a cannot be negative"):
+            pipeline.error_snapshot.reproduce()
+
+    pipeline["c"].error_snapshot = None
+    with pytest.raises(ValueError, match="a cannot be negative"):
+        pipeline.run("c", kwargs={"b": -1})
+    with pytest.raises(ValueError, match="a cannot be negative"):
+        pipeline.error_snapshot.reproduce()
+
+
+@pytest.mark.skipif(not has_xarray, reason="requires xarray")
+def test_load_dataframe_with_list_of_tuples_output(tmp_path: Path) -> None:
+    """Regression test for loading outputs that are lists of tuples.
+
+    This tests the fix for a bug where load_dataframe would fail when trying to
+    convert single outputs (not part of any mapspec) that are lists of tuples
+    into a DataFrame. The bug was caused by xarray trying to create a scalar
+    variable from multidimensional data without proper array conversion.
+    """
+
+    @pipefunc(output_name="processed", mapspec="x[i] -> processed[i]")
+    def process(x: int) -> tuple[int, int, int]:
+        return (x, x * 2, x * 3)
+
+    @pipefunc(output_name="final_results")
+    def aggregate(processed: Array[tuple]) -> list[tuple[int, ...]]:
+        # Return a list of tuples (not part of any mapspec)
+        return list(processed)
+
+    pipeline = Pipeline([process, aggregate])
+    inputs = {"x": [1, 2, 3]}
+
+    results = pipeline.map(
+        inputs,
+        run_folder=tmp_path,
+        parallel=False,
+        storage="dict",
+    )
+
+    # Check that the results are correct
+    expected = [(1, 2, 3), (2, 4, 6), (3, 6, 9)]
+    assert results["final_results"].output == expected
+
+    # Test load_outputs works correctly
+    loaded = load_outputs("final_results", run_folder=tmp_path)
+    assert loaded == expected
+
+    # Test load_dataframe works correctly (this was failing before the fix)
+    df = load_dataframe("final_results", run_folder=tmp_path)
+    assert len(df) == 1
+    assert "final_results" in df.columns
+
+    # Check that the array is properly unwrapped
+    final_array = df["final_results"].iloc[0]
+    assert isinstance(final_array, np.ndarray)
+    assert final_array.shape == (3, 3)
+    np.testing.assert_array_equal(final_array, np.array(expected, dtype=object))
+
+
+def test_legacy_fix(tmp_path: Path) -> None:
+    """Test that _legacy_fix correctly converts legacy format paths to new format."""
+
+    # Test 1: Legacy format (<=v0.86.0)
+    legacy_data: dict[str, Any] = {
+        "run_folder": "adaptive_1d/run_folder_0.0",
+        "defaults_path": "adaptive_1d/run_folder_0.0/defaults/defaults.cloudpickle",
+        "input_paths": {
+            "x": "adaptive_1d/run_folder_0.0/inputs/x.cloudpickle",
+            "d": "adaptive_1d/run_folder_0.0/inputs/d.cloudpickle",
+            "c": "adaptive_1d/run_folder_0.0/inputs/c.cloudpickle",
+        },
+    }
+
+    run_folder = tmp_path / "adaptive_1d" / "run_folder_0.0"
+    _legacy_fix(legacy_data, run_folder)
+
+    assert legacy_data["run_folder"] == str(run_folder.resolve())
+    assert legacy_data["defaults_path"] == "defaults/defaults.cloudpickle"
+    assert legacy_data["input_paths"] == {
+        "x": "inputs/x.cloudpickle",
+        "d": "inputs/d.cloudpickle",
+        "c": "inputs/c.cloudpickle",
+    }
+
+    # Test 2: New format (>v0.86.0) should remain unchanged
+    new_data: dict[str, Any] = {
+        "run_folder": str(run_folder.resolve()),
+        "defaults_path": "defaults/defaults.cloudpickle",
+        "input_paths": {
+            "x": "inputs/x.cloudpickle",
+            "d": "inputs/d.cloudpickle",
+        },
+    }
+
+    new_data_copy = new_data.copy()
+    _legacy_fix(new_data, run_folder)
+
+    # Should be unchanged (except run_folder might be different object)
+    assert new_data["defaults_path"] == new_data_copy["defaults_path"]
+    assert new_data["input_paths"] == new_data_copy["input_paths"]
+
+    # Test 3: Different run_folder structure
+    legacy_data_2: dict[str, Any] = {
+        "run_folder": "foo/bar/my_run",
+        "defaults_path": "foo/bar/my_run/defaults/defaults.cloudpickle",
+        "input_paths": {
+            "a": "foo/bar/my_run/inputs/a.cloudpickle",
+        },
+    }
+
+    run_folder_2 = tmp_path / "foo" / "bar" / "my_run"
+    _legacy_fix(legacy_data_2, run_folder_2)
+
+    assert legacy_data_2["run_folder"] == str(run_folder_2.resolve())
+    assert legacy_data_2["defaults_path"] == "defaults/defaults.cloudpickle"
+    assert legacy_data_2["input_paths"]["a"] == "inputs/a.cloudpickle"

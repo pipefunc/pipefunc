@@ -4,6 +4,7 @@ import importlib.util
 from concurrent.futures import Executor
 from typing import Literal
 
+import numpy as np
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
@@ -285,11 +286,9 @@ def test_independent_axes_in_mapspecs_with_disconnected_chains() -> None:
     assert pipeline.independent_axes_in_mapspecs(("c", "d")) == {"i", "j"}
     assert pipeline.independent_axes_in_mapspecs("z") == {"i", "j"}
 
-    with pytest.raises(
-        ValueError,
-        match="The provided `pipefuncs` should have only one leaf node, not 2.",
-    ):
-        NestedPipeFunc([f, g])
+    nf = NestedPipeFunc([f, g])
+    assert nf.output_name == ("c", "d", "z")
+    assert nf(a=1, b=2, x=3, y=4) == (3, 1, 7)
 
 
 def test_axis_in_root_args() -> None:
@@ -316,7 +315,7 @@ def test_mapping_over_default() -> None:
         return a + b
 
     pipeline = Pipeline([f])
-    r_map = pipeline.map(inputs={"a": [1, 2, 3]})
+    r_map = pipeline.map(inputs={"a": [1, 2, 3]}, parallel=False, storage="dict")
     assert r_map["out"].output.tolist() == [2, 4, 6]
 
 
@@ -342,6 +341,8 @@ def test_calling_add_with_autogen_mapspec(dim: int | Literal["?"]):
     results = pipeline.map(
         inputs={"vector": [1, 2, 3], "factor": [1, 2, 3]},
         internal_shapes={"foo_out": (dim,)},
+        parallel=False,
+        storage="dict",
     )
     assert results["bar_out"].output.tolist() == [1, 4, 9]
 
@@ -352,7 +353,7 @@ def test_validation_parallel():
         ValueError,
         match="Cannot use an executor without `parallel=True`",
     ):
-        pipeline.map({}, parallel=False, executor=Executor())
+        pipeline.map({}, executor=Executor(), parallel=False, storage="dict")
 
 
 @pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
@@ -366,11 +367,21 @@ def test_with_progress() -> None:
         return sum(out)
 
     pipeline = Pipeline([f, g])
-    r_map = pipeline.map(inputs={"a": [1, 2, 3]}, show_progress=True)
+    r_map = pipeline.map(
+        inputs={"a": [1, 2, 3]},
+        show_progress="ipywidgets",
+        parallel=True,
+        storage="dict",
+    )
     assert r_map["out"].output.tolist() == [1, 2, 3]
     assert r_map["out_sum"].output == 6
 
-    r_map_sequential = pipeline.map(inputs={"a": [1, 2, 3]}, show_progress=True, parallel=False)
+    r_map_sequential = pipeline.map(
+        inputs={"a": [1, 2, 3]},
+        show_progress="ipywidgets",
+        parallel=False,
+        storage="dict",
+    )
     assert r_map_sequential["out"].output.tolist() == [1, 2, 3]
     assert r_map_sequential["out_sum"].output == 6
 
@@ -397,3 +408,199 @@ def test_replace_none_in_axes() -> None:
     non_root_inputs = {"a": [None, "j"]}
     replace_none_in_axes(mapspecs, non_root_inputs, {})  # type: ignore[arg-type]
     assert non_root_inputs == {"a": ["unnamed_0", "j"]}
+
+
+@pytest.mark.parametrize("show_progress", [True, False])
+def test_zero_sizes_list_with_progress_bar(show_progress: bool) -> None:
+    if show_progress and not has_ipywidgets:
+        pytest.skip("ipywidgets not installed")
+
+    @pipefunc(output_name="x")
+    def generate_ints() -> list[int]:
+        return []
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def double_it(x: int) -> int:
+        return 2 * x
+
+    pipeline_sum = Pipeline([generate_ints, double_it])
+    results = pipeline_sum.map({}, show_progress=show_progress, parallel=False, storage="dict")
+    assert results["y"].output.tolist() == []
+
+
+def test_add_nd_mapspec_axis() -> None:
+    @pipefunc(output_name="x")
+    def f(a):
+        return a
+
+    pipeline = Pipeline([f])
+    pipeline.add_mapspec_axis("a", axis="i, j")
+    assert str(pipeline["x"].mapspec) == "a[i, j] -> x[i, j]"
+
+
+def test_add_nd_mapspec_axis_to_existing_1d() -> None:
+    """Test adding a 2D axis 'k, l' to input 'a' which already has axis 'i'."""
+
+    @pipefunc(output_name="result", mapspec="a[i] -> result[i]")
+    def func(a):
+        return a
+
+    pipeline = Pipeline([func])
+    pipeline.add_mapspec_axis("a", axis="k, l")
+    assert str(pipeline["result"].mapspec) == "a[i, k, l] -> result[i, k, l]"
+
+
+def test_add_nd_mapspec_axis_to_existing_mixed() -> None:
+    """Test adding a 2D axis 'k, l' to input 'b' which has 'j', while 'a' has 'i'."""
+
+    @pipefunc(output_name="result", mapspec="a[i], b[j] -> result[i, j]")
+    def func(a, b):
+        return a + b
+
+    pipeline = Pipeline([func])
+    pipeline.add_mapspec_axis("b", axis="k, l")
+    assert str(pipeline["result"].mapspec) == "a[i], b[j, k, l] -> result[i, j, k, l]"
+
+
+def test_add_nd_mapspec_axis_to_existing_nd() -> None:
+    """Test adding a 2D axis 'k, l' to input 'a' which already has 'i, j'."""
+
+    @pipefunc(output_name="result", mapspec="a[i, j] -> result[i, j]")
+    def func(a):
+        return a
+
+    pipeline = Pipeline([func])
+    pipeline.add_mapspec_axis("a", axis="k, l")
+    assert str(pipeline["result"].mapspec) == "a[i, j, k, l] -> result[i, j, k, l]"
+
+
+def test_add_nd_mapspec_axis_propagates() -> None:
+    """Test adding 2D axis 'k, l' to 'a' propagates through 'c'."""
+
+    @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
+    def f_c(a):
+        return a
+
+    @pipefunc(output_name="d", mapspec="c[i], b[j] -> d[i, j]")
+    def f_d(c, b):
+        return c + b
+
+    pipeline = Pipeline([f_c, f_d])
+    pipeline.add_mapspec_axis("a", axis="k, l")
+
+    assert str(pipeline["c"].mapspec) == "a[i, k, l] -> c[i, k, l]"
+    assert str(pipeline["d"].mapspec) == "c[i, k, l], b[j] -> d[i, j, k, l]"
+
+
+def test_add_nd_mapspec_axis_fan_in() -> None:
+    """Test adding 2D axis 'k, l' to 'a' in a fan-in structure."""
+
+    @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
+    def f_c(a):
+        return a
+
+    @pipefunc(output_name="d", mapspec="b[j] -> d[j]")
+    def f_d(b):
+        return b
+
+    @pipefunc(output_name="e", mapspec="c[i], d[j] -> e[i, j]")
+    def f_e(c, d):
+        return c + d
+
+    pipeline = Pipeline([f_c, f_d, f_e])
+    pipeline.add_mapspec_axis("a", axis="k, l")
+
+    assert str(pipeline["c"].mapspec) == "a[i, k, l] -> c[i, k, l]"
+    assert str(pipeline["d"].mapspec) == "b[j] -> d[j]"  # Unchanged
+    assert str(pipeline["e"].mapspec) == "c[i, k, l], d[j] -> e[i, j, k, l]"
+
+
+def test_add_nd_mapspec_axis_fan_out() -> None:
+    """Test adding 2D axis 'k, l' to 'a' in a fan-out structure."""
+
+    @pipefunc(output_name="c", mapspec="... -> c[i]")
+    def f_c(a):
+        return [a, a, a]
+
+    @pipefunc(output_name="d", mapspec="b[j] -> d[j]")
+    def f_d(b):
+        return b
+
+    @pipefunc(output_name="e", mapspec="c[i], d[j] -> e[i, j]")
+    def f_e(c, d):
+        return c + d
+
+    pipeline = Pipeline([f_c, f_d, f_e])
+    pipeline.add_mapspec_axis("a", axis="k, l")
+
+    assert str(pipeline["c"].mapspec) == "a[k, l] -> c[i, k, l]"
+    assert str(pipeline["d"].mapspec) == "b[j] -> d[j]"  # Unchanged
+    assert str(pipeline["e"].mapspec) == "c[i, k, l], d[j] -> e[i, j, k, l]"
+    results = pipeline.map({"a": np.array([[1]]), "b": [1, 2]})
+    assert results["e"].output.tolist() == [[[[2]], [[3]]], [[[2]], [[3]]], [[[2]], [[3]]]]
+    assert results["e"].output.shape == (3, 2, 1, 1)
+
+
+@pytest.fixture
+def pipeline_complex() -> Pipeline:
+    """A complex pipeline for testing."""
+
+    def f1(a, b, c, d):
+        return a + b + c + d
+
+    def f2(a, b, e):
+        return a + b + e
+
+    def f3(a, b, f1):
+        return a + b + f1
+
+    def f4(f1, f3):
+        return f1 + f3
+
+    def f5(f1, f4):
+        return f1 + f4
+
+    def f6(b, f5):
+        return b + f5
+
+    def f7(a, f2, f6):
+        return a + f2 + f6
+
+    return Pipeline([f1, f2, f3, f4, f5, f6, f7])  # type: ignore[list-item]
+
+
+def test_update_mapspec_axes(pipeline_complex: Pipeline) -> None:
+    pipeline = pipeline_complex.copy()
+    pipeline.add_mapspec_axis("a", axis="i")
+    pipeline.add_mapspec_axis("b", axis="j")
+    assert pipeline.mapspec_axes["f1"] == ("i", "j")
+    pipeline.update_mapspec_axes({"i": "ii", "j": "jj"})
+    assert pipeline.mapspec_axes["f1"] == ("ii", "jj")
+    assert "a[ii], b[jj] -> f1[ii, jj]" in pipeline.mapspecs_as_strings
+
+
+def test_update_mapspec_axes_unknown_axis(pipeline_complex: Pipeline) -> None:
+    pipeline = pipeline_complex.copy()
+    pipeline.add_mapspec_axis("a", axis="i")
+    with pytest.raises(ValueError, match="Unknown axes to rename"):
+        pipeline.update_mapspec_axes({"z": "zz"})
+
+
+def test_update_mapspec_axes_no_mapspec() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    with pytest.raises(ValueError, match="Unknown axes to rename"):
+        pipeline.update_mapspec_axes({"i": "ii"})
+
+
+def test_update_mapspec_skip_mapspecless_function(pipeline_complex: Pipeline) -> None:
+    pipeline = pipeline_complex.copy()
+    pipeline.add_mapspec_axis("e", axis="i")
+    # Skip mapspecless function f1
+    pipeline.update_mapspec_axes({"i": "ii"})
+
+    assert pipeline.mapspec_axes["f2"] == ("ii",)
+    assert pipeline.mapspecs_as_strings == ["e[ii] -> f2[ii]", "f2[ii] -> f7[ii]"]

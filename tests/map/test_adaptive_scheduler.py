@@ -63,7 +63,6 @@ def test_slurm_run_setup(tmp_path: Path) -> None:
         "cores_per_node",
         "extra_scheduler",
         "partition",
-        "executor_type",
     }
 
     run(info)
@@ -504,7 +503,7 @@ def test_independent_axes_2(tmp_path: Path) -> None:
 
     pipeline = Pipeline([f, g])
     inputs = {"x": [1, 2, 3], "z": [3, 4, 5]}
-    r = pipeline.map(inputs, parallel=False)
+    r = pipeline.map(inputs, parallel=False, storage="dict")
     assert r["y"].output == [1, 2, 3]
     assert r["r"].output.tolist() == [4, 6, 8]
     learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)

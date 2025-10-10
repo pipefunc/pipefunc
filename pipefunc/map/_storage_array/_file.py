@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from pipefunc.map._types import ShapeTuple
+
 storage_registry: dict[str, type[StorageBase]] = {}
 
 FILENAME_TEMPLATE = "__{:d}__.pickle"
@@ -60,6 +61,15 @@ class FileArray(StorageBase):
         self.filename_template = str(filename_template)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
+
+    def __repr__(self) -> str:
+        return (
+            f"FileArray(folder='{self.folder}', "
+            f"shape={self.shape}, "
+            f"internal_shape={self.internal_shape}, "
+            f"shape_mask={self.shape_mask}, "
+            f"filename_template={self.filename_template!r})"
+        )
 
     def _normalize_key(
         self,
@@ -126,38 +136,7 @@ class FileArray(StorageBase):
         normalized_key = self._normalize_key(key)
 
         if any(isinstance(k, slice) for k in normalized_key):
-            slice_indices = self._slice_indices(key)
-            sliced_data = []
-            sliced_mask = []
-
-            for index in itertools.product(*slice_indices):
-                file_key = tuple(i for i, m in zip(index, self.shape_mask) if m)
-                file = self._key_to_file(file_key)
-                if file.is_file():
-                    sub_array = load(file)
-                    internal_index = tuple(i for i, m in zip(index, self.shape_mask) if not m)
-                    if internal_index:
-                        sub_array = np.asarray(sub_array)  # could be a list
-                        sliced_sub_array = sub_array[internal_index]
-                        sliced_data.append(sliced_sub_array)
-                    else:
-                        sliced_data.append(sub_array)
-                    sliced_mask.append(False)
-                else:
-                    sliced_data.append(np.ma.masked)
-                    sliced_mask.append(True)
-
-            sliced_array: np.ndarray = np.empty(len(sliced_data), dtype=object)
-            sliced_array[:] = sliced_data
-            mask: np.ndarray = np.array(sliced_mask, dtype=bool)
-            sliced_array = np.ma.masked_array(sliced_array, mask=mask)
-
-            new_shape = tuple(
-                len(range_)
-                for k, range_ in zip(normalized_key, slice_indices)
-                if isinstance(k, slice)
-            )
-            return sliced_array.reshape(new_shape)
+            return self._get_item_sliced(key, normalized_key)
 
         external_indices = tuple(i for i, m in zip(normalized_key, self.shape_mask) if m)
         internal_indices = tuple(i for i, m in zip(normalized_key, self.shape_mask) if not m)
@@ -171,6 +150,43 @@ class FileArray(StorageBase):
             sub_array = np.asarray(sub_array)
             return sub_array[internal_indices]
         return sub_array
+
+    def _get_item_sliced(
+        self,
+        key: tuple[int | slice, ...],
+        normalized_key: tuple[int | slice, ...],
+    ) -> np.ma.core.MaskedArray:
+        """Return a sliced view of the array as a masked array."""
+        slice_indices = self._slice_indices(key)
+        sliced_data = []
+        sliced_mask = []
+
+        for index in itertools.product(*slice_indices):
+            file_key = tuple(i for i, m in zip(index, self.shape_mask) if m)
+            file = self._key_to_file(file_key)
+            if file.is_file():
+                sub_array = load(file)
+                internal_index = tuple(i for i, m in zip(index, self.shape_mask) if not m)
+                if internal_index:
+                    sub_array = np.asarray(sub_array)  # could be a list
+                    sliced_sub_array = sub_array[internal_index]
+                    sliced_data.append(sliced_sub_array)
+                else:
+                    sliced_data.append(sub_array)
+                sliced_mask.append(False)
+            else:
+                sliced_data.append(np.ma.masked)
+                sliced_mask.append(True)
+
+        sliced_array: np.ndarray = np.empty(len(sliced_data), dtype=object)
+        sliced_array[:] = sliced_data
+        mask: np.ndarray = np.array(sliced_mask, dtype=bool)
+        sliced_array = np.ma.masked_array(sliced_array, mask=mask)
+
+        new_shape = tuple(
+            len(range_) for k, range_ in zip(normalized_key, slice_indices) if isinstance(k, slice)
+        )
+        return sliced_array.reshape(new_shape)
 
     def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray:
         """Return a masked numpy array containing all the data.
@@ -195,10 +211,10 @@ class FileArray(StorageBase):
         items = _load_all(map(self._index_to_file, range(self.size)))
 
         if not splat_internal:
-            arr = np.empty(self.size, dtype=object)  # type: ignore[var-annotated]
-            arr[:] = items
+            ma_arr = np.empty(self.size, dtype=object)  # type: ignore[var-annotated]
+            ma_arr[:] = items
             mask = self.mask_linear()
-            return np.ma.MaskedArray(arr, mask=mask, dtype=object).reshape(self.resolved_shape)
+            return np.ma.MaskedArray(ma_arr, mask=mask, dtype=object).reshape(self.resolved_shape)
 
         if not self.resolved_internal_shape:
             msg = "internal_shape must be provided if splat_internal is True"
@@ -228,7 +244,7 @@ class FileArray(StorageBase):
         """Return a list of booleans indicating which elements are missing."""
         # We use os.listdir to check if a file exists instead of checking with
         # self._index_to_file(i).is_file() because this is more efficient.
-        existing_files = set(os.listdir(self.folder))
+        existing_files = set(os.listdir(self.folder))  # noqa: PTH208
         return [self.filename_template.format(i) not in existing_files for i in range(self.size)]
 
     @property
@@ -263,6 +279,40 @@ class FileArray(StorageBase):
     def dump_in_subprocess(self) -> bool:
         """Indicates if the storage can be dumped in a subprocess and read by the main process."""
         return True
+
+    @classmethod
+    def from_data(cls, data: list[Any] | np.ndarray, folder: str | Path) -> FileArray:
+        """Create a FileArray from an existing list or NumPy array.
+
+        This method serializes the provided `data` (which can be a Python list
+        or a NumPy array) into the FileArray's on-disk format within the
+        specified `folder`. Each element of the input `data` is dumped
+        individually.
+
+        This is useful for preparing large datasets for use with `pipeline.map`
+        in distributed environments (like SLURM), as it allows `pipefunc` to
+        pass around a lightweight `FileArray` object instead of serializing
+        the entire large dataset for each task.
+
+        Parameters
+        ----------
+        data
+            The list or NumPy-like array to store in the FileArray.
+        folder
+            The directory where the FileArray will store its data files.
+            This folder must be accessible by all worker nodes if used in
+            a distributed setting.
+
+        Returns
+        -------
+        FileArray
+            A new FileArray instance populated with the provided data.
+
+        """
+        file_array = FileArray(folder, np.shape(data))
+        for index, value in np.ndenumerate(data):
+            file_array.dump(index, value)
+        return file_array
 
 
 def _read(name: str | Path) -> bytes:

@@ -1,0 +1,26 @@
+{
+  "LABEL": {
+    "name": "invalid-title",
+    "color": "d93f0b"
+  },
+  "CHECKS": {
+    "prefixes": [
+      "DOC:",
+      "ENH:",
+      "CI:",
+      "TST:",
+      "MAINT:",
+      "BUG:",
+      "⬆️",
+      "[pre-commit.ci]"
+    ],
+    "regexp": "",
+    "regexpFlags": "",
+    "ignoreLabels": []
+  },
+  "MESSAGES": {
+    "success": "PR Title: OK",
+    "failure": "PR Title: Invalid",
+    "notice": ""
+  }
+}

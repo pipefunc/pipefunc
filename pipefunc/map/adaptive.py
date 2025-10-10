@@ -363,9 +363,10 @@ def _execute_iteration_in_single(
     if exists:
         return output
     kwargs_task = _submit_func(func, run_info, store, fixed_indices=None, executor=None)
-    result = _process_task(func, kwargs_task, store)
+    result = _process_task(func, kwargs_task, store, run_info, return_results=True)
     if not return_output:
         return None
+    assert result is not None
     output = tuple(result[name].output for name in at_least_tuple(func.output_name))
     return output if isinstance(func.output_name, tuple) else output[0]
 
@@ -403,6 +404,7 @@ def _execute_iteration_in_map_spec(
         mask,
         arrays,
         cache,
+        in_executor=True,
         force_dump=True,
     )
     if not return_output:
@@ -538,7 +540,7 @@ def _maybe_iterate_axes(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     fixed_indices: dict[str, int | slice] | None,
-    split_independent_axes: bool,  # noqa: FBT001
+    split_independent_axes: bool,
     internal_shapes: UserShapeDict | None,
 ) -> Generator[dict[str, int | slice] | None, None, None]:
     if fixed_indices:
@@ -571,7 +573,7 @@ def _adaptive_wrapper(
     inputs_ = inputs.copy()
     for dim, val in zip(adaptive_dimensions, values):
         inputs_[dim] = val
-    results = pipeline.map(inputs_, run_folder=run_folder, **map_kwargs)
+    results = pipeline.map(inputs_, run_folder=run_folder, show_progress=False, **map_kwargs)
     return results[adaptive_output].output
 
 

@@ -18,7 +18,7 @@ _CACHE_KEY_TYPE: TypeAlias = tuple[OUTPUT_TYPE, tuple[tuple[str, Any], ...]]
 
 def create_cache(
     cache_type: Literal["lru", "hybrid", "disk", "simple"] | None,
-    lazy: bool,  # noqa: FBT001
+    lazy: bool,
     cache_kwargs: dict[str, Any] | None,
 ) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
     if cache_type is None:
@@ -50,7 +50,7 @@ def create_cache(
 
 
 def compute_cache_key(
-    output_name: OUTPUT_TYPE,
+    cache_id: str,
     kwargs: dict[str, Any],
     root_args: tuple[str, ...],
 ) -> _CACHE_KEY_TYPE | None:
@@ -60,16 +60,15 @@ def compute_cache_key(
     root input keys and their corresponding values. Root inputs are the
     inputs that are not derived from any other function in the pipeline.
 
-    If any of the root inputs required for the output_name are not available
-    in kwargs, the cache key computation is skipped, and the method returns
-    None. This can happen when a non-root input is directly provided as an
-    input to another function, in which case the result should not be
-    cached.
+    If any of the root inputs are not available in kwargs, the cache key computation is
+    skipped, and the method returns None. This can happen when a non-root input is
+    directly provided as an input to another function, in which case the result should not
+    be cached.
 
     Parameters
     ----------
-    output_name
-        The identifier for the return value of the pipeline.
+    cache_id
+        A hashable identifier for the PipeFunc instance.
     kwargs
         Keyword arguments to be passed to the pipeline functions.
     root_args
@@ -92,7 +91,7 @@ def compute_cache_key(
         key = to_hashable(kwargs[k])
         cache_key_items.append((k, key))
 
-    return output_name, tuple(cache_key_items)
+    return cache_id, tuple(cache_key_items)
 
 
 def update_cache(
@@ -115,9 +114,9 @@ def get_result_from_cache(
     cache_key: _CACHE_KEY_TYPE | None,
     output_name: OUTPUT_TYPE,
     all_results: dict[OUTPUT_TYPE, Any],
-    full_output: bool,  # noqa: FBT001
+    full_output: bool,
     used_parameters: set[str | None],
-    lazy: bool = False,  # noqa: FBT002, FBT001
+    lazy: bool = False,  # noqa: FBT002
 ) -> tuple[bool, bool]:
     from ._base import _update_all_results
 

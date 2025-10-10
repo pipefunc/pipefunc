@@ -96,6 +96,64 @@ def test_update_defaults_and_renames_with_pipeline() -> None:
     assert pipeline("y") == 4 * 666
 
 
+def test_update_defaults_with_non_comparable_inputs() -> None:
+    class CustomType:  # noqa: PLW1641
+        def __eq__(self, _) -> bool:
+            msg = "Cannot compare CustomType instances"
+            raise ValueError(msg)
+
+    @pipefunc("a", defaults={"array": CustomType()})
+    def a(array: np.ndarray) -> np.ndarray:
+        return array + 1
+
+    @pipefunc("b", defaults={"array": CustomType()})
+    def b(array: np.ndarray, factor: float) -> np.ndarray:
+        return array * factor
+
+    with pytest.warns(
+        UserWarning,
+        match="Could not compare default values for argument 'array'",
+    ):
+        Pipeline([a, b])
+
+    @pipefunc("a")
+    def a2(array: np.ndarray) -> np.ndarray:
+        return array + 1
+
+    @pipefunc("b")
+    def b2(array: np.ndarray, factor: float) -> np.ndarray:
+        return array * factor
+
+    with pytest.warns(
+        UserWarning,
+        match="Could not compare default values for argument 'array'",
+    ):
+        Pipeline([a2, b2]).update_defaults({"array": CustomType()})
+
+
+def test_update_defaults_with_nd_array() -> None:
+    @pipefunc("a", defaults={"array": np.array([1, 2, 3])})
+    def a(array: np.ndarray) -> np.ndarray:
+        return array + 1
+
+    @pipefunc("b", defaults={"array": np.array([4, 5, 6])})
+    def b(array: np.ndarray, factor: float) -> np.ndarray:
+        return array * factor
+
+    with pytest.raises(ValueError, match="Inconsistent default values for argument 'array'"):
+        Pipeline([a, b])
+
+    @pipefunc("a")
+    def a2(array: np.ndarray) -> np.ndarray:
+        return array + 1
+
+    @pipefunc("b")
+    def b2(array: np.ndarray, factor: float) -> np.ndarray:
+        return array * factor
+
+    Pipeline([a2, b2]).update_defaults({"array": np.array([4, 5, 6])})
+
+
 def test_update_renames_pipeline() -> None:
     @pipefunc(output_name="c", renames={"a": "a1"})
     def f(a, b):
@@ -146,6 +204,16 @@ def test_pipeline_scope() -> None:
     assert pipeline(**{"x.b": 1, "x": {"a": 1}}) == 2
 
 
+def test_pipeline_scope_no_selected_exception() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    with pytest.raises(ValueError, match="No function's scope was updated"):
+        pipeline.update_scope("myscope")
+
+
 def test_pipeline_scope_partial() -> None:
     @pipefunc(output_name="c")
     def f(a, b):
@@ -180,7 +248,8 @@ def test_set_pipeline_scope_on_init() -> None:
     assert pipeline(**{"x.a": 1, "x.b": 1}) == 2
     with pytest.raises(ValueError, match="The provided `scope='a'` cannot be identical "):
         pipeline.update_scope("a", "*")
-    pipeline.update_scope("foo", outputs="*")
+    with pytest.warns(UserWarning, match="Parameter 'c' already has a scope 'x'"):
+        pipeline.update_scope("foo", outputs="*")
     pipeline.update_scope("foo", outputs="*")  # twice should be fine
     assert pipeline("foo.c", x={"a": 1, "b": 1}) == 2
     pipeline.update_scope(None, {"x.b"})
@@ -222,7 +291,7 @@ def test_scope_with_mapspec() -> None:
     assert str(f.mapspec) == "foo.a[i] -> foo.c[i]"
     pipeline = Pipeline([f])
     assert pipeline.mapspecs_as_strings == ["foo.a[i] -> foo.c[i]"]
-    results = pipeline.map({"foo": {"a": [0, 1, 2]}, "b": 1})
+    results = pipeline.map({"foo": {"a": [0, 1, 2]}, "b": 1}, parallel=False, storage="dict")
     assert results["foo.c"].output.tolist() == [1, 2, 3]
 
 
@@ -265,9 +334,100 @@ def test_update_scope_from_faq() -> None:
 
     pipeline = Pipeline([f, g_func])
     # all outputs except foo.y, so only bar.z, which becomes baz.z
-    pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})
+    with pytest.warns(
+        UserWarning,
+        match="Parameter 'z' already has a scope 'bar', replacing it with 'baz'",
+    ):
+        pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})
     kwargs = {"foo.a": 1, "foo.b": 2, "bar.a": 3, "b": 4}
     assert pipeline(**kwargs) == 15
-    results = pipeline.map(inputs=kwargs)
+    results = pipeline.map(inputs=kwargs, parallel=False, storage="dict")
     assert results["baz.z"].output == 15
     assert pipeline(foo={"a": 1, "b": 2}, bar={"a": 3}, b=4) == 15
+
+
+def test_update_scoped_defaults() -> None:
+    def f(val: int, a: int = 1) -> int:
+        return val + a
+
+    @pipefunc("g", scope="scope")
+    def g(val: int, b: int = 2) -> int:
+        return val * b
+
+    @pipefunc("g")
+    def h(val: int, b: int = 2) -> int:
+        return val - b
+
+    pipeline = Pipeline([PipeFunc(f, "f", scope="scope"), PipeFunc(f, "f"), g, h])
+
+    assert pipeline["scope.f"].defaults == {"scope.a": 1}
+    assert pipeline["scope.g"].defaults == {"scope.b": 2}
+    assert pipeline["f"].defaults == {"a": 1}
+    assert pipeline["g"].defaults == {"b": 2}
+
+    # Only update unscoped values
+    updated_pipeline = pipeline.copy()
+    updated_pipeline.update_defaults({"a": 3, "b": 4})
+
+    assert updated_pipeline["scope.f"].defaults == {"scope.a": 1}
+    assert updated_pipeline["scope.g"].defaults == {"scope.b": 2}
+    assert updated_pipeline["f"].defaults == {"a": 3}
+    assert updated_pipeline["g"].defaults == {"b": 4}
+
+    # Only update scoped values as scope-keyed
+    updated_pipeline = pipeline.copy()
+    updated_pipeline.update_defaults({"scope": {"a": 3, "b": 4}})
+
+    assert updated_pipeline["scope.f"].defaults == {"scope.a": 3}
+    assert updated_pipeline["scope.g"].defaults == {"scope.b": 4}
+    assert updated_pipeline["f"].defaults == {"a": 1}
+    assert updated_pipeline["g"].defaults == {"b": 2}
+
+    # Only update scoped values as flat-keyed
+    updated_pipeline = pipeline.copy()
+    updated_pipeline.update_defaults({"scope.a": 3, "scope.b": 4})
+
+    assert updated_pipeline["scope.f"].defaults == {"scope.a": 3}
+    assert updated_pipeline["scope.g"].defaults == {"scope.b": 4}
+    assert updated_pipeline["f"].defaults == {"a": 1}
+    assert updated_pipeline["g"].defaults == {"b": 2}
+
+    # Update both methods simultaneously
+    updated_pipeline = pipeline.copy()
+    updated_pipeline.update_defaults({"a": 10, "b": 20, "scope": {"a": 3, "b": 4}})
+
+    assert updated_pipeline["scope.f"].defaults == {"scope.a": 3}
+    assert updated_pipeline["scope.g"].defaults == {"scope.b": 4}
+    assert updated_pipeline["f"].defaults == {"a": 10}
+    assert updated_pipeline["g"].defaults == {"b": 20}
+
+    updated_pipeline = pipeline.copy()
+    updated_pipeline.update_defaults({"a": 10, "b": 20, "scope.a": 3, "scope.b": 4})
+
+    assert updated_pipeline["scope.f"].defaults == {"scope.a": 3}
+    assert updated_pipeline["scope.g"].defaults == {"scope.b": 4}
+    assert updated_pipeline["f"].defaults == {"a": 10}
+    assert updated_pipeline["g"].defaults == {"b": 20}
+
+    # Try to update a value scope based and flat
+    updated_pipeline = pipeline.copy()
+    with pytest.raises(
+        ValueError,
+        match="Conflicting definitions for `scope.a`: found both flattened",
+    ):
+        updated_pipeline.update_defaults({"scope.a": 1, "scope": {"a": 1}})
+
+    # Try to update a non-existing scope/value
+    updated_pipeline = pipeline.copy()
+    with pytest.raises(
+        ValueError,
+        match="Unused keyword arguments: `DOES_NOT_EXIST`. These are not settable defaults.",
+    ):
+        updated_pipeline.update_defaults({"DOES_NOT_EXIST": 1})
+
+    updated_pipeline = pipeline.copy()
+    with pytest.raises(
+        ValueError,
+        match="Unused keyword arguments: `scope.DOES_NOT_EXIST`. These are not settable defaults.",
+    ):
+        updated_pipeline.update_defaults({"scope": {"DOES_NOT_EXIST": 1}})

@@ -3,14 +3,17 @@
 #
 
 import os
-import shutil
 import sys
 from pathlib import Path
 
-package_path = Path("../..").resolve()
-sys.path.insert(0, str(package_path))
+from docutils import nodes
+from sphinx.util.docutils import SphinxDirective
+from docutils.statemachine import StringList
+
+PACKAGE_PATH = Path("../..").resolve()
+sys.path.insert(0, str(PACKAGE_PATH))
 os.environ["PYTHONPATH"] = ":".join(
-    (str(package_path), os.environ.get("PYTHONPATH", "")),
+    (str(PACKAGE_PATH), os.environ.get("PYTHONPATH", "")),
 )
 docs_path = Path("..").resolve()
 sys.path.insert(1, str(docs_path))
@@ -42,6 +45,8 @@ extensions = [
     "sphinx_togglebutton",
     "sphinx_copybutton",
     "notfound.extension",
+    "sphinxcontrib.mermaid",
+    "sphinx_llms_txt",
 ]
 
 templates_path = ["_templates"]
@@ -68,6 +73,7 @@ default_role = "autolink"
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "networkx": ("https://networkx.org/documentation/stable/", None),
+    "adaptive_scheduler": ("https://adaptive-scheduler.readthedocs.io/en/latest/", None),
 }
 
 autodoc_member_order = "bysource"
@@ -92,7 +98,58 @@ html_theme_options = {
     "use_repository_button": True,
     "use_download_button": True,
     "navigation_with_keys": False,
+    "analytics": {
+        "plausible_analytics_domain": "pipefunc.readthedocs.io",
+        "plausible_analytics_url": "https://plausible.nijho.lt/js/script.js",
+    },
 }
+
+
+class TryNotebookWithUV(SphinxDirective):
+    """Render a tip box with the opennb command to open the current page in a Jupyter notebook."""
+
+    has_content = True
+    optional_arguments = 1
+
+    def run(self):
+        source_path = os.path.relpath(self.get_source_info()[0], PACKAGE_PATH)
+        notebook_url = self.arguments[0] if self.arguments else source_path
+
+        lines = [
+            ":::{admonition} Have [`uv`](https://docs.astral.sh/uv/)? ⚡",
+            ":class: tip, dropdown",
+            "",
+            "If you have [`uv`](https://docs.astral.sh/uv/) installed, you can instantly open this page as a Jupyter notebook [using `opennb`](https://github.com/basnijholt/opennb):",
+            "",
+            "```bash",
+            f'uvx --with "pipefunc[docs]" opennb pipefunc/pipefunc/{notebook_url}',
+            "```",
+            "",
+            "This command creates an ephemeral environment with all dependencies and launches the notebook in your browser in 1 second - no manual setup needed! ✨.",
+            "",
+            "Alternatively, run:",
+            "",
+            "```bash",
+            f"uv run https://raw.githubusercontent.com/pipefunc/pipefunc/refs/heads/main/get-notebooks.py",
+            "```",
+            "",
+            "to download *all* documentation as Jupyter notebooks.",
+            ":::",
+        ]
+
+        # Convert lines to StringList with proper source information
+        source_info = self.get_source_info()
+        string_list = StringList(lines, source=(source_info[0], source_info[1]))
+
+        # Parse the content
+        node = nodes.Element()
+        self.state.nested_parse(string_list, 0, node)
+
+        return node.children
+
+
+def setup(app):
+    app.add_directive("try-notebook", TryNotebookWithUV)
 
 
 def replace_named_emojis(input_file: Path, output_file: Path) -> None:
@@ -196,22 +253,44 @@ def process_readme_for_sphinx_docs(readme_path: Path, docs_path: Path) -> None:
     change_alerts_to_admonitions(output_file, output_file)
 
 
+def replace_rtd_links_with_local(input_file: str, output_file: str) -> None:
+    """Replace ReadTheDocs links with local markdown links in a file.
+
+    Parameters
+    ----------
+    input_file
+        Path to the input file
+    output_file
+        Path to the output file where the modified content will be written
+    """
+    with open(input_file, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Replace the RTD links with local markdown links
+    base_url = "https://pipefunc.readthedocs.io/en/latest/"
+    content = content.replace(f"{base_url}examples/", "./examples/")
+    content = content.replace("/) page.", ".md) page.")
+
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(content)
+
+
 # Process the README.md file for Sphinx documentation
-readme_path = package_path / "README.md"
+readme_path = PACKAGE_PATH / "README.md"
 process_readme_for_sphinx_docs(readme_path, docs_path)
 
 # Add the example notebook to the docs
-nb = package_path / "example.ipynb"
+nb = PACKAGE_PATH / "example.ipynb"
 convert_notebook_to_md(nb, docs_path / "source" / "tutorial.md")
-
-# Copy nb to docs/source/notebooks
-nb_docs_folder = docs_path / "source" / "notebooks"
-nb_docs_folder.mkdir(exist_ok=True)
-shutil.copy(nb, nb_docs_folder)
+replace_rtd_links_with_local(
+    docs_path / "source" / "tutorial.md",
+    docs_path / "source" / "tutorial.md",
+)
 
 # Group into single streams to prevent multiple output boxes
 nb_merge_streams = True
 
 
 def setup(app) -> None:
-    pass
+    app.add_directive("try-notebook", TryNotebookWithUV)
+    app.add_css_file("custom.css")

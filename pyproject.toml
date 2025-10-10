@@ -28,18 +28,24 @@ dependencies = ["cloudpickle", "networkx", "numpy"]
 
 [project.optional-dependencies]
 adaptive = ["adaptive", "adaptive-scheduler>=2.14.0"]
-pandas = ["pandas"]
-plotting = ["bokeh", "graphviz", "holoviews","matplotlib"]
+autodoc = ["griffe", "rich"]
+cli = ["griffe", "rich", "pydantic", "rich-argparse"]
+mcp = ["fastmcp>=2.12.0", "rich", "griffe"]
+pandas = ["pandas", "xarray"]  # DataFrame loading requires xarray for conversion
+polars = ["polars", "pandas", "xarray"]  # Polars backend requires pandas+xarray for conversion
+# Prevent old holoviews resulting in broken env
+plotting = ["bokeh", "graphviz", "holoviews>=1.14.0", "matplotlib"]
 profiling = ["psutil"]
 pydantic = ["pydantic"]
 rich = ["rich"]
-widgets = ["graphviz-anywidget>=0.3.0", "ipywidgets"]
+widgets = ["graphviz-anywidget>=0.7.0", "ipywidgets"]
 xarray = ["xarray"]
-zarr = ["zarr"]
+zarr = ["zarr>=2,<3", "numcodecs<0.16.0"]  # https://github.com/zarr-developers/numcodecs/issues/721
 test = [
     "coverage",
     "pytest-asyncio",
     "pytest-codspeed",
+    "cffi<2.0.0",  # Avoid cffi 2.0.0 which has no 3.13t wheel yet
     "pytest-cov",
     "pytest-timeout",
     "pytest-xdist",
@@ -54,9 +60,11 @@ docs = [
     "sphinx-autodoc-typehints",
     "sphinx-book-theme",
     "sphinx-copybutton",
+    "sphinx-llms-txt",
     "sphinx-notfound-page",
     "sphinx-togglebutton",
     "sphinx",
+    "sphinxcontrib-mermaid",
     "versioningit",
     # Used for the example notebook
     "nltk",
@@ -64,16 +72,36 @@ docs = [
     "seaborn",
     "pipefunc[all]",
 ]
-# all doesn't include 'pydantic' because there are no specific features that depend on it
-all = ["pipefunc[adaptive,pandas,plotting,profiling,rich,widgets,xarray,zarr]"]
+all = [
+    "pipefunc[adaptive,autodoc,cli,pandas,polars,mcp,plotting,profiling,pydantic,rich,widgets,xarray,zarr]",
+]
 dev = [ # all + dev deps
     "black[jupyter]",
     "mypy",
     "pre-commit",
+    "pre-commit-uv",
     "ruff",
     "versioningit",
-    "pipefunc[all,test,docs,pydantic]",
+    "pipefunc[all,test,docs]",
 ]
+# matches pipefunc-extras in https://github.com/conda-forge/pipefunc-feedstock/blob/main/recipe/meta.yaml
+extras = [
+    "adaptive",
+    "graphviz",
+    "graphviz-anywidget",
+    "griffe",
+    "ipywidgets",
+    "matplotlib",
+    "pandas",
+    "polars",
+    "psutil",
+    "pydantic",
+    "rich",
+    "rich-argparse",
+    "xarray",
+    "zarr>=2,<3",
+]
+
 [project.urls]
 homepage = "https://pipefunc.readthedocs.io/"
 documentation = "https://pipefunc.readthedocs.io/"
@@ -114,7 +142,6 @@ addopts = """
     --cov-report term
     --cov-report html
     --cov-report xml
-    --cov-fail-under=35
     --asyncio-mode=strict
     --timeout 60
 """
@@ -156,6 +183,8 @@ ignore = [
     "E501",    # Line too long
     "D107",    # Missing docstring in `__init__`
     "B905",    # `zip()` without an explicit `strict=` parameter
+    "PLC0415", # `import` should be at the top-level of a file
+    "FBT001",  # Boolean-typed positional argument in function definition
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -173,6 +202,7 @@ ignore = [
     "NPY002",
     "RET504",
 ]
+"get-notebooks.py" = ["EXE003"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 18

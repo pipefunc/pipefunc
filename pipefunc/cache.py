@@ -20,6 +20,7 @@ import cloudpickle
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Hashable, Iterable
+    from multiprocessing.managers import DictProxy, ListProxy, SyncManager
 
 
 class _CacheBase(abc.ABC):
@@ -42,15 +43,6 @@ class _CacheBase(abc.ABC):
     @abc.abstractmethod
     def clear(self) -> None:
         raise NotImplementedError
-
-    def __getstate__(self) -> object:
-        if hasattr(self, "shared") and self.shared:
-            return self.__dict__
-        msg = "Cannot pickle non-shared cache instances, use `shared=True`."
-        raise RuntimeError(msg)
-
-    def __setstate__(self, state: dict) -> None:
-        self.__dict__.update(state)
 
 
 class HybridCache(_CacheBase):
@@ -249,8 +241,33 @@ class HybridCache(_CacheBase):
         """Return the number of entries in the cache."""
         return len(self._cache_dict)
 
+    def __getstate__(self) -> dict[str, Any]:
+        """Prepare the object for pickling."""
+        state = self.__dict__.copy()
 
-def _maybe_load(value: bytes | str, allow_cloudpickle: bool) -> Any:  # noqa: FBT001
+        if self.shared:
+            # Convert shared structures to regular ones
+            state["_cache_dict"] = _dict_to_regular(self._cache_dict)
+            state["_access_counts"] = _dict_to_regular(self._access_counts)
+            state["_computation_durations"] = _dict_to_regular(self._computation_durations)
+            # Remove unpicklable lock
+            state.pop("_cache_lock", None)
+
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Restore the object after unpickling."""
+        self.__dict__.update(state)
+        if not self.shared:
+            return
+        manager = Manager()
+        self._cache_dict = _create_shared_dict(manager, self._cache_dict)  # type: ignore[arg-type]
+        self._access_counts = _create_shared_dict(manager, self._access_counts)  # type: ignore[arg-type]
+        self._computation_durations = _create_shared_dict(manager, self._computation_durations)  # type: ignore[arg-type]
+        self._cache_lock = manager.Lock()
+
+
+def _maybe_load(value: bytes | str, allow_cloudpickle: bool) -> Any:
     return cloudpickle.loads(value) if allow_cloudpickle else value
 
 
@@ -344,6 +361,29 @@ class LRUCache(_CacheBase):
                 del self._cache_dict[key]
             del self._cache_queue[:]
 
+    def __getstate__(self) -> dict[str, Any]:
+        """Prepare the object for pickling."""
+        state = self.__dict__.copy()
+
+        if self.shared:
+            # Convert shared structures to regular ones
+            state["_cache_dict"] = _dict_to_regular(self._cache_dict)
+            state["_cache_queue"] = _list_to_regular(self._cache_queue)
+            # Remove unpicklable lock
+            state.pop("_cache_lock", None)
+
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Restore the object after unpickling."""
+        self.__dict__.update(state)
+        if not self.shared:
+            return
+        manager = Manager()
+        self._cache_dict = _create_shared_dict(manager, self._cache_dict)  # type: ignore[arg-type]
+        self._cache_queue = _create_shared_list(manager, self._cache_queue)  # type: ignore[arg-type]
+        self._cache_lock = manager.Lock()
+
 
 class SimpleCache(_CacheBase):
     """A simple cache without any eviction strategy."""
@@ -397,6 +437,16 @@ class DiskCache(_CacheBase):
         The maximum size of the in-memory LRU cache. Only used if with_lru_cache is True.
     lru_shared
         Whether the in-memory LRU cache should be shared between multiple processes.
+    permissions
+        The file permissions to set for the cache files.
+        If None, the default permissions are used.
+        Some examples:
+
+            - 0o660 (read/write for owner and group, no access for others)
+            - 0o644 (read/write for owner, read-only for group and others)
+            - 0o777 (read/write/execute for everyone - generally not recommended)
+            - 0o600 (read/write for owner, no access for group and others)
+            - None (use the system's default umask)
 
     """
 
@@ -409,12 +459,14 @@ class DiskCache(_CacheBase):
         with_lru_cache: bool = True,
         lru_cache_size: int = 128,
         lru_shared: bool = True,
+        permissions: int | None = None,
     ) -> None:
         self.cache_dir = Path(cache_dir)
         self.max_size = max_size
         self.use_cloudpickle = use_cloudpickle
         self.with_lru_cache = with_lru_cache
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.permissions = permissions
 
         if self.with_lru_cache:
             self.lru_cache = LRUCache(
@@ -451,6 +503,9 @@ class DiskCache(_CacheBase):
                 cloudpickle.dump(value, f)
             else:
                 pickle.dump(value, f)
+        if self.permissions is not None:
+            file_path.chmod(self.permissions)  # Set permissions after writing
+
         if self.with_lru_cache:
             self.lru_cache.put(key, value)
         self._evict_if_needed()
@@ -463,7 +518,14 @@ class DiskCache(_CacheBase):
             files = self._all_files()
             for _ in range(len(files) - self.max_size):
                 oldest_file = min(files, key=lambda f: f.stat().st_ctime_ns)
-                oldest_file.unlink()
+                try:
+                    oldest_file.unlink()
+                except PermissionError:  # pragma: no cover
+                    warnings.warn(
+                        f"Permission denied when trying to delete {oldest_file}.",
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
 
     def __contains__(self, key: Hashable) -> bool:
         """Check if a key is present in the cache."""
@@ -480,7 +542,7 @@ class DiskCache(_CacheBase):
     def clear(self) -> None:
         """Clear the cache by deleting all cache files."""
         for file_path in self._all_files():
-            with suppress(Exception):
+            with suppress(PermissionError, FileNotFoundError):
                 file_path.unlink()
         if self.with_lru_cache:
             self.lru_cache.clear()
@@ -594,7 +656,7 @@ def memoize(
 
 def try_to_hashable(
     obj: Any,
-    fallback_to_pickle: bool = True,  # noqa: FBT001, FBT002
+    fallback_to_pickle: bool = True,  # noqa: FBT002
     unhashable_action: Literal["error", "warning", "ignore"] = "error",
     where: str = "function",
 ) -> Hashable | type[UnhashableError]:
@@ -651,7 +713,7 @@ def try_to_hashable(
 
 def _hashable_iterable(
     iterable: Iterable,
-    fallback_to_pickle: bool,  # noqa: FBT001
+    fallback_to_pickle: bool,
     *,
     sort: bool = False,
 ) -> tuple:
@@ -661,7 +723,7 @@ def _hashable_iterable(
 
 def _hashable_mapping(
     mapping: dict,
-    fallback_to_pickle: bool,  # noqa: FBT001
+    fallback_to_pickle: bool,
     *,
     sort: bool = False,
 ) -> tuple:
@@ -675,7 +737,7 @@ _HASH_MARKER = "__CONVERTED__"
 
 def to_hashable(  # noqa: C901, PLR0911, PLR0912
     obj: Any,
-    fallback_to_pickle: bool = True,  # noqa: FBT001, FBT002
+    fallback_to_pickle: bool = True,  # noqa: FBT002
 ) -> Any:
     """Convert any object to a hashable representation if not hashable yet.
 
@@ -751,6 +813,21 @@ def to_hashable(  # noqa: C901, PLR0911, PLR0912
         if isinstance(obj, sys.modules["pandas"].DataFrame):
             return (m, tp, to_hashable(obj.to_dict("list"), fallback_to_pickle))
 
+    # Handle polars Series and DataFrames
+    if "polars" in sys.modules:
+        polars = sys.modules["polars"]
+        if isinstance(obj, polars.Series):
+            # Include dtype to distinguish Series with different dtypes but same values
+            hsh = (
+                obj.name,
+                str(obj.dtype),
+                to_hashable(obj.to_list(), fallback_to_pickle),
+            )
+            return (m, tp, hsh)
+        if isinstance(obj, polars.DataFrame):
+            hsh = to_hashable(obj.to_dict(as_series=False), fallback_to_pickle)
+            return (m, tp, hsh)
+
     if fallback_to_pickle:
         try:
             return (m, tp, _cloudpickle_key(obj))
@@ -768,3 +845,28 @@ class UnhashableError(TypeError):
             f"Object of type {type(obj)} cannot be hashed using `pipefunc.cache.to_hashable`."
         )
         super().__init__(self.message)
+
+
+# Helper functions for pickling
+def _dict_to_regular(shared_dict: DictProxy) -> dict:
+    """Convert a shared dictionary to a regular dictionary."""
+    return dict(shared_dict.items())
+
+
+def _list_to_regular(shared_list: ListProxy) -> list:
+    """Convert a shared list to a regular list."""
+    return list(shared_list)
+
+
+def _create_shared_dict(manager: SyncManager, regular_dict: dict) -> DictProxy:
+    """Create a shared dictionary and populate it."""
+    shared_dict = manager.dict()
+    shared_dict.update(regular_dict)
+    return shared_dict
+
+
+def _create_shared_list(manager: SyncManager, regular_list: list) -> ListProxy:
+    """Create a shared list and populate it."""
+    shared_list = manager.list()
+    shared_list.extend(regular_list)
+    return shared_list
