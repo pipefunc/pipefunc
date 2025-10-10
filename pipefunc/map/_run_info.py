@@ -267,6 +267,8 @@ class RunInfo:
 def _legacy_fix(data: dict, run_folder: Path) -> None:
     """Fix legacy format where paths included run_folder prefix.
 
+    Paths (#898)
+    ------------
     Legacy format (<=v0.86.0):
     - run_folder: "foo/my_run_folder"
     - input_paths: {"x": "foo/my_run_folder/inputs/x.cloudpickle"}
@@ -277,20 +279,30 @@ def _legacy_fix(data: dict, run_folder: Path) -> None:
     - input_paths: {"x": "inputs/x.cloudpickle"}
     - defaults_path: "defaults/defaults.cloudpickle"
 
+    Error handling (#854)
+    ---------------------
+    The ``error_handling`` field was introduced in v0.88.0. Older
+    ``run_info.json`` files omit it, so we inject the default value to keep
+    ``RunInfo.load`` backward compatible.
+
     Parameters
     ----------
     data
-        RunInfo data dict (modified in place)
+        RunInfo data dict (modified in place).
     run_folder
-        Original run_folder path
+        Original run_folder path detected at load time.
 
     """
     stored_run_folder = data["run_folder"]
 
-    # Detect legacy: check if paths start with stored run_folder
-    is_legacy = data["defaults_path"].startswith(stored_run_folder)
+    # ``error_handling`` was introduced in v0.88.0; older run_info.json files lack it
+    # which would otherwise cause RunInfo(**data) to raise.
+    data.setdefault("error_handling", "raise")
 
-    if not is_legacy:
+    # Detect legacy: check if paths start with stored run_folder
+    legacy_path = data["defaults_path"].startswith(stored_run_folder)
+
+    if not legacy_path:
         return
 
     # Fix paths: strip the stored run_folder prefix
