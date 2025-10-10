@@ -20,137 +20,64 @@ kernelspec:
 :depth: 2
 ```
 
-## What is the `ErrorSnapshot` feature in `pipefunc`?
+## Overview
 
-The {class}`~pipefunc.ErrorSnapshot` feature captures detailed information about errors occurring during the execution of a `PipeFunc`. It aids in debugging by storing snapshots of error states, including the function, exception details, arguments, timestamp, and environment. This snapshot can be used to reproduce the error and examine the error context.
+`pipefunc` exposes two error-handling strategies when running pipelines:
 
-**Key Features:**
+- `error_handling="raise"` (default): stop on the first failure and raise the
+  underlying exception.
+- `error_handling="continue"`: convert failures into
+  {class}`~pipefunc.ErrorSnapshot` objects so the run can continue and
+  downstream tasks can inspect the failure.
 
-- **Error Details**: Captures function name, exception, arguments, traceback, user, machine, timestamp, and directory.
-- **Reproduction**: Offers a `reproduce()` method to recreate the error with the stored arguments.
-- **Persistence**: Allows saving and loading snapshots using `save_to_file` and `load_from_file`.
+The sections below show how to inspect snapshots, how propagation works, and
+why the behaviour is consistent across synchronous, parallel, and async runs.
 
-**Usage:**
+## Capturing error snapshots
 
-1. **Accessing Snapshots**:
-
-   ```python
-   result = my_pipefunc_or_pipeline(args)
-   if my_pipefunc_or_pipeline.error_snapshot:
-       print(my_pipefunc_or_pipeline.error_snapshot)
-   ```
-
-2. **Reproducing Errors**:
-
-   ```python
-   error_snapshot = my_pipefunc_or_pipeline.error_snapshot
-   if error_snapshot:
-       error_snapshot.reproduce()
-   ```
-
-3. **Saving and Loading**:
-   ```python
-   error_snapshot.save_to_file("snapshot.pkl")
-   loaded_snapshot = ErrorSnapshot.load_from_file("snapshot.pkl")
-   ```
-
-**Example:**
+When a {class}`~pipefunc.PipeFunc` fails, it stores an
+{class}`~pipefunc.ErrorSnapshot` on the callable itself and on the owning
+pipeline.
 
 ```{code-cell} ipython3
-from pipefunc import pipefunc
+from pipefunc import Pipeline, pipefunc
+from pipefunc.exceptions import ErrorSnapshot
 
 @pipefunc(output_name="c")
-def faulty_function(a, b):
-    # Simulate an error
+def faulty_function(a: int, b: int) -> int:
     raise ValueError("Intentional error")
 
-try:
-    faulty_function(a=1, b=2)
-except Exception:
-    snapshot = faulty_function.error_snapshot
-    print(snapshot)
-```
-
-In the same way, for a {class}`~pipefunc.Pipeline` we can also access the error snapshot of the last failed function using the `error_snapshot` attribute.
-
-```{code-cell} ipython3
-from pipefunc import Pipeline
-
 pipeline = Pipeline([faulty_function])
+
 try:
     pipeline(a=1, b=2)
-except Exception:
-    snapshot = pipeline.error_snapshot
-    print(snapshot)
+except Exception:  # noqa: BLE001
+    func_snapshot = faulty_function.error_snapshot
+    pipeline_snapshot = pipeline.error_snapshot
+
+func_snapshot is pipeline_snapshot, isinstance(func_snapshot, ErrorSnapshot)
 ```
 
-{class}`~pipefunc.ErrorSnapshot` is very useful for debugging complex pipelines, making it easy to replicate and understand issues as they occur.
-
-## Continue Mode in Parallel and Async Runs
-
-`Pipeline.map(..., error_handling="continue")` behaves consistently whether work
-is executed sequentially, through `parallel=True` with an executor
-(`ThreadPoolExecutor`, `ProcessPoolExecutor`, etc.), or via
-`pipeline.map_async`. Every failing element becomes an
-{class}`~pipefunc.ErrorSnapshot`, and the snapshot is written back to the correct
-index even when the work was processed in a chunked executor task.
+`ErrorSnapshot` captures the function, arguments, traceback, and useful helper
+methods such as {meth}`ErrorSnapshot.reproduce`:
 
 ```{code-cell} ipython3
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-from pipefunc import Pipeline, pipefunc
-
-@pipefunc(output_name="y", mapspec="x[i] -> y[i]")
-def double_or_fail(x: int) -> int:
-    if x == 13:
-        raise ValueError("boom")
-    return x * 2
-
-pipeline = Pipeline([double_or_fail])
-inputs = {"x": list(range(20))}
-
-with ThreadPoolExecutor(max_workers=4) as executor:
-    parallel_result = pipeline.map(
-        inputs,
-        parallel=True,
-        executor=executor,
-        chunksizes=6,
-        error_handling="continue",
-    )
-
-
-async def run_async() -> tuple[object, object]:
-    with ThreadPoolExecutor(max_workers=4) as async_executor:
-        async_result = pipeline.map_async(
-            inputs,
-            executor=async_executor,
-            chunksizes=5,
-            error_handling="continue",
-        )
-        async_outputs = await async_result.task
-    return parallel_result["y"].output[13], async_outputs["y"].output[13]
-
+print(func_snapshot)
 
 try:
-    parallel_err, async_err = asyncio.run(run_async())
-except RuntimeError:
-    parallel_err, async_err = await run_async()
-parallel_err, async_err
+    func_snapshot.reproduce()
+except Exception as exc:  # noqa: BLE001
+    type(exc), exc
 ```
 
-This means downstream pipeline steps can trust that per-index error metadata is
-aligned, regardless of the execution strategy or chunk size.
+## Continue mode walkthrough
 
-## Basic Continue Mode Example
-
-The same guarantees apply in simpler element-wise pipelines. When
-`error_handling="continue"`, failures turn into
-{class}`~pipefunc.ErrorSnapshot` objects and downstream map steps receive the
-snapshots instead of hard failures.
+One small example covers the core concepts: failing elements turn into
+`ErrorSnapshot` objects, and downstream functions see
+{class}`~pipefunc.PropagatedErrorSnapshot` placeholders when their inputs
+contain errors.
 
 ```{code-cell} ipython3
-from pipefunc import Pipeline, pipefunc
-
 @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
 def may_fail(x: int) -> int:
     if x == 3:
@@ -168,110 +95,80 @@ result_basic = pipeline_basic.map(
     error_handling="continue",
 )
 
-result_basic["y"].output, result_basic["z"].output
-```
-
-```{code-cell} ipython3
-from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
-
 y_outputs = result_basic["y"].output
 z_outputs = result_basic["z"].output
+
+y_outputs, z_outputs
+```
+
+The error for `x == 3` hydrates two complementary objects:
+
+```{code-cell} ipython3
+from pipefunc.exceptions import PropagatedErrorSnapshot
 
 type(y_outputs[2]), type(z_outputs[2])
 ```
 
-## ErrorSnapshot capabilities
-
-{class}`~pipefunc.ErrorSnapshot` instances store rich debugging context.
-
 ```{code-cell} ipython3
 snapshot = y_outputs[2]
 print(snapshot)
-print("\nReproduce raises the same exception:")
-try:
-    snapshot.reproduce()
-except Exception as exc:  # noqa: BLE001
-    print(type(exc), exc)
+snapshot.kwargs
 ```
 
-## PropagatedErrorSnapshot overview
-
-Functions downstream of an error receive
-{class}`~pipefunc.PropagatedErrorSnapshot` objects describing what inputs were
-problematic.
+Downstream code can walk back to the original failures:
 
 ```{code-cell} ipython3
 propagated = z_outputs[2]
-print(propagated)
 propagated.get_root_causes()
 ```
 
-## Error propagation patterns
+## Parallel and async consistency
 
-### Element-wise operations
-
-```{code-cell} ipython3
-import numpy as np
-
-@pipefunc(output_name="doubled", mapspec="x[i] -> doubled[i]")
-def double(x: int) -> int:
-    if x < 0:
-        raise ValueError(f"Negative value: {x}")
-    return x * 2
-
-@pipefunc(output_name="squared", mapspec="doubled[i] -> squared[i]")
-def square(doubled: int) -> int:
-    return doubled**2
-
-pipeline_elements = Pipeline([double, square])
-result_elements = pipeline_elements.map(
-    {"x": [1, -2, 3, -4, 5]},
-    error_handling="continue",
-)
-
-result_elements["doubled"].output, result_elements["squared"].output
-```
-
-### Reduction operations
+`continue` mode produces the same per-index snapshots even when work is chunked
+across executors or awaited asynchronously.
 
 ```{code-cell} ipython3
-@pipefunc(output_name="matrix", mapspec="x[i], y[j] -> matrix[i, j]")
-def compute(x: int, y: int) -> int:
-    if x == 2 and y == 2:
-        raise ValueError("Cannot compute (2, 2)")
-    return x * y
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
-@pipefunc(output_name="row_sums", mapspec="matrix[i, :] -> row_sums[i]")
-def sum_row(matrix: np.ndarray) -> int:
-    return int(np.sum(matrix))
+inputs = {"x": list(range(10))}
 
-pipeline_rows = Pipeline([compute, sum_row])
-result_rows = pipeline_rows.map(
-    {"x": [1, 2, 3], "y": [1, 2, 3]},
-    error_handling="continue",
-)
+with ThreadPoolExecutor(max_workers=4) as executor:
+    parallel_outputs = pipeline_basic.map(
+        inputs,
+        parallel=True,
+        executor=executor,
+        chunksizes=4,
+        error_handling="continue",
+    )
 
-result_rows["matrix"].output, result_rows["row_sums"].output
+
+async def run_async() -> list[object]:
+    with ThreadPoolExecutor(max_workers=4) as async_executor:
+        async_result = pipeline_basic.map_async(
+            inputs,
+            executor=async_executor,
+            chunksizes=4,
+            error_handling="continue",
+        )
+        return (await async_result.task)["y"].output
+
+
+try:
+    async_outputs = asyncio.run(run_async())
+except RuntimeError:
+    async_outputs = await run_async()
+
+parallel_outputs["y"].output[3], async_outputs[3]
 ```
 
-### Full array operations
+## Recap
 
-```{code-cell} ipython3
-@pipefunc(output_name="values", mapspec="x[i] -> values[i]")
-def process(x: int) -> int:
-    if x == 3:
-        raise ValueError("Bad value")
-    return x * 10
-
-@pipefunc(output_name="total")
-def sum_all(values: np.ndarray) -> int:
-    return int(np.sum(values))
-
-pipeline_total = Pipeline([process, sum_all])
-result_total = pipeline_total.map(
-    {"x": [1, 2, 3, 4]},
-    error_handling="continue",
-)
-
-result_total["values"].output, result_total["total"].output
-```
+- `error_handling="raise"` aborts immediately; `"continue"` records
+  `ErrorSnapshot` objects while allowing the run to finish.
+- `ErrorSnapshot` instances preserve everything needed to reproduce the
+  exception locally or offline.
+- {class}`~pipefunc.PropagatedErrorSnapshot` highlights which downstream inputs
+  contained errors and lets you walk back to the root causes.
+- The semantics are identical for sequential, threaded, process-based, and
+  async execution so downstream code can rely on consistent error metadata.
