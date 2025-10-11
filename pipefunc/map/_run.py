@@ -1604,6 +1604,19 @@ def _handle_future_exception(
     return outputs
 
 
+def _materialize_chunk_result(
+    res: Any,
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    run_info: RunInfo,
+    chunk_indices: tuple[int, ...] | None,
+) -> Any:
+    if isinstance(res, _ChunkResult):
+        assert chunk_indices is not None
+        return _outputs_from_chunk_result(func, kwargs, run_info, chunk_indices, res)
+    return res
+
+
 def _result(
     x: Any | Future,
     func: PipeFunc,
@@ -1616,11 +1629,7 @@ def _result(
             res = x.result()
         except Exception as e:  # noqa: BLE001
             return _handle_future_exception(e, func, kwargs, run_info, chunk_indices)
-
-        if isinstance(res, _ChunkResult):
-            assert chunk_indices is not None
-            return _outputs_from_chunk_result(func, kwargs, run_info, chunk_indices, res)
-        return res
+        return _materialize_chunk_result(res, func, kwargs, run_info, chunk_indices)
 
     return x
 
@@ -1638,10 +1647,7 @@ async def _result_async(
     except Exception as e:  # noqa: BLE001
         return _handle_future_exception(e, func, kwargs, run_info, chunk_indices)
 
-    if isinstance(res, _ChunkResult):
-        assert chunk_indices is not None
-        return _outputs_from_chunk_result(func, kwargs, run_info, chunk_indices, res)
-    return res
+    return _materialize_chunk_result(res, func, kwargs, run_info, chunk_indices)
 
 
 def _to_result_dict(
