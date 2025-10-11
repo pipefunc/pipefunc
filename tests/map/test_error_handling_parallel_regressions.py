@@ -134,6 +134,36 @@ def test_chunk_exception_preserves_prior_successes(monkeypatch: pytest.MonkeyPat
     assert isinstance(outputs[-1], ErrorSnapshot)
 
 
+def test_chunk_continue_handles_mid_chunk_failure() -> None:
+    """Chunked continue-mode should preserve earlier successes when a later element fails."""
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def fail_on_second(x: int) -> int:
+        if x == 2:
+            msg = "boom at index 2"
+            raise ValueError(msg)
+        return x * 10
+
+    pipeline = Pipeline([fail_on_second])
+
+    inputs = {"x": [0, 1, 2, 3, 4]}
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        result = pipeline.map(
+            inputs,
+            error_handling="continue",
+            parallel=True,
+            executor=executor,
+            chunksizes=4,
+        )
+
+    outputs = list(result["y"].output)
+    assert outputs[0] == 0
+    assert outputs[1] == 10
+    assert isinstance(outputs[2], ErrorSnapshot)
+    assert outputs[3] == 30
+    assert outputs[4] == 40
+
+
 def test_continue_headless_counts_failures_without_results(monkeypatch: pytest.MonkeyPatch) -> None:
     """Continue-mode must surface failures in progress when results are dropped."""
 
