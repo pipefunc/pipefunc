@@ -1565,8 +1565,6 @@ def _outputs_from_chunk_result(
 ) -> list[tuple[Any, ...]]:
     names = at_least_tuple(func.output_name)
     results_by_index = {element.index: element for element in chunk_result.elements}
-    fallback_exception = chunk_result.exception
-
     outputs: list[tuple[Any, ...]] = []
     for chunk_index in indices:
         element = results_by_index.get(chunk_index)
@@ -1576,10 +1574,8 @@ def _outputs_from_chunk_result(
         error_exc: Exception
         if element is not None and element.exception is not None:
             error_exc = element.exception
-        elif fallback_exception is not None:
-            error_exc = fallback_exception
         else:
-            msg = "chunk execution failed without per-index exception information"
+            msg = "chunk execution missing per-index exception information"
             raise RuntimeError(msg)
         snapshot = _raise_and_set_error_snapshot(
             error_exc,
