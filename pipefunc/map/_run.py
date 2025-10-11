@@ -986,7 +986,10 @@ def _submit(
         else:
             result = future.result()
             if isinstance(result, _ChunkResult):
-                successes = sum(element.exception is None for element in result.elements)
+                successes = sum(
+                    element.exception is None and not element.has_error
+                    for element in result.elements
+                )
                 failures = chunksize - successes
             else:
                 failures = _count_errors_in_result(result)
@@ -1017,10 +1020,19 @@ def _process_chunk(
             outputs = process_index(index)
         except Exception as exc:
             if error_handling == "continue":
-                results.append(_ChunkElementResult(index=index, exception=exc))
+                results.append(
+                    _ChunkElementResult(index=index, exception=exc, has_error=True),
+                )
                 return _ChunkResult(results, exception=exc)
             raise
-        results.append(_ChunkElementResult(index=index, outputs=outputs))
+        has_error = _count_errors_in_result(outputs) > 0
+        results.append(
+            _ChunkElementResult(
+                index=index,
+                outputs=outputs,
+                has_error=has_error,
+            ),
+        )
     if error_handling == "continue":
         return _ChunkResult(results, exception=None)
     return [result.outputs for result in results]
@@ -1237,6 +1249,7 @@ class _ChunkElementResult:
     index: int
     outputs: tuple[Any, ...] | None = None
     exception: Exception | None = None
+    has_error: bool = False
 
 
 @dataclass
@@ -1553,22 +1566,21 @@ def _outputs_from_chunk_result(
     names = at_least_tuple(func.output_name)
     results_by_index = {element.index: element for element in chunk_result.elements}
     fallback_exception = chunk_result.exception
-    if fallback_exception is not None and not isinstance(fallback_exception, Exception):
-        fallback_exception = Exception(str(fallback_exception))
 
     outputs: list[tuple[Any, ...]] = []
     for chunk_index in indices:
         element = results_by_index.get(chunk_index)
-        if element is not None and element.outputs is not None and element.exception is None:
+        if element is not None and element.outputs is not None:
             outputs.append(element.outputs)
             continue
         error_exc: Exception
         if element is not None and element.exception is not None:
             error_exc = element.exception
-        elif isinstance(fallback_exception, Exception):
+        elif fallback_exception is not None:
             error_exc = fallback_exception
         else:
-            error_exc = Exception("chunk execution failed")
+            msg = "chunk execution failed without per-index exception information"
+            raise RuntimeError(msg)
         snapshot = _raise_and_set_error_snapshot(
             error_exc,
             func,
