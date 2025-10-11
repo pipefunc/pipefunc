@@ -1619,9 +1619,6 @@ def _result(
             )
         return res
 
-    if isinstance(x, _ChunkResult) and chunk_indices is not None:
-        return _outputs_from_chunk_result(func, kwargs, run_info, chunk_indices, x)
-
     return x
 
 
