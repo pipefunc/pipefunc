@@ -981,8 +981,12 @@ def _submit(
     def _on_done(future: Future) -> None:
         exc = future.exception()
         if exc is not None:
-            successes = 0
-            failures = chunksize
+            if isinstance(exc, _ChunkExecutionError):
+                successes = sum(result.exception is None for result in exc.results)
+                failures = chunksize - successes
+            else:
+                successes = 0
+                failures = chunksize
         else:
             result = future.result()
             failures = _count_errors_in_result(result)
@@ -1005,7 +1009,19 @@ def _process_chunk(
     and it returns tuples containing ErrorSnapshots. When error_handling='raise',
     exceptions are propagated.
     """
-    return list(map(process_index, chunk))
+    kw = process_index.keywords or {}
+    error_handling = kw.get("error_handling", "raise")
+    results: list[_ChunkElementResult] = []
+    for index in chunk:
+        try:
+            outputs = process_index(index)
+        except Exception as exc:
+            if error_handling == "continue":
+                results.append(_ChunkElementResult(index=index, exception=exc))
+                raise _ChunkExecutionError(results) from exc
+            raise
+        results.append(_ChunkElementResult(index=index, outputs=outputs))
+    return [result.outputs for result in results]
 
 
 def _chunk_indices(indices: list[int], chunksize: int) -> Iterable[tuple[int, ...]]:
@@ -1212,6 +1228,19 @@ def _load_data(kwargs: dict[str, Any]) -> None:
 
 class _SingleTask(NamedTuple):
     value: Any
+
+
+@dataclass
+class _ChunkElementResult:
+    index: int
+    outputs: tuple[Any, ...] | None = None
+    exception: Exception | None = None
+
+
+class _ChunkExecutionError(Exception):
+    def __init__(self, results: list[_ChunkElementResult]) -> None:
+        super().__init__("chunk execution failed")
+        self.results = results
 
 
 class _ChunkTask(NamedTuple):
@@ -1512,6 +1541,44 @@ def _error_outputs_for_chunk(
     return outputs
 
 
+def _outputs_from_chunk_execution_error(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    run_info: RunInfo,
+    indices: tuple[int, ...],
+    exc: _ChunkExecutionError,
+) -> list[tuple[Any, ...]]:
+    names = at_least_tuple(func.output_name)
+    results_by_index = {result.index: result for result in exc.results}
+    fallback_exception = next(
+        (result.exception for result in exc.results if result.exception is not None),
+        exc.__cause__ or exc,
+    )
+    if not isinstance(fallback_exception, Exception):
+        fallback_exception = Exception(str(fallback_exception))
+
+    outputs: list[tuple[Any, ...]] = []
+    for chunk_index in indices:
+        result = results_by_index.get(chunk_index)
+        if result is not None and result.outputs is not None:
+            outputs.append(result.outputs)
+            continue
+        error_exc: Exception
+        if result is not None and result.exception is not None:
+            error_exc = result.exception
+        else:
+            error_exc = fallback_exception
+        snapshot = _raise_and_set_error_snapshot(
+            error_exc,
+            func,
+            kwargs,
+            run_info,
+            index=chunk_index,
+        )
+        outputs.append(tuple(snapshot for _ in names))
+    return outputs
+
+
 def _result(
     x: Any | Future,
     func: PipeFunc,
@@ -1528,6 +1595,16 @@ def _result(
                 _raise_and_set_error_snapshot(e, func, kwargs, run_info)
                 assert run_info.error_handling == "continue"
                 return func.error_snapshot
+            if isinstance(e, _ChunkExecutionError):
+                outputs = _outputs_from_chunk_execution_error(
+                    func,
+                    kwargs,
+                    run_info,
+                    chunk_indices,
+                    e,
+                )
+                assert run_info.error_handling == "continue"
+                return outputs
             # Mapspec functions with chunks return list of per-element errors
             outputs = _error_outputs_for_chunk(func, kwargs, run_info, chunk_indices, e)
             assert run_info.error_handling == "continue"
@@ -1553,6 +1630,16 @@ async def _result_async(
             _raise_and_set_error_snapshot(e, func, kwargs, run_info)
             assert run_info.error_handling == "continue"
             return func.error_snapshot
+        if isinstance(e, _ChunkExecutionError):
+            outputs = _outputs_from_chunk_execution_error(
+                func,
+                kwargs,
+                run_info,
+                chunk_indices,
+                e,
+            )
+            assert run_info.error_handling == "continue"
+            return outputs
         # Mapspec functions with chunks return list of per-element errors
         outputs = _error_outputs_for_chunk(func, kwargs, run_info, chunk_indices, e)
         assert run_info.error_handling == "continue"
