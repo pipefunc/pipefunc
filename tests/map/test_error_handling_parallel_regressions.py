@@ -134,26 +134,17 @@ def test_chunk_exception_preserves_prior_successes(monkeypatch: pytest.MonkeyPat
     assert isinstance(outputs[-1], ErrorSnapshot)
 
 
-def test_chunk_continue_handles_mid_chunk_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Chunk failure mid-chunk should not abort subsequent indices in continue mode."""
-
-    from pipefunc.map import _run as run_mod
+def test_chunk_continue_handles_mid_chunk_failure() -> None:
+    """Chunked continue-mode should preserve earlier successes when a later element fails."""
 
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
-    def double(x: int) -> int:
+    def fail_on_second(x: int) -> int:
+        if x == 2:
+            msg = "boom at index 2"
+            raise ValueError(msg)
         return x * 10
 
-    fail_index = 2
-    pipeline = Pipeline([double])
-    original = run_mod._run_iteration_and_process
-
-    def wrapped(index: int, *args, **kwargs):  # type: ignore[override]
-        if index == fail_index:
-            msg = "mid-chunk failure"
-            raise RuntimeError(msg)
-        return original(index, *args, **kwargs)
-
-    monkeypatch.setattr(run_mod, "_run_iteration_and_process", wrapped)
+    pipeline = Pipeline([fail_on_second])
 
     inputs = {"x": [0, 1, 2, 3, 4]}
     with ThreadPoolExecutor(max_workers=2) as executor:
@@ -168,7 +159,7 @@ def test_chunk_continue_handles_mid_chunk_failure(monkeypatch: pytest.MonkeyPatc
     outputs = list(result["y"].output)
     assert outputs[0] == 0
     assert outputs[1] == 10
-    assert isinstance(outputs[fail_index], ErrorSnapshot)
+    assert isinstance(outputs[2], ErrorSnapshot)
     assert outputs[3] == 30
     assert outputs[4] == 40
 

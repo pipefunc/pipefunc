@@ -1608,6 +1608,7 @@ def _result(
             outputs = _error_outputs_for_chunk(func, kwargs, run_info, chunk_indices, e)
             assert run_info.error_handling == "continue"
             return outputs
+
         if isinstance(res, _ChunkResult):
             assert chunk_indices is not None
             return _outputs_from_chunk_result(func, kwargs, run_info, chunk_indices, res)
@@ -1617,12 +1618,11 @@ def _result(
 
 
 async def _result_async(
-    task: Future | Any,
+    task: Any | Future,
     loop: asyncio.AbstractEventLoop,
     func: PipeFunc,
     kwargs: dict[str, Any],
     run_info: RunInfo,
-    *,
     chunk_indices: tuple[int, ...] | None = None,
 ) -> Any:
     try:
@@ -1640,15 +1640,7 @@ async def _result_async(
 
     if isinstance(res, _ChunkResult):
         assert chunk_indices is not None
-        return _outputs_from_chunk_result(
-            func,
-            kwargs,
-            run_info,
-            chunk_indices,
-            res,
-        )
-    if isinstance(res, list | tuple):
-        return res
+        return _outputs_from_chunk_result(func, kwargs, run_info, chunk_indices, res)
     return res
 
 
@@ -1738,14 +1730,7 @@ async def _process_task_async(
     if func.requires_mapping:
         assert isinstance(task, _MapTask)
         futs = [
-            _result_async(
-                chunk_task.value,
-                loop,
-                func,
-                kwargs,
-                run_info,
-                chunk_indices=chunk_task.chunk_indices,
-            )
+            _result_async(chunk_task.value, loop, func, kwargs, run_info, chunk_task.chunk_indices)
             for chunk_task in task.chunk_tasks
         ]
         chunk_outputs_list = await asyncio.gather(*futs)
