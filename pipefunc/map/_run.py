@@ -6,7 +6,7 @@ import itertools
 import math
 import time
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Sequence
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -981,16 +981,16 @@ def _submit(
     def _on_done(future: Future) -> None:
         exc = future.exception()
         if exc is not None:
-            if isinstance(exc, _ChunkExecutionError):
-                successes = sum(result.exception is None for result in exc.results)
-                failures = chunksize - successes
-            else:
-                successes = 0
-                failures = chunksize
+            successes = 0
+            failures = chunksize
         else:
             result = future.result()
-            failures = _count_errors_in_result(result)
-            successes = chunksize - failures
+            if isinstance(result, _ChunkResult):
+                successes = sum(element.exception is None for element in result.elements)
+                failures = chunksize - successes
+            else:
+                failures = _count_errors_in_result(result)
+                successes = chunksize - failures
         status.mark_finished(successes=successes, failures=failures)
         if not progress.in_async:
             progress.update_progress()
@@ -1002,7 +1002,7 @@ def _submit(
 def _process_chunk(
     chunk: list[int],
     process_index: functools.partial[tuple[Any, ...]],
-) -> list[Any]:
+) -> list[Any] | _ChunkResult:
     """Process a chunk of indices.
 
     When error_handling='continue', exceptions are handled within process_index
@@ -1018,9 +1018,11 @@ def _process_chunk(
         except Exception as exc:
             if error_handling == "continue":
                 results.append(_ChunkElementResult(index=index, exception=exc))
-                raise _ChunkExecutionError(results) from exc
+                return _ChunkResult(results, exception=exc)
             raise
         results.append(_ChunkElementResult(index=index, outputs=outputs))
+    if error_handling == "continue":
+        return _ChunkResult(results, exception=None)
     return [result.outputs for result in results]
 
 
@@ -1237,10 +1239,10 @@ class _ChunkElementResult:
     exception: Exception | None = None
 
 
-class _ChunkExecutionError(Exception):
-    def __init__(self, results: list[_ChunkElementResult]) -> None:
-        super().__init__("chunk execution failed")
-        self.results = results
+@dataclass
+class _ChunkResult:
+    elements: list[_ChunkElementResult]
+    exception: Exception | None = None
 
 
 class _ChunkTask(NamedTuple):
@@ -1541,33 +1543,32 @@ def _error_outputs_for_chunk(
     return outputs
 
 
-def _outputs_from_chunk_execution_error(
+def _outputs_from_chunk_result(
     func: PipeFunc,
     kwargs: dict[str, Any],
     run_info: RunInfo,
     indices: tuple[int, ...],
-    exc: _ChunkExecutionError,
+    chunk_result: _ChunkResult,
 ) -> list[tuple[Any, ...]]:
     names = at_least_tuple(func.output_name)
-    results_by_index = {result.index: result for result in exc.results}
-    fallback_exception = next(
-        (result.exception for result in exc.results if result.exception is not None),
-        exc.__cause__ or exc,
-    )
-    if not isinstance(fallback_exception, Exception):
+    results_by_index = {element.index: element for element in chunk_result.elements}
+    fallback_exception = chunk_result.exception
+    if fallback_exception is not None and not isinstance(fallback_exception, Exception):
         fallback_exception = Exception(str(fallback_exception))
 
     outputs: list[tuple[Any, ...]] = []
     for chunk_index in indices:
-        result = results_by_index.get(chunk_index)
-        if result is not None and result.outputs is not None:
-            outputs.append(result.outputs)
+        element = results_by_index.get(chunk_index)
+        if element is not None and element.outputs is not None and element.exception is None:
+            outputs.append(element.outputs)
             continue
         error_exc: Exception
-        if result is not None and result.exception is not None:
-            error_exc = result.exception
-        else:
+        if element is not None and element.exception is not None:
+            error_exc = element.exception
+        elif isinstance(fallback_exception, Exception):
             error_exc = fallback_exception
+        else:
+            error_exc = Exception("chunk execution failed")
         snapshot = _raise_and_set_error_snapshot(
             error_exc,
             func,
@@ -1588,27 +1589,30 @@ def _result(
 ) -> Any:
     if isinstance(x, Future):
         try:
-            return x.result()
+            res = x.result()
         except Exception as e:  # noqa: BLE001
             # Non-mapspec functions (single outputs) don't have chunk_indices
             if chunk_indices is None:
                 _raise_and_set_error_snapshot(e, func, kwargs, run_info)
                 assert run_info.error_handling == "continue"
                 return func.error_snapshot
-            if isinstance(e, _ChunkExecutionError):
-                outputs = _outputs_from_chunk_execution_error(
-                    func,
-                    kwargs,
-                    run_info,
-                    chunk_indices,
-                    e,
-                )
-                assert run_info.error_handling == "continue"
-                return outputs
             # Mapspec functions with chunks return list of per-element errors
             outputs = _error_outputs_for_chunk(func, kwargs, run_info, chunk_indices, e)
             assert run_info.error_handling == "continue"
             return outputs
+        if isinstance(res, _ChunkResult):
+            assert chunk_indices is not None
+            return _outputs_from_chunk_result(
+                func,
+                kwargs,
+                run_info,
+                chunk_indices,
+                res,
+            )
+        return res
+
+    if isinstance(x, _ChunkResult) and chunk_indices is not None:
+        return _outputs_from_chunk_result(func, kwargs, run_info, chunk_indices, x)
 
     return x
 
@@ -1623,27 +1627,30 @@ async def _result_async(
     chunk_indices: tuple[int, ...] | None = None,
 ) -> Any:
     try:
-        return await asyncio.wrap_future(task, loop=loop)
+        res = await asyncio.wrap_future(task, loop=loop)
     except Exception as e:  # noqa: BLE001
         # Non-mapspec functions (single outputs) don't have chunk_indices
         if chunk_indices is None:
             _raise_and_set_error_snapshot(e, func, kwargs, run_info)
             assert run_info.error_handling == "continue"
             return func.error_snapshot
-        if isinstance(e, _ChunkExecutionError):
-            outputs = _outputs_from_chunk_execution_error(
-                func,
-                kwargs,
-                run_info,
-                chunk_indices,
-                e,
-            )
-            assert run_info.error_handling == "continue"
-            return outputs
         # Mapspec functions with chunks return list of per-element errors
         outputs = _error_outputs_for_chunk(func, kwargs, run_info, chunk_indices, e)
         assert run_info.error_handling == "continue"
         return outputs
+
+    if isinstance(res, _ChunkResult):
+        assert chunk_indices is not None
+        return _outputs_from_chunk_result(
+            func,
+            kwargs,
+            run_info,
+            chunk_indices,
+            res,
+        )
+    if isinstance(res, list | tuple):
+        return res
+    return res
 
 
 def _to_result_dict(
