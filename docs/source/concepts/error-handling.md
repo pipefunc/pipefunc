@@ -26,9 +26,12 @@ kernelspec:
 
 - `error_handling="raise"` (default): stop on the first failure and raise the
   underlying exception.
-- `error_handling="continue"`: convert failures into
+- `error_handling="continue"`: convert failures raised inside user-defined
+  {class}`~pipefunc.PipeFunc` callables into
   {class}`~pipefunc.ErrorSnapshot` objects so the run can continue and
-  downstream tasks can inspect the failure.
+  downstream tasks can inspect the failure. Infrastructure issues (e.g. pickling
+  the return value, shape validation, storage I/O) still abort the run regardless
+  of the setting.
 
 The sections below show how to inspect snapshots, how propagation works, and
 why the behaviour is consistent across synchronous, parallel, and async runs.
