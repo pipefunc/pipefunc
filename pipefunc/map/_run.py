@@ -1588,6 +1588,22 @@ def _outputs_from_chunk_result(
     return outputs
 
 
+def _handle_future_exception(
+    exc: Exception,
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    run_info: RunInfo,
+    chunk_indices: tuple[int, ...] | None,
+) -> Any:
+    if chunk_indices is None:
+        _raise_and_set_error_snapshot(exc, func, kwargs, run_info)
+        assert run_info.error_handling == "continue"
+        return func.error_snapshot
+    outputs = _error_outputs_for_chunk(func, kwargs, run_info, chunk_indices, exc)
+    assert run_info.error_handling == "continue"
+    return outputs
+
+
 def _result(
     x: Any | Future,
     func: PipeFunc,
@@ -1599,15 +1615,7 @@ def _result(
         try:
             res = x.result()
         except Exception as e:  # noqa: BLE001
-            # Non-mapspec functions (single outputs) don't have chunk_indices
-            if chunk_indices is None:
-                _raise_and_set_error_snapshot(e, func, kwargs, run_info)
-                assert run_info.error_handling == "continue"
-                return func.error_snapshot
-            # Mapspec functions with chunks return list of per-element errors
-            outputs = _error_outputs_for_chunk(func, kwargs, run_info, chunk_indices, e)
-            assert run_info.error_handling == "continue"
-            return outputs
+            return _handle_future_exception(e, func, kwargs, run_info, chunk_indices)
 
         if isinstance(res, _ChunkResult):
             assert chunk_indices is not None
@@ -1628,15 +1636,7 @@ async def _result_async(
     try:
         res = await asyncio.wrap_future(task, loop=loop)
     except Exception as e:  # noqa: BLE001
-        # Non-mapspec functions (single outputs) don't have chunk_indices
-        if chunk_indices is None:
-            _raise_and_set_error_snapshot(e, func, kwargs, run_info)
-            assert run_info.error_handling == "continue"
-            return func.error_snapshot
-        # Mapspec functions with chunks return list of per-element errors
-        outputs = _error_outputs_for_chunk(func, kwargs, run_info, chunk_indices, e)
-        assert run_info.error_handling == "continue"
-        return outputs
+        return _handle_future_exception(e, func, kwargs, run_info, chunk_indices)
 
     if isinstance(res, _ChunkResult):
         assert chunk_indices is not None
