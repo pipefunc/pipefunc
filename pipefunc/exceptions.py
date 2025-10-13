@@ -207,7 +207,7 @@ class PropagatedErrorSnapshot:
                 if isinstance(serialized_error, bytes):
                     error = cloudpickle.loads(serialized_error)
                 else:
-                    # NOTE: The upcoming v0.88 release stores serialized bytes, while
+                    # NOTE: v0.88 stores serialized bytes, while
                     # older snapshots stored the ErrorSnapshot directly.
                     error = serialized_error
                 error_info[param] = ErrorInfo.from_full_error(error)
