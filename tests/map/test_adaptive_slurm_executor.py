@@ -5,6 +5,7 @@ import shutil
 import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
+from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Literal
 from unittest import mock
@@ -22,9 +23,9 @@ from pipefunc.map._storage_array._file import FileArray
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from pathlib import Path
 
-has_slurm = shutil.which("srun") is not None
+bash_path = Path("/bin/bash")
+has_slurm = shutil.which("srun") is not None and bash_path.exists()
 
 
 @pytest.fixture(autouse=True)
