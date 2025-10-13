@@ -1513,7 +1513,7 @@ def _result(
     if isinstance(x, Future):
         try:
             return x.result()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             _raise_and_set_error_snapshot(e, func, kwargs, index=index, run_info=run_info)
             raise  # pragma: no cover
     return x
@@ -1529,7 +1529,7 @@ async def _result_async(
 ) -> Any:
     try:
         return await asyncio.wrap_future(task, loop=loop)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         _raise_and_set_error_snapshot(e, func, kwargs, index=index, run_info=run_info)
         raise  # pragma: no cover
 

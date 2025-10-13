@@ -2014,7 +2014,9 @@ def test_error_snapshot_in_parallel_map():
         pipeline.error_snapshot.reproduce()
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="spawned processes require __main__ guard on Windows")
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="spawned processes require __main__ guard on Windows"
+)
 def test_error_snapshot_in_process_pool_map(tmp_path: Path) -> None:
     @pipefunc(output_name="c", renames={"a": "b"})
     def f(a):
