@@ -571,6 +571,18 @@ def _select_kwargs(
     return selected
 
 
+def _select_kwargs_and_eval_resources(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    shape: ShapeTuple,
+    shape_mask: tuple[bool, ...],
+    index: int,
+) -> dict[str, Any]:
+    selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
+    _maybe_eval_resources(func, kwargs, selected, _ErrorInfos(None, None))
+    return selected
+
+
 class _ErrorInfos(NamedTuple):
     map: dict[str, ErrorInfo] | None
     element: dict[str, ErrorInfo] | None
@@ -1109,21 +1121,24 @@ def _maybe_parallel_map(
             if status is not None:
                 assert progress is not None
                 process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
-            return [_ChunkTask((process_index(i),)) for i in indices]
+            return [_ChunkTask((process_index(i),), (i,)) for i in indices]
 
         ex = maybe_update_slurm_executor_map(func, ex, executor, process_index, indices)
         chunksize = _chunksize_for_func(func, chunksizes, len(indices), ex)
         chunks = list(_chunk_indices(indices, chunksize))
         process_chunk = functools.partial(_process_chunk, process_index=process_index)
         return [
-            _ChunkTask(_submit(process_chunk, ex, status, progress, len(chunk), chunk))
+            _ChunkTask(
+                _submit(process_chunk, ex, status, progress, len(chunk), chunk),
+                tuple(chunk),
+            )
             for chunk in chunks
         ]
     if status is not None:
         assert progress is not None
         process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
     # Put the process_index result in a tuple to have consistent shapes when func has mapspec
-    return [_ChunkTask((process_index(i),)) for i in indices]
+    return [_ChunkTask((process_index(i),), (i,)) for i in indices]
 
 
 def _wrap_with_status_update(
@@ -1210,6 +1225,7 @@ class _SingleTask(NamedTuple):
 
 class _ChunkTask(NamedTuple):
     value: Any
+    indices: tuple[int, ...]
 
 
 class _MapTask(NamedTuple):
@@ -1470,14 +1486,52 @@ def _maybe_set_internal_shape(output: Any, storage: StorageBase) -> None:
         storage.internal_shape = internal_shape
 
 
-def _result(x: Any | Future) -> Any:
+def _raise_and_set_error_snapshot(
+    exc: Exception,
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    *,
+    index: int | None = None,
+    run_info: RunInfo | None = None,
+) -> None:
+    if index is not None:
+        assert run_info is not None, "run_info required when index is provided"
+        shape = run_info.resolved_shapes[func.output_name]
+        mask = run_info.shape_masks[func.output_name]
+        kwargs = _select_kwargs_and_eval_resources(func, kwargs, shape, mask, index)
+    kwargs = func._rename_to_native(kwargs)
+    handle_pipefunc_error(exc, func, kwargs)
+
+
+def _result(
+    x: Any | Future,
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    index: int | None = None,
+    run_info: RunInfo | None = None,
+) -> Any:
     if isinstance(x, Future):
-        return x.result()
+        try:
+            return x.result()
+        except Exception as e:  # noqa: BLE001
+            _raise_and_set_error_snapshot(e, func, kwargs, index=index, run_info=run_info)
+            raise  # pragma: no cover
     return x
 
 
-async def _result_async(task: Future, loop: asyncio.AbstractEventLoop) -> Any:
-    return await asyncio.wrap_future(task, loop=loop)
+async def _result_async(
+    task: Future,
+    loop: asyncio.AbstractEventLoop,
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    index: int | None = None,
+    run_info: RunInfo | None = None,
+) -> Any:
+    try:
+        return await asyncio.wrap_future(task, loop=loop)
+    except Exception as e:  # noqa: BLE001
+        _raise_and_set_error_snapshot(e, func, kwargs, index=index, run_info=run_info)
+        raise  # pragma: no cover
 
 
 def _to_result_dict(
@@ -1511,7 +1565,16 @@ def _process_task(
     kwargs, task = kwargs_task
     if func.requires_mapping:
         assert isinstance(task, _MapTask)
-        chunk_outputs_list = [_result(chunk_task.value) for chunk_task in task.chunk_tasks]
+        chunk_outputs_list = [
+            _result(
+                chunk_task.value,
+                func,
+                kwargs,
+                chunk_task.indices[0] if chunk_task.indices else None,
+                run_info,
+            )
+            for chunk_task in task.chunk_tasks
+        ]
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
         output = _output_from_mapspec_task(
@@ -1524,7 +1587,7 @@ def _process_task(
         )
     else:
         assert isinstance(task, _SingleTask)
-        r = _result(task.value)
+        r = _result(task.value, func, kwargs, run_info=run_info)
         output = _dump_single_output(func, r, store, run_info)
 
     if return_results:
@@ -1566,9 +1629,22 @@ async def _process_task_async(
         for chunk_task in task.chunk_tasks:
             value = chunk_task.value
             if isinstance(value, Future):
-                outputs = await _result_async(value, loop)
+                outputs = await _result_async(
+                    value,
+                    loop,
+                    func,
+                    kwargs,
+                    chunk_task.indices[0] if chunk_task.indices else None,
+                    run_info,
+                )
             else:
-                outputs = _result(value)
+                outputs = _result(
+                    value,
+                    func,
+                    kwargs,
+                    chunk_task.indices[0] if chunk_task.indices else None,
+                    run_info,
+                )
             chunk_outputs_list.append(outputs)
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
@@ -1583,7 +1659,7 @@ async def _process_task_async(
     else:
         assert isinstance(task, _SingleTask)
         assert isinstance(task.value, Future)
-        r = await _result_async(task.value, loop)
+        r = await _result_async(task.value, loop, func, kwargs, run_info=run_info)
         output = _dump_single_output(func, r, store, run_info)
     if return_results:
         assert output is not None

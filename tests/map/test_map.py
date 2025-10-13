@@ -2014,6 +2014,33 @@ def test_error_snapshot_in_parallel_map():
         pipeline.error_snapshot.reproduce()
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="spawned processes require __main__ guard on Windows")
+def test_error_snapshot_in_process_pool_map(tmp_path: Path) -> None:
+    @pipefunc(output_name="c", renames={"a": "b"})
+    def f(a):
+        if a < 0:
+            msg = "a cannot be negative"
+            raise ValueError(msg)
+        return a * 2
+
+    pipeline = Pipeline([f])
+
+    with ProcessPoolExecutor() as executor:
+        with pytest.raises(ValueError, match="a cannot be negative"):
+            pipeline.map(
+                {"b": -1},
+                parallel=True,
+                executor=executor,
+                storage="dict",
+                run_folder=tmp_path,
+            )
+
+    assert pipeline.error_snapshot is not None
+
+    with pytest.raises(ValueError, match="a cannot be negative"):
+        pipeline.error_snapshot.reproduce()
+
+
 @pytest.mark.skipif(not has_xarray, reason="requires xarray")
 def test_load_dataframe_with_list_of_tuples_output(tmp_path: Path) -> None:
     """Regression test for loading outputs that are lists of tuples.
