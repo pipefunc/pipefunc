@@ -1565,16 +1565,19 @@ def _process_task(
     kwargs, task = kwargs_task
     if func.requires_mapping:
         assert isinstance(task, _MapTask)
-        chunk_outputs_list = [
-            _result(
-                chunk_task.value,
-                func,
-                kwargs,
-                chunk_task.indices[0] if chunk_task.indices else None,
-                run_info,
+        chunk_outputs_list = []
+        for chunk_task in task.chunk_tasks:
+            # TODO: Capture the precise failing index when a chunk contains multiple items.
+            representative_index = chunk_task.indices[0] if chunk_task.indices else None
+            chunk_outputs_list.append(
+                _result(
+                    chunk_task.value,
+                    func,
+                    kwargs,
+                    representative_index,
+                    run_info,
+                ),
             )
-            for chunk_task in task.chunk_tasks
-        ]
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
         output = _output_from_mapspec_task(
@@ -1627,6 +1630,7 @@ async def _process_task_async(
         assert isinstance(task, _MapTask)
         chunk_outputs_list: list[list[Any]] = []
         for chunk_task in task.chunk_tasks:
+            representative_index = chunk_task.indices[0] if chunk_task.indices else None
             value = chunk_task.value
             if isinstance(value, Future):
                 outputs = await _result_async(
@@ -1634,7 +1638,7 @@ async def _process_task_async(
                     loop,
                     func,
                     kwargs,
-                    chunk_task.indices[0] if chunk_task.indices else None,
+                    representative_index,
                     run_info,
                 )
             else:
@@ -1642,7 +1646,7 @@ async def _process_task_async(
                     value,
                     func,
                     kwargs,
-                    chunk_task.indices[0] if chunk_task.indices else None,
+                    representative_index,
                     run_info,
                 )
             chunk_outputs_list.append(outputs)
