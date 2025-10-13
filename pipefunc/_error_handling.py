@@ -210,6 +210,6 @@ def cloudunpickle_function_state(state: dict[str, Any], function_key: str) -> di
         # NOTE: Starting with the upcoming v0.88 release we persist raw bytes here;
         # pre-v0.88 pickles still contain the live callable, so only deserialize if
         # the stored value is bytes.
-        if isinstance(value, (bytes, bytearray, memoryview)):
+        if isinstance(value, bytes):
             state[function_key] = cloudpickle.loads(value)
     return state
