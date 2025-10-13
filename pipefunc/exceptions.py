@@ -203,7 +203,13 @@ class PropagatedErrorSnapshot:
         error_info = {}
         for param, info_dict in pickled_info.items():
             if info_dict["type"] == "full" and "error" in info_dict:
-                error = cloudpickle.loads(info_dict["error"])
+                serialized_error = info_dict["error"]
+                if isinstance(serialized_error, (bytes, bytearray, memoryview)):
+                    error = cloudpickle.loads(serialized_error)
+                else:
+                    # NOTE: The upcoming v0.88 release stores serialized bytes, while
+                    # older snapshots stored the ErrorSnapshot directly.
+                    error = serialized_error
                 error_info[param] = ErrorInfo.from_full_error(error)
             else:
                 error_info[param] = ErrorInfo(

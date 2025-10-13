@@ -5,6 +5,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+import cloudpickle
 import numpy as np
 import pytest
 
@@ -204,8 +205,6 @@ def test_propagated_error_snapshot_pickle_unpickle():
     )
 
     # Test pickling and unpickling
-    import cloudpickle
-
     pickled = cloudpickle.dumps(propagated)
     unpickled = cloudpickle.loads(pickled)
 
@@ -228,3 +227,99 @@ def test_propagated_error_snapshot_pickle_unpickle():
     assert partial_info.type == "partial"
     assert partial_info.shape == (2, 2)
     assert partial_info.error_count == 2
+
+
+def test_error_snapshot_loads_legacy_pickle(tmp_path, monkeypatch):
+    """Regression: load snapshots pickled before function serialization change."""
+
+    def failing() -> None:
+        message = "legacy boom"
+        raise RuntimeError(message)
+
+    try:
+        failing()
+    except RuntimeError as exc:
+        legacy_snapshot = ErrorSnapshot(
+            function=failing,
+            exception=exc,
+            args=(),
+            kwargs={},
+        )
+
+    def legacy_getstate(self: ErrorSnapshot):  # type: ignore[no-redef]
+        return self.__dict__.copy()
+
+    monkeypatch.setattr(ErrorSnapshot, "__getstate__", legacy_getstate, raising=False)
+
+    legacy_path = tmp_path / "legacy_error.pkl"
+    with legacy_path.open("wb") as fh:
+        cloudpickle.dump(legacy_snapshot, fh)
+
+    loaded = ErrorSnapshot.load_from_file(legacy_path)
+    assert isinstance(loaded, ErrorSnapshot)
+    assert loaded.function.__name__ == failing.__name__
+    assert str(loaded.exception) == "legacy boom"
+    with pytest.raises(RuntimeError, match="legacy boom"):
+        loaded.reproduce()
+
+
+def test_propagated_error_snapshot_loads_legacy_pickle(tmp_path, monkeypatch):
+    """Regression: load propagated snapshots containing direct ErrorSnapshots."""
+
+    def exploding(x: int) -> int:
+        message = f"bad {x}"
+        raise ValueError(message)
+
+    try:
+        exploding(1)
+    except ValueError as exc:
+        nested_snapshot = ErrorSnapshot(
+            function=exploding,
+            exception=exc,
+            args=(1,),
+            kwargs={},
+        )
+
+    error_info = {"p": ErrorInfo.from_full_error(nested_snapshot)}
+
+    def skipped(p):
+        return p
+
+    propagated = PropagatedErrorSnapshot(
+        error_info=error_info,
+        skipped_function=skipped,
+        reason="input_is_error",
+        attempted_kwargs={},
+    )
+
+    def legacy_pickle_error_info(self, info):  # type: ignore[no-redef]
+        legacy = {}
+        for param, entry in info.items():
+            legacy[param] = {
+                "type": entry.type,
+                "shape": entry.shape,
+                "error_indices": entry.error_indices,
+                "error_count": entry.error_count,
+            }
+            if entry.type == "full" and entry.error is not None:
+                legacy[param]["error"] = entry.error
+        return legacy
+
+    monkeypatch.setattr(
+        PropagatedErrorSnapshot,
+        "_pickle_error_info",
+        legacy_pickle_error_info,
+        raising=False,
+    )
+
+    propagated_path = tmp_path / "legacy_propagated.pkl"
+    with propagated_path.open("wb") as fh:
+        cloudpickle.dump(propagated, fh)
+
+    with propagated_path.open("rb") as fh:
+        loaded = cloudpickle.load(fh)
+    assert isinstance(loaded, PropagatedErrorSnapshot)
+    info = loaded.error_info["p"]
+    assert info.type == "full"
+    assert isinstance(info.error, ErrorSnapshot)
+    assert str(info.error.exception) == "bad 1"
