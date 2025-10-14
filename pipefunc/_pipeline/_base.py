@@ -545,6 +545,16 @@ class Pipeline:
             # `clear_pipelines=False` to avoid infinite recursion
             f._clear_internal_cache(clear_pipelines=False)
 
+    @functools.cached_property
+    def has_async_functions(self) -> bool:
+        """Return ``True`` if any function in the pipeline is asynchronous."""
+        return any(func.is_async for func in self.functions)
+
+    @functools.cached_property
+    def requires_async_execution(self) -> bool:
+        """Return ``True`` if the pipeline must be executed asynchronously."""
+        return self.has_async_functions
+
     def __call__(self, __output_name__: OUTPUT_TYPE | None = None, /, **kwargs: Any) -> Any:
         """Call the pipeline for a specific return value.
 
@@ -585,6 +595,37 @@ class Pipeline:
                 value = flat_scope_kwargs[arg]
             elif arg in self.output_to_func:
                 value = self._run(
+                    output_name=arg,
+                    flat_scope_kwargs=flat_scope_kwargs,
+                    all_results=all_results,
+                    full_output=full_output,
+                    used_parameters=used_parameters,
+                )
+            elif arg in self.defaults:
+                value = self.defaults[arg]
+            else:
+                msg = f"Missing value for argument `{arg}` in `{func}`."
+                raise ValueError(msg)
+            func_args[arg] = value
+            used_parameters.add(arg)
+        return func_args
+
+    async def _get_func_args_async(
+        self,
+        func: PipeFunc,
+        flat_scope_kwargs: dict[str, Any],
+        all_results: dict[OUTPUT_TYPE, Any],
+        full_output: bool,
+        used_parameters: set[str | None],
+    ) -> dict[str, Any]:
+        func_args = {}
+        for arg in func.parameters:
+            if arg in func._bound:
+                value = func._bound[arg]
+            elif arg in flat_scope_kwargs:
+                value = flat_scope_kwargs[arg]
+            elif arg in self.output_to_func:
+                value = await self._run_async(
                     output_name=arg,
                     flat_scope_kwargs=flat_scope_kwargs,
                     all_results=all_results,
@@ -664,6 +705,65 @@ class Pipeline:
         _update_all_results(func, r, output_name, all_results, self.lazy)
         return all_results[output_name]
 
+    async def _run_async(
+        self,
+        *,
+        output_name: OUTPUT_TYPE,
+        flat_scope_kwargs: dict[str, Any],
+        all_results: dict[OUTPUT_TYPE, Any],
+        full_output: bool,
+        used_parameters: set[str | None],
+    ) -> Any:
+        if output_name in all_results:
+            return all_results[output_name]
+        func = self.output_to_func[output_name]
+        assert func.parameters is not None
+
+        cache = self._current_cache()
+        use_cache = (func.cache and cache is not None) or task_graph() is not None
+        root_args = self.root_args(output_name)
+        result_from_cache = False
+        cache_key: tuple[OUTPUT_TYPE, tuple[tuple[str, Any], ...]] | None = None
+        if use_cache:
+            assert cache is not None
+            cache_key = compute_cache_key(
+                func._cache_id,
+                self._func_defaults(func) | flat_scope_kwargs | func._bound,
+                root_args,
+            )
+            return_now, result_from_cache = get_result_from_cache(
+                func,
+                cache,
+                cache_key,
+                output_name,
+                all_results,
+                full_output,
+                used_parameters,
+                self.lazy,
+            )
+            if return_now:
+                return all_results[output_name]
+
+        func_args = await self._get_func_args_async(
+            func,
+            flat_scope_kwargs,
+            all_results,
+            full_output,
+            used_parameters,
+        )
+
+        if result_from_cache:
+            assert full_output
+            return all_results[output_name]
+
+        start_time = time.perf_counter()
+        r = await _execute_func_async(func, func_args, self.lazy)
+        if use_cache and cache_key is not None:
+            assert cache is not None
+            update_cache(cache, cache_key, r, start_time)
+        _update_all_results(func, r, output_name, all_results, self.lazy)
+        return all_results[output_name]
+
     def _validate_run_output_name(
         self,
         kwargs: dict[str, Any],
@@ -725,6 +825,12 @@ class Pipeline:
             return values of the pipeline functions.
 
         """
+        if self.has_async_functions:
+            msg = (
+                "Pipeline contains async functions and must be executed asynchronously. "
+                "Use `await pipeline.run_async(...)` instead of `pipeline.run(...)`."
+            )
+            raise RuntimeError(msg)
         self._validate_run_output_name(kwargs, output_name)
         self._validate_scoped_parameters(kwargs)
         flat_scope_kwargs = self._flatten_scopes(kwargs)
@@ -742,6 +848,54 @@ class Pipeline:
             )
 
         # if has None, result was from cache, so we don't know which parameters were used
+        if (
+            not allow_unused
+            and None not in used_parameters
+            and (unused := flat_scope_kwargs.keys() - set(used_parameters))
+        ):
+            unused_str = ", ".join(sorted(unused))
+            msg = f"Unused keyword arguments: `{unused_str}`. {kwargs=}, {used_parameters=}"
+            raise UnusedParametersError(msg)
+
+        if full_output:
+            return all_results
+        if isinstance(output_name, list):
+            return tuple(all_results[k] for k in output_name)
+        return all_results[output_name]
+
+    async def run_async(
+        self,
+        output_name: OUTPUT_TYPE | list[OUTPUT_TYPE],
+        *,
+        full_output: bool = False,
+        kwargs: dict[str, Any],
+        allow_unused: bool = False,
+    ) -> Any:
+        """Asynchronously execute the pipeline for a specific return value."""
+        if not self.has_async_functions:
+            return self.run(
+                output_name,
+                full_output=full_output,
+                kwargs=kwargs,
+                allow_unused=allow_unused,
+            )
+
+        self._validate_run_output_name(kwargs, output_name)
+        self._validate_scoped_parameters(kwargs)
+        flat_scope_kwargs = self._flatten_scopes(kwargs)
+
+        all_results: dict[OUTPUT_TYPE, Any] = flat_scope_kwargs.copy()  # type: ignore[assignment]
+        used_parameters: set[str | None] = set()
+        output_names = [output_name] if not isinstance(output_name, list) else output_name
+        for _output_name in output_names:
+            await self._run_async(
+                output_name=_output_name,
+                flat_scope_kwargs=flat_scope_kwargs,
+                all_results=all_results,
+                full_output=full_output,
+                used_parameters=used_parameters,
+            )
+
         if (
             not allow_unused
             and None not in used_parameters
@@ -895,6 +1049,11 @@ class Pipeline:
             use `Result.output` to get the actual result.
 
         """
+        if self.has_async_functions:
+            msg = (
+                "Pipeline contains async functions and must be executed with `Pipeline.map_async`."
+            )
+            raise RuntimeError(msg)
         if scheduling_strategy == "generation":
             run_map_func = run_map
         elif scheduling_strategy == "eager":
@@ -2595,6 +2754,24 @@ def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:
     except Exception as e:
         handle_pipefunc_error(e, func, func_args)
         # handle_pipefunc_error raises but mypy doesn't know that
+        raise  # pragma: no cover
+
+
+async def _execute_func_async(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:
+    if lazy:
+        if func.is_async:
+            msg = (
+                f"Lazy execution is not supported for async function '{func.__name__}'."
+                " Disable lazy evaluation or provide a synchronous implementation."
+            )
+            raise RuntimeError(msg)
+        return _LazyFunction(func, kwargs=func_args)
+    try:
+        if func.is_async:
+            return await func.__call_async__(**func_args)
+        return func(**func_args)
+    except Exception as e:
+        handle_pipefunc_error(e, func, func_args)
         raise  # pragma: no cover
 
 
