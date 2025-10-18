@@ -6,6 +6,7 @@ import itertools
 import math
 import time
 import warnings
+from collections.abc import Callable, Iterable, Sequence
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -15,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 import numpy as np
 import numpy.typing as npt
 
+from pipefunc._error_handling import ErrorInfo, check_for_error_inputs, handle_error_inputs
 from pipefunc._pipefunc_utils import handle_pipefunc_error
 from pipefunc._utils import (
     at_least_tuple,
@@ -25,6 +27,7 @@ from pipefunc._utils import (
 )
 from pipefunc._widgets.helpers import maybe_async_task_status_widget
 from pipefunc.cache import HybridCache, to_hashable
+from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
 
 from ._adaptive_scheduler_slurm_executor import (
     is_slurm_executor,
@@ -78,6 +81,7 @@ def run_map(
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
+    error_handling: Literal["raise", "continue"] = "raise",
 ) -> ResultDict:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -177,6 +181,11 @@ def run_map(
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+    error_handling
+        How to handle errors during function execution:
+
+        - ``"raise"`` (default): Stop execution on first error and raise exception
+        - ``"continue"``: Continue execution, collecting errors as ErrorSnapshot objects
 
     """
     prep = prepare_run(
@@ -193,6 +202,7 @@ def run_map(
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,
+        error_handling=error_handling,
         in_async=False,
     )
 
@@ -297,6 +307,7 @@ def run_map_async(
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
+    error_handling: Literal["raise", "continue"] = "raise",
     display_widgets: bool = True,
     start: bool = True,
 ) -> AsyncMap:
@@ -399,6 +410,11 @@ def run_map_async(
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+    error_handling
+        How to handle errors during function execution:
+
+        - ``"raise"`` (default): Stop execution on first error and raise exception
+        - ``"continue"``: Continue execution, collecting errors as ErrorSnapshot objects
     start
         Whether to start the pipeline immediately. If ``False``, the pipeline is not started until the
         `start()` method on the `AsyncMap` instance is called.
@@ -419,6 +435,7 @@ def run_map_async(
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,
         in_async=True,
+        error_handling=error_handling,
     )
 
     multi_run_manager = maybe_multi_run_manager(prep.executor)
@@ -554,16 +571,6 @@ def _select_kwargs(
     return selected
 
 
-def _maybe_eval_resources_in_selected(
-    kwargs: dict[str, Any],
-    selected: dict[str, Any],
-    func: PipeFunc,
-) -> None:
-    if callable(func.resources):  # type: ignore[has-type]
-        kw = kwargs if func.resources_scope == "map" else selected
-        selected[_EVALUATED_RESOURCES] = func.resources(kw)  # type: ignore[has-type]
-
-
 def _select_kwargs_and_eval_resources(
     func: PipeFunc,
     kwargs: dict[str, Any],
@@ -572,8 +579,47 @@ def _select_kwargs_and_eval_resources(
     index: int,
 ) -> dict[str, Any]:
     selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
-    _maybe_eval_resources_in_selected(kwargs, selected, func)
+    _maybe_eval_resources(func, kwargs, selected, _ErrorInfos(None, None))
     return selected
+
+
+class _ErrorInfos(NamedTuple):
+    map: dict[str, ErrorInfo] | None
+    element: dict[str, ErrorInfo] | None
+
+
+def _collect_error_info(
+    func: PipeFunc,
+    map_kwargs: dict[str, Any],
+    element_kwargs: dict[str, Any],
+    error_handling: Literal["raise", "continue"],
+) -> _ErrorInfos:
+    if error_handling != "continue":
+        return _ErrorInfos(None, None)
+
+    element_error_info = check_for_error_inputs(element_kwargs)
+    map_error_info: dict[str, ErrorInfo] | None = None
+
+    if func.requires_mapping and func.resources_scope == "map":
+        map_error_info = check_for_error_inputs(map_kwargs)
+
+    return _ErrorInfos(map_error_info, element_error_info)
+
+
+def _maybe_eval_resources(
+    func: PipeFunc,
+    map_kwargs: dict[str, Any],
+    element_kwargs: dict[str, Any],
+    error_infos: _ErrorInfos,
+) -> None:
+    if (
+        not callable(func.resources)  # type: ignore[has-type]
+        or (func.resources_scope == "map" and error_infos.map)
+        or (func.resources_scope == "element" and error_infos.element)
+    ):
+        return
+    kw = map_kwargs if func.resources_scope == "map" else element_kwargs
+    element_kwargs[_EVALUATED_RESOURCES] = func.resources(kw)  # type: ignore[has-type]
 
 
 def _init_result_arrays(
@@ -621,17 +667,24 @@ _EVALUATED_RESOURCES = "__pipefunc_internal_evaluated_resources__"
 def _run_iteration(
     func: PipeFunc,
     selected: dict[str, Any],
+    error_info: dict[str, ErrorInfo] | None,
     cache: _CacheBase | None,
-    in_executor: bool,
+    error_handling: Literal["raise", "continue"],
 ) -> Any:
+    # Early error detection when error_handling == "continue"
+    propagated_error = handle_error_inputs(selected, func, error_handling, error_info)
+    if propagated_error is not None:
+        return propagated_error
+
     def compute_fn() -> Any:
         try:
             return func(**selected)
         except Exception as e:
-            if not in_executor:
-                # If we are in the executor, we need to handle the error in `_result`
-                handle_pipefunc_error(e, func, selected)
-                # handle_pipefunc_error raises but mypy doesn't know that
+            # Collect the snapshot in the worker and continue so chunk futures
+            # still resolve and `_result` can map errors back to each index.
+            handle_pipefunc_error(e, func, selected, error_handling)
+            if error_handling == "continue":
+                return func.error_snapshot
             raise  # pragma: no cover
 
     return _get_or_set_cache(func, selected, cache, compute_fn)
@@ -650,8 +703,28 @@ class _InternalShape:
     shape: tuple[int, ...]
 
     @classmethod
-    def from_outputs(cls, outputs: tuple[Any]) -> tuple[_InternalShape, ...]:
-        return tuple(cls(_try_shape(output)) for output in outputs)
+    def from_outputs(cls, outputs: tuple[Any]) -> tuple[Any, ...]:
+        return tuple(
+            output
+            if isinstance(output, (ErrorSnapshot, PropagatedErrorSnapshot))
+            else cls(_try_shape(output))
+            for output in outputs
+        )
+
+
+def _entry_contains_error(entry: Any) -> bool:
+    if isinstance(entry, (ErrorSnapshot, PropagatedErrorSnapshot)):
+        return True
+    return any(
+        isinstance(value, (ErrorSnapshot, PropagatedErrorSnapshot))
+        for value in at_least_tuple(entry)
+    )
+
+
+def _count_errors_in_result(result: Any) -> int:
+    if isinstance(result, list | tuple):
+        return sum(_entry_contains_error(entry) for entry in result)
+    return int(_entry_contains_error(result))
 
 
 def _run_iteration_and_process(
@@ -663,12 +736,14 @@ def _run_iteration_and_process(
     arrays: Sequence[StorageBase],
     cache: _CacheBase | None = None,
     *,
-    in_executor: bool,
+    error_handling: Literal["raise", "continue"],
     return_results: bool = True,
     force_dump: bool = False,
 ) -> tuple[Any, ...]:
-    selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
-    output = _run_iteration(func, selected, cache, in_executor)
+    selected_kwargs = _select_kwargs(func, kwargs, shape, shape_mask, index)
+    error_infos = _collect_error_info(func, kwargs, selected_kwargs, error_handling)
+    _maybe_eval_resources(func, kwargs, selected_kwargs, error_infos)
+    output = _run_iteration(func, selected_kwargs, error_infos.element, cache, error_handling)
     outputs = _pick_output(func, output)
     has_dumped = _update_array(
         func,
@@ -702,12 +777,18 @@ def _update_array(
     # we dump it in the executor. Otherwise, we dump it in the main process during the result array update.
     # We do this to offload the I/O and serialization overhead to the executor process if possible.
     assert isinstance(func.mapspec, MapSpec)
+
     output_key = None
     has_dumped = False
     for array, _output in zip(arrays, outputs):
         if not array.full_shape_is_resolved():
             _maybe_set_internal_shape(_output, array)
-        if force_dump or (array.dump_in_subprocess ^ in_post_process):
+        # Error objects bypass XOR logic and dump immediately when created because:
+        # 1. They short-circuit execution (subsequent functions skip when seeing errors)
+        # 2. Without immediate dump, the XOR logic could prevent saving them entirely
+        # Normal values use XOR to dump exactly once (subprocess OR main process)
+        is_error_object = isinstance(_output, (ErrorSnapshot, PropagatedErrorSnapshot))
+        if is_error_object or force_dump or (array.dump_in_subprocess ^ in_post_process):
             if output_key is None:  # Only calculate the output key if needed
                 external_shape = external_shape_from_mask(shape, shape_mask)
                 output_key = func.mapspec.output_key(external_shape, index)  # type: ignore[arg-type]
@@ -840,7 +921,6 @@ def _prepare_submit_map_spec(
     fixed_indices: dict[str, int | slice] | None,
     status: Status | None,
     return_results: bool,
-    in_executor: bool,
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
@@ -856,7 +936,7 @@ def _prepare_submit_map_spec(
         shape_mask=mask,
         arrays=arrays,
         cache=cache,
-        in_executor=in_executor,
+        error_handling=run_info.error_handling,
         return_results=return_results,
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
@@ -909,10 +989,21 @@ def _submit(
     assert progress is not None
     status.mark_in_progress(n=chunksize)
     fut = executor.submit(func, *args)
-    mark_complete = functools.partial(status.mark_complete, n=chunksize)
-    fut.add_done_callback(mark_complete)
-    if not progress.in_async:
-        fut.add_done_callback(progress.update_progress)
+
+    def _on_done(future: Future) -> None:
+        exc = future.exception()
+        if exc is not None:
+            successes = 0
+            failures = chunksize
+        else:
+            result = future.result()
+            failures = _count_errors_in_result(result)
+            successes = chunksize - failures
+        status.mark_finished(successes=successes, failures=failures)
+        if not progress.in_async:
+            progress.update_progress()
+
+    fut.add_done_callback(_on_done)
     return fut
 
 
@@ -920,7 +1011,8 @@ def _process_chunk(
     chunk: list[int],
     process_index: functools.partial[tuple[Any, ...]],
 ) -> list[Any]:
-    return list(map(process_index, chunk))
+    """Process a chunk of indices."""
+    return [process_index(index) for index in chunk]
 
 
 def _chunk_indices(indices: list[int], chunksize: int) -> Iterable[tuple[int, ...]]:
@@ -996,6 +1088,21 @@ def _get_optimal_chunk_size(
     return max(1, chunk_size)
 
 
+def _all_indices_propagate_errors(
+    process_index: functools.partial[tuple[Any, ...]],
+    indices: list[int],
+) -> bool:
+    kw = process_index.keywords
+    if kw["error_handling"] != "continue":
+        return False
+    func = kw["func"]
+    for idx in indices:
+        selected = _select_kwargs(func, kw["kwargs"], kw["shape"], kw["shape_mask"], idx)
+        if not check_for_error_inputs(selected):
+            return False
+    return True
+
+
 def _maybe_parallel_map(
     func: PipeFunc,
     process_index: functools.partial[tuple[Any, ...]],
@@ -1004,22 +1111,34 @@ def _maybe_parallel_map(
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     status: Status | None,
     progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
-) -> list[Any]:
+) -> list[_ChunkTask]:
     if not indices:
         return []
     ex = _executor_for_func(func, executor)
     if ex is not None:
         assert executor is not None
+        if _all_indices_propagate_errors(process_index, indices):
+            if status is not None:
+                assert progress is not None
+                process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
+            return [_ChunkTask((process_index(i),), (i,)) for i in indices]
+
         ex = maybe_update_slurm_executor_map(func, ex, executor, process_index, indices)
         chunksize = _chunksize_for_func(func, chunksizes, len(indices), ex)
         chunks = list(_chunk_indices(indices, chunksize))
         process_chunk = functools.partial(_process_chunk, process_index=process_index)
-        return [_submit(process_chunk, ex, status, progress, len(chunk), chunk) for chunk in chunks]
+        return [
+            _ChunkTask(
+                _submit(process_chunk, ex, status, progress, len(chunk), chunk),
+                tuple(chunk),
+            )
+            for chunk in chunks
+        ]
     if status is not None:
         assert progress is not None
         process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
     # Put the process_index result in a tuple to have consistent shapes when func has mapspec
-    return [(process_index(i),) for i in indices]
+    return [_ChunkTask((process_index(i),), (i,)) for i in indices]
 
 
 def _wrap_with_status_update(
@@ -1030,8 +1149,11 @@ def _wrap_with_status_update(
     def wrapped(*args: Any) -> Any:
         status.mark_in_progress()
         result = func(*args)
-        status.mark_complete()
-        progress.update_progress()
+        failures = _count_errors_in_result(result)
+        successes = max(0, 1 - failures)
+        status.mark_finished(successes=successes, failures=failures)
+        if not progress.in_async:
+            progress.update_progress()
         return result
 
     return wrapped
@@ -1045,8 +1167,9 @@ def _maybe_execute_single(
     kwargs: dict[str, Any],
     store: dict[str, StoreType],
     cache: _CacheBase | None,
+    error_handling: Literal["raise", "continue"],
 ) -> Any:
-    args = (func, kwargs, store, cache)  # args for _execute_single
+    args = (func, kwargs, store, cache, error_handling)  # args for _execute_single
     ex = _executor_for_func(func, executor)
     if ex is not None:
         assert executor is not None
@@ -1063,6 +1186,7 @@ def _execute_single(
     kwargs: dict[str, Any],
     store: dict[str, StoreType],
     cache: _CacheBase | None,
+    error_handling: Literal["raise", "continue"],
 ) -> Any:
     # Load the output if it exists
     output, exists = _load_from_store(func.output_name, store, return_output=True)
@@ -1071,14 +1195,21 @@ def _execute_single(
 
     # Otherwise, run the function
     _load_data(kwargs)
+    error_infos = _collect_error_info(func, kwargs, kwargs, error_handling)
 
     def compute_fn() -> Any:
+        # Early error detection for non-mapspec operations
+        propagated_error = handle_error_inputs(kwargs, func, error_handling, error_infos.element)
+        if propagated_error is not None:
+            return propagated_error
+
         try:
             return func(**kwargs)
-        except Exception as e:
-            handle_pipefunc_error(e, func, kwargs)
-            # handle_pipefunc_error raises but mypy doesn't know that
-            raise  # pragma: no cover
+        except Exception as e:  # noqa: BLE001
+            handle_pipefunc_error(e, func, kwargs, error_handling)
+            # handle_pipefunc_error raises if error_handling == "raise"
+            assert error_handling == "continue"
+            return func.error_snapshot
 
     return _get_or_set_cache(func, kwargs, cache, compute_fn)
 
@@ -1088,9 +1219,23 @@ def _load_data(kwargs: dict[str, Any]) -> None:
         kwargs[k] = maybe_load_data(v)
 
 
+class _SingleTask(NamedTuple):
+    value: Any
+
+
+class _ChunkTask(NamedTuple):
+    value: Any
+    indices: tuple[int, ...]
+
+
+class _MapTask(NamedTuple):
+    chunk_tasks: list[_ChunkTask]
+    args: _MapSpecArgs
+
+
 class _KwargsTask(NamedTuple):
     kwargs: dict[str, Any]
-    task: tuple[Any, _MapSpecArgs] | Any
+    task: _MapTask | _SingleTask
 
 
 # NOTE: A similar async version of this function is provided below.
@@ -1198,6 +1343,7 @@ def _submit_func(
     kwargs = _func_kwargs(func, run_info, store)
     status = progress.progress_dict[func.output_name] if progress is not None else None
     cache = cache if func.cache else None
+    task: _MapTask | _SingleTask
     if func.requires_mapping:
         args = _prepare_submit_map_spec(
             func,
@@ -1207,10 +1353,9 @@ def _submit_func(
             fixed_indices,
             status,
             return_results,
-            in_executor=bool(executor),
             cache=cache,
         )
-        r = _maybe_parallel_map(
+        chunk_tasks = _maybe_parallel_map(
             func,
             args.process_index,
             args.missing,
@@ -1219,9 +1364,19 @@ def _submit_func(
             status,
             progress,
         )
-        task = r, args
+        task = _MapTask(chunk_tasks, args)
     else:
-        task = _maybe_execute_single(executor, status, progress, func, kwargs, store, cache)
+        single_value = _maybe_execute_single(
+            executor,
+            status,
+            progress,
+            func,
+            kwargs,
+            store,
+            cache,
+            run_info.error_handling,
+        )
+        task = _SingleTask(single_value)
     return _KwargsTask(kwargs, task)
 
 
@@ -1365,7 +1520,7 @@ def _result(
 
 
 async def _result_async(
-    task: Future | Any,
+    task: Future,
     loop: asyncio.AbstractEventLoop,
     func: PipeFunc,
     kwargs: dict[str, Any],
@@ -1409,20 +1564,33 @@ def _process_task(
 ) -> ResultDict | None:
     kwargs, task = kwargs_task
     if func.requires_mapping:
-        r, args = task
-        chunk_outputs_list = [_result(x, func, kwargs, i, run_info) for i, x in enumerate(r)]
+        assert isinstance(task, _MapTask)
+        chunk_outputs_list = []
+        for chunk_task in task.chunk_tasks:
+            # TODO: Capture the precise failing index when a chunk contains multiple items.
+            representative_index = chunk_task.indices[0] if chunk_task.indices else None
+            chunk_outputs_list.append(
+                _result(
+                    chunk_task.value,
+                    func,
+                    kwargs,
+                    representative_index,
+                    run_info,
+                ),
+            )
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
         output = _output_from_mapspec_task(
             func,
             store,
-            args,
+            task.args,
             chained_outputs_list,
             run_info,
             return_results,
         )
     else:
-        r = _result(task, func, kwargs)
+        assert isinstance(task, _SingleTask)
+        r = _result(task.value, func, kwargs, run_info=run_info)
         output = _dump_single_output(func, r, store, run_info)
 
     if return_results:
@@ -1459,22 +1627,43 @@ async def _process_task_async(
     kwargs, task = kwargs_task
     loop = asyncio.get_event_loop()
     if func.requires_mapping:
-        r, args = task
-        futs = [_result_async(x, loop, func, kwargs, i, run_info) for i, x in enumerate(r)]
-        chunk_outputs_list = await asyncio.gather(*futs)
+        assert isinstance(task, _MapTask)
+        chunk_outputs_list: list[list[Any]] = []
+        for chunk_task in task.chunk_tasks:
+            representative_index = chunk_task.indices[0] if chunk_task.indices else None
+            value = chunk_task.value
+            if isinstance(value, Future):
+                outputs = await _result_async(
+                    value,
+                    loop,
+                    func,
+                    kwargs,
+                    representative_index,
+                    run_info,
+                )
+            else:
+                outputs = _result(
+                    value,
+                    func,
+                    kwargs,
+                    representative_index,
+                    run_info,
+                )
+            chunk_outputs_list.append(outputs)
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
         output = _output_from_mapspec_task(
             func,
             store,
-            args,
+            task.args,
             chained_outputs_list,
             run_info,
             return_results,
         )
     else:
-        assert isinstance(task, Future)
-        r = await _result_async(task, loop, func, kwargs)
+        assert isinstance(task, _SingleTask)
+        assert isinstance(task.value, Future)
+        r = await _result_async(task.value, loop, func, kwargs, run_info=run_info)
         output = _dump_single_output(func, r, store, run_info)
     if return_results:
         assert output is not None
