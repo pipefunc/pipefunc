@@ -772,3 +772,38 @@ def test_map_scope_resources_skipped_on_error_input() -> None:
     assert z_output[0] == 0
     assert isinstance(z_output[1], PropagatedErrorSnapshot)
     assert z_output[2] == 4
+
+
+def test_non_mapspec_resources_evaluated_correctly() -> None:
+    """Regression: non-mapspec functions with callable resources must evaluate them.
+
+    This is a regression test for a bug where _execute_single() (used for non-mapspec
+    functions) was missing the _maybe_eval_resources() call, causing callable resources
+    to never be evaluated.
+    """
+    resources_was_called = []
+
+    def track_resources(kw: dict) -> dict:
+        """Track that resources function was called and return resources."""
+        resources_was_called.append(kw["x"])
+        return {"cpus": kw["x"]}
+
+    @pipefunc(
+        output_name="y",
+        resources=track_resources,
+    )
+    def compute(x: int) -> int:
+        return x * 2
+
+    pipeline = Pipeline([compute])
+
+    # Test with error_handling="raise" (default)
+    result = pipeline.map({"x": 5}, error_handling="raise", parallel=False)
+    assert result["y"].output == 10
+    assert resources_was_called == [5], "Resources callback should have been called"
+
+    # Test with error_handling="continue"
+    resources_was_called.clear()
+    result = pipeline.map({"x": 3}, error_handling="continue", parallel=False)
+    assert result["y"].output == 6
+    assert resources_was_called == [3], "Resources callback should have been called"
