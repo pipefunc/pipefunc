@@ -571,18 +571,6 @@ def _select_kwargs(
     return selected
 
 
-def _select_kwargs_and_eval_resources(
-    func: PipeFunc,
-    kwargs: dict[str, Any],
-    shape: ShapeTuple,
-    shape_mask: tuple[bool, ...],
-    index: int,
-) -> dict[str, Any]:
-    selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
-    _maybe_eval_resources(func, kwargs, selected, _ErrorInfos(None, None))
-    return selected
-
-
 class _ErrorInfos(NamedTuple):
     map: dict[str, ErrorInfo] | None
     element: dict[str, ErrorInfo] | None
@@ -1498,8 +1486,7 @@ def _raise_and_set_error_snapshot(
         assert run_info is not None, "run_info required when index is provided"
         shape = run_info.resolved_shapes[func.output_name]
         mask = run_info.shape_masks[func.output_name]
-        kwargs = _select_kwargs_and_eval_resources(func, kwargs, shape, mask, index)
-    kwargs = func._rename_to_native(kwargs)
+        kwargs = _select_kwargs(func, kwargs, shape, mask, index)
     handle_pipefunc_error(exc, func, kwargs)
 
 
