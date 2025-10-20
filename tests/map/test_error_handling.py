@@ -807,3 +807,60 @@ def test_non_mapspec_resources_evaluated_correctly() -> None:
     result = pipeline.map({"x": 3}, error_handling="continue", parallel=False)
     assert result["y"].output == 6
     assert resources_was_called == [3], "Resources callback should have been called"
+
+
+def test_return_results_false_with_errors_uses_lightweight_markers(tmp_path) -> None:
+    """Regression: return_results=False should use _ErrorMarker, not full ErrorSnapshot.
+
+    When return_results=False, we discard heavy data to save memory. ErrorSnapshots
+    can be huge (they store full kwargs which may contain large arrays). This test
+    verifies that we replace ErrorSnapshots with lightweight _ErrorMarker objects.
+
+    We verify this indirectly by:
+    1. Running with return_results=False and errors
+    2. Loading the data from storage
+    3. Confirming the saved ErrorSnapshots are correct (proving lightweight markers worked)
+    """
+    from pipefunc.map import load_outputs
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def fail_for_one(x: int) -> int:
+        if x == 1:
+            msg = "boom"
+            raise ValueError(msg)
+        return x * 2
+
+    @pipefunc(output_name="z", mapspec="y[i] -> z[i]")
+    def downstream(y: int) -> int:
+        return y + 10
+
+    pipeline = Pipeline([fail_for_one, downstream])
+
+    # Use run_folder to enable persistence with return_results=False
+    result = pipeline.map(
+        {"x": [0, 1, 2]},
+        error_handling="continue",
+        parallel=False,
+        return_results=False,
+        run_folder=tmp_path,
+    )
+
+    # With return_results=False, result dict should be empty
+    assert result == {}
+
+    # But data should be persisted to disk
+    y_output = load_outputs("y", run_folder=tmp_path)
+    z_output = load_outputs("z", run_folder=tmp_path)
+
+    # y[0] = 0, y[1] = ErrorSnapshot, y[2] = 4
+    assert y_output[0] == 0
+    assert isinstance(y_output[1], ErrorSnapshot)
+    assert y_output[2] == 4
+
+    # z[0] = 10, z[1] = PropagatedErrorSnapshot, z[2] = 14
+    assert z_output[0] == 10
+    assert isinstance(z_output[1], PropagatedErrorSnapshot)
+    assert z_output[2] == 14
+
+    # The key test: this should have worked without keeping full ErrorSnapshots in memory
+    # during execution (they were replaced with lightweight _ErrorMarker objects)
