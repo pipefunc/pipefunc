@@ -1124,7 +1124,7 @@ def _maybe_parallel_map(
     ex = _executor_for_func(func, executor)
     if ex is not None:
         assert executor is not None
-        if _all_indices_propagate_errors(process_index, indices):
+        if _all_indices_propagate_errors(process_index, indices):  # skip submitting to executor
             if status is not None:
                 assert progress is not None
                 process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
