@@ -610,6 +610,20 @@ def _maybe_eval_resources(
     element_kwargs[_EVALUATED_RESOURCES] = func.resources(kw)  # type: ignore[has-type]
 
 
+def _prepare_kwargs_for_execution(
+    func: PipeFunc,
+    map_kwargs: dict[str, Any],
+    shape: ShapeTuple,
+    shape_mask: tuple[bool, ...],
+    index: int,
+    error_handling: Literal["raise", "continue"],
+) -> tuple[dict[str, Any], _ErrorInfos]:
+    selected_kwargs = _select_kwargs(func, map_kwargs, shape, shape_mask, index)
+    error_infos = _collect_error_info(func, map_kwargs, selected_kwargs, error_handling)
+    _maybe_eval_resources(func, map_kwargs, selected_kwargs, error_infos)
+    return selected_kwargs, error_infos
+
+
 def _init_result_arrays(
     output_name: OUTPUT_TYPE,
     shape: ShapeTuple,
@@ -728,9 +742,14 @@ def _run_iteration_and_process(
     return_results: bool = True,
     force_dump: bool = False,
 ) -> tuple[Any, ...]:
-    selected_kwargs = _select_kwargs(func, kwargs, shape, shape_mask, index)
-    error_infos = _collect_error_info(func, kwargs, selected_kwargs, error_handling)
-    _maybe_eval_resources(func, kwargs, selected_kwargs, error_infos)
+    selected_kwargs, error_infos = _prepare_kwargs_for_execution(
+        func,
+        kwargs,
+        shape,
+        shape_mask,
+        index,
+        error_handling,
+    )
     output = _run_iteration(func, selected_kwargs, error_infos.element, cache, error_handling)
     outputs = _pick_output(func, output)
     has_dumped = _update_array(
@@ -1184,6 +1203,7 @@ def _execute_single(
     # Otherwise, run the function
     _load_data(kwargs)
     error_infos = _collect_error_info(func, kwargs, kwargs, error_handling)
+    _maybe_eval_resources(func, kwargs, kwargs, error_infos)
 
     def compute_fn() -> Any:
         # Early error detection for non-mapspec operations

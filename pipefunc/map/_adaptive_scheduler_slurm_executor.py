@@ -246,12 +246,8 @@ def _resources_from_process_index(
     process_index: functools.partial[tuple[Any, ...]],
     index: int,
 ) -> Resources | None:
-    from ._run import (
-        _EVALUATED_RESOURCES,
-        _collect_error_info,
-        _maybe_eval_resources,
-        _select_kwargs,
-    )
+    from ._run import _EVALUATED_RESOURCES, _prepare_kwargs_for_execution
+
     # Import here to avoid circular imports
 
     kw = process_index.keywords
@@ -259,9 +255,14 @@ def _resources_from_process_index(
     # NOTE: We are executing this line below 2 times for each index.
     # This is not ideal, if it becomes a performance issue we can cache
     # the result.
-    selected = _select_kwargs(kw["func"], kw["kwargs"], kw["shape"], kw["shape_mask"], index)
-    error_infos = _collect_error_info(kw["func"], kw["kwargs"], selected, kw["error_handling"])
-    _maybe_eval_resources(kw["func"], kw["kwargs"], selected, error_infos)
+    selected, _error_infos = _prepare_kwargs_for_execution(
+        kw["func"],
+        kw["kwargs"],
+        kw["shape"],
+        kw["shape_mask"],
+        index,
+        kw["error_handling"],
+    )
     return selected.get(_EVALUATED_RESOURCES)  # missing with PropagatedErrorSnapshot
 
 
