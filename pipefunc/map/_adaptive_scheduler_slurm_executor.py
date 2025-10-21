@@ -262,6 +262,7 @@ def _resources_from_process_index(
         kw["shape_mask"],
         index,
         kw["error_handling"],
+        kw["map_error_info"],
     )
     return selected.get(_EVALUATED_RESOURCES)  # missing with PropagatedErrorSnapshot
 

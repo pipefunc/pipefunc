@@ -576,20 +576,28 @@ class _ErrorInfos(NamedTuple):
     element: dict[str, ErrorInfo] | None
 
 
-def _create_error_infos(
+def _should_scan_map_error_info(
     func: PipeFunc,
-    map_kwargs: dict[str, Any],
+    error_handling: Literal["raise", "continue"],
+) -> bool:
+    return (
+        error_handling == "continue"
+        and func.requires_mapping
+        and func.resources_scope == "map"
+        and callable(func.resources)  # type: ignore[has-type]
+    )
+
+
+def _create_error_infos(
     element_kwargs: dict[str, Any],
     error_handling: Literal["raise", "continue"],
+    precomputed_map_error_info: dict[str, ErrorInfo] | None,
 ) -> _ErrorInfos:
     if error_handling != "continue":
         return _ErrorInfos(None, None)
 
     element_error_info = scan_inputs_for_errors(element_kwargs)
-    map_error_info: dict[str, ErrorInfo] | None = None
-
-    if func.requires_mapping and func.resources_scope == "map":
-        map_error_info = scan_inputs_for_errors(map_kwargs)
+    map_error_info = precomputed_map_error_info
 
     return _ErrorInfos(map_error_info, element_error_info)
 
@@ -617,9 +625,10 @@ def _prepare_kwargs_for_execution(
     shape_mask: tuple[bool, ...],
     index: int,
     error_handling: Literal["raise", "continue"],
+    map_error_info: dict[str, ErrorInfo] | None,
 ) -> tuple[dict[str, Any], _ErrorInfos]:
     selected_kwargs = _select_kwargs(func, map_kwargs, shape, shape_mask, index)
-    error_infos = _create_error_infos(func, map_kwargs, selected_kwargs, error_handling)
+    error_infos = _create_error_infos(selected_kwargs, error_handling, map_error_info)
     _maybe_eval_resources(func, map_kwargs, selected_kwargs, error_infos)
     return selected_kwargs, error_infos
 
@@ -753,6 +762,7 @@ def _run_iteration_and_process(
     cache: _CacheBase | None = None,
     *,
     error_handling: Literal["raise", "continue"],
+    map_error_info: dict[str, ErrorInfo] | None = None,
     return_results: bool = True,
     force_dump: bool = False,
 ) -> tuple[Any, ...]:
@@ -763,6 +773,7 @@ def _run_iteration_and_process(
         shape_mask,
         index,
         error_handling,
+        map_error_info,
     )
     output = _run_iteration(func, selected_kwargs, error_infos.element, cache, error_handling)
     outputs = _pick_output(func, output)
@@ -949,6 +960,11 @@ def _prepare_submit_map_spec(
     mask = run_info.shape_masks[func.output_name]
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     result_arrays = _init_result_arrays(func.output_name, shape, return_results)
+    map_error_info = (
+        scan_inputs_for_errors(kwargs)
+        if _should_scan_map_error_info(func, run_info.error_handling)
+        else None
+    )
     process_index = functools.partial(
         _run_iteration_and_process,
         func=func,
@@ -958,6 +974,7 @@ def _prepare_submit_map_spec(
         arrays=arrays,
         cache=cache,
         error_handling=run_info.error_handling,
+        map_error_info=map_error_info,
         return_results=return_results,
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
@@ -1216,7 +1233,7 @@ def _execute_single(
 
     # Otherwise, run the function
     _load_data(kwargs)
-    error_infos = _create_error_infos(func, kwargs, kwargs, error_handling)
+    error_infos = _create_error_infos(kwargs, error_handling, None)
     _maybe_eval_resources(func, kwargs, kwargs, error_infos)
 
     def compute_fn() -> Any:
