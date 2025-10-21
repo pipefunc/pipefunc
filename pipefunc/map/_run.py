@@ -576,7 +576,7 @@ class _ErrorInfos(NamedTuple):
     element: dict[str, ErrorInfo] | None
 
 
-def _collect_error_info(
+def _create_error_infos(
     func: PipeFunc,
     map_kwargs: dict[str, Any],
     element_kwargs: dict[str, Any],
@@ -619,7 +619,7 @@ def _prepare_kwargs_for_execution(
     error_handling: Literal["raise", "continue"],
 ) -> tuple[dict[str, Any], _ErrorInfos]:
     selected_kwargs = _select_kwargs(func, map_kwargs, shape, shape_mask, index)
-    error_infos = _collect_error_info(func, map_kwargs, selected_kwargs, error_handling)
+    error_infos = _create_error_infos(func, map_kwargs, selected_kwargs, error_handling)
     _maybe_eval_resources(func, map_kwargs, selected_kwargs, error_infos)
     return selected_kwargs, error_infos
 
@@ -1216,7 +1216,7 @@ def _execute_single(
 
     # Otherwise, run the function
     _load_data(kwargs)
-    error_infos = _collect_error_info(func, kwargs, kwargs, error_handling)
+    error_infos = _create_error_infos(func, kwargs, kwargs, error_handling)
     _maybe_eval_resources(func, kwargs, kwargs, error_infos)
 
     def compute_fn() -> Any:
