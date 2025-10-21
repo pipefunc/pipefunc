@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pytest
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
+from pipefunc.resources import Resources
 
 
 # Test 1: Simple pipeline with no mapspec - error propagation through pipeline
@@ -772,6 +775,80 @@ def test_map_scope_resources_skipped_on_error_input() -> None:
     assert z_output[0] == 0
     assert isinstance(z_output[1], PropagatedErrorSnapshot)
     assert z_output[2] == 4
+
+
+def test_continue_mode_preserves_map_scope_resources_for_clean_indices() -> None:
+    """Continue mode should still provide map-scope resources to downstream functions."""
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def fail_for_one(x: int) -> int:
+        if x == 1:
+            msg = "boom"
+            raise ValueError(msg)
+        return x
+
+    def map_scope_resources(kwargs: dict[str, Any]) -> Resources:
+        values = kwargs["y"].to_array()
+        successes = [
+            v for v in values if not isinstance(v, (ErrorSnapshot, PropagatedErrorSnapshot))
+        ]
+        return Resources(extra_args={"success_sum": sum(successes)})
+
+    @pipefunc(
+        output_name="z",
+        mapspec="y[i] -> z[i]",
+        resources=map_scope_resources,
+        resources_scope="map",
+        resources_variable="resources",
+    )
+    def downstream(y: int, resources: Resources) -> int:
+        return y + resources.extra_args["success_sum"]
+
+    pipeline = Pipeline([fail_for_one, downstream])
+
+    result = pipeline.map({"x": [0, 1, 2]}, error_handling="continue", parallel=False)
+
+    y_output = result["y"].output
+    z_output = result["z"].output
+
+    assert y_output[0] == 0
+    assert isinstance(y_output[1], ErrorSnapshot)
+    assert y_output[2] == 2
+
+    assert z_output[0] == 2
+    assert isinstance(z_output[1], PropagatedErrorSnapshot)
+    assert z_output[2] == 4
+
+
+def test_non_mapspec_map_scope_resources_skipped_on_error_input() -> None:
+    """Regression: map-scope resources on scalar functions must skip when inputs fail."""
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def fail_for_one(x: int) -> int:
+        if x == 1:
+            msg = "boom"
+            raise ValueError(msg)
+        return x
+
+    @pipefunc(
+        output_name="total",
+        resources=lambda kw: {"cpus": int(np.sum(kw["y"]))},
+        resources_scope="map",
+    )
+    def aggregate(y: np.ndarray) -> int:
+        return int(np.sum(y))
+
+    pipeline = Pipeline([fail_for_one, aggregate])
+
+    result = pipeline.map({"x": [0, 1, 2]}, error_handling="continue", parallel=False)
+
+    y_output = result["y"].output
+    assert y_output[0] == 0
+    assert isinstance(y_output[1], ErrorSnapshot)
+    assert y_output[2] == 2
+
+    total_output = result["total"].output
+    assert isinstance(total_output, PropagatedErrorSnapshot)
 
 
 def test_non_mapspec_resources_evaluated_correctly() -> None:

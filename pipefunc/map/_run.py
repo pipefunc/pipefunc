@@ -608,13 +608,18 @@ def _maybe_eval_resources(
     element_kwargs: dict[str, Any],
     error_infos: _ErrorInfos,
 ) -> None:
-    if (
-        not callable(func.resources)  # type: ignore[has-type]
-        or (func.resources_scope == "map" and error_infos.map)
-        or (func.resources_scope == "element" and error_infos.element)
-    ):
+    if not callable(func.resources):  # type: ignore[has-type]
         return
-    kw = map_kwargs if func.resources_scope == "map" else element_kwargs
+
+    if func.resources_scope == "map":
+        if error_infos.map and func.resources_variable is None:
+            return
+        kw = map_kwargs
+    else:
+        if error_infos.element:
+            return
+        kw = element_kwargs
+
     element_kwargs[_EVALUATED_RESOURCES] = func.resources(kw)  # type: ignore[has-type]
 
 
