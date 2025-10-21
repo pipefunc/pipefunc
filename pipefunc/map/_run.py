@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 import numpy as np
 import numpy.typing as npt
 
-from pipefunc._error_handling import ErrorInfo, check_for_error_inputs, handle_error_inputs
+from pipefunc._error_handling import ErrorInfo, propagate_input_errors, scan_inputs_for_errors
 from pipefunc._pipefunc_utils import handle_pipefunc_error
 from pipefunc._utils import (
     at_least_tuple,
@@ -585,11 +585,11 @@ def _collect_error_info(
     if error_handling != "continue":
         return _ErrorInfos(None, None)
 
-    element_error_info = check_for_error_inputs(element_kwargs)
+    element_error_info = scan_inputs_for_errors(element_kwargs)
     map_error_info: dict[str, ErrorInfo] | None = None
 
     if func.requires_mapping and func.resources_scope == "map":
-        map_error_info = check_for_error_inputs(map_kwargs)
+        map_error_info = scan_inputs_for_errors(map_kwargs)
 
     return _ErrorInfos(map_error_info, element_error_info)
 
@@ -674,7 +674,7 @@ def _run_iteration(
     error_handling: Literal["raise", "continue"],
 ) -> Any:
     # Early error detection when error_handling == "continue"
-    propagated_error = handle_error_inputs(selected, func, error_handling, error_info)
+    propagated_error = propagate_input_errors(selected, func, error_handling, error_info)
     if propagated_error is not None:
         return propagated_error
 
@@ -1119,7 +1119,7 @@ def _all_indices_propagate_errors(
     func = kw["func"]
     for idx in indices:
         selected = _select_kwargs(func, kw["kwargs"], kw["shape"], kw["shape_mask"], idx)
-        if not check_for_error_inputs(selected):
+        if not scan_inputs_for_errors(selected):
             return False
     return True
 
@@ -1221,7 +1221,7 @@ def _execute_single(
 
     def compute_fn() -> Any:
         # Early error detection for non-mapspec operations
-        propagated_error = handle_error_inputs(kwargs, func, error_handling, error_infos.element)
+        propagated_error = propagate_input_errors(kwargs, func, error_handling, error_infos.element)
         if propagated_error is not None:
             return propagated_error
 

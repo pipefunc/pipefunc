@@ -11,11 +11,11 @@ import pytest
 
 from pipefunc._error_handling import (
     ErrorInfo,
-    check_for_error_inputs,
     cloudpickle_function_state,
     cloudunpickle_function_state,
     create_propagated_error,
-    handle_error_inputs,
+    propagate_input_errors,
+    scan_inputs_for_errors,
 )
 from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
 
@@ -67,13 +67,13 @@ def test_create_propagated_error_default_reason():
     assert propagated.attempted_kwargs == kwargs
 
 
-def test_handle_error_inputs_with_raise_mode():
-    """Test handle_error_inputs returns None when error_handling is 'raise'."""
+def test_propagate_input_errors_with_raise_mode():
+    """Test propagate_input_errors returns None when error_handling is 'raise'."""
     kwargs = {"x": 5}
     func = lambda x: x * 2  # noqa: E731
 
-    error_info = check_for_error_inputs(kwargs)
-    result = handle_error_inputs(kwargs, func, "raise", error_info=error_info)
+    error_info = scan_inputs_for_errors(kwargs)
+    result = propagate_input_errors(kwargs, func, "raise", error_info=error_info)
     assert result is None
 
 

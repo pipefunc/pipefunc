@@ -45,7 +45,7 @@ class ErrorInfo:
         )
 
 
-def check_for_error_inputs(
+def scan_inputs_for_errors(
     kwargs: dict[str, Any],
 ) -> dict[str, ErrorInfo]:
     """Check if any input contains ErrorSnapshot objects.
@@ -136,7 +136,7 @@ def create_propagated_error(
     )
 
 
-def handle_error_inputs(
+def propagate_input_errors(
     kwargs: dict[str, Any],
     func: Callable[..., Any],
     error_handling: str,
