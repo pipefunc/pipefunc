@@ -45,9 +45,7 @@ class ErrorInfo:
         )
 
 
-def scan_inputs_for_errors(
-    kwargs: dict[str, Any],
-) -> dict[str, ErrorInfo]:
+def scan_inputs_for_errors(kwargs: dict[str, Any]) -> dict[str, ErrorInfo]:
     """Check if any input contains ErrorSnapshot objects.
 
     Parameters
