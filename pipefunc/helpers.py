@@ -383,9 +383,7 @@ def launch_maps(
     return asyncio.create_task(coro)
 
 
-# ---------------------------------------------------------------------------
 # Linear chaining helper
-# ---------------------------------------------------------------------------
 
 
 def _pick_output_name(
@@ -476,8 +474,6 @@ def _pick_primary_param(
 def linear_chain(
     functions: Sequence[PipeFunc | Callable],
     *,
-    select_param: str | int | Callable[[PipeFunc], str] | None = None,
-    select_output: str | int | Callable[[PipeFunc], str] | None = None,
     copy: bool = True,
 ) -> list[PipeFunc]:
     """Return a new list of PipeFuncs connected linearly by applying minimal renames.
@@ -490,17 +486,6 @@ def linear_chain(
     functions
         Sequence of PipeFuncs (or callables). Callables are wrapped as PipeFuncs with
         ``output_name=f.__name__``.
-    select_param
-        Strategy for picking the parameter that receives the upstream value for each
-        function (except the first). Options:
-        - ``None`` (default): use the first parameter, skipping bound ones.
-        - ``str``: explicit parameter name.
-        - ``int``: index into the current parameter list.
-        - ``Callable[PipeFunc, str]``: returns the desired parameter name.
-    select_output
-        Strategy for picking the output name of each function to pass forward.
-        Accepts the same forms as ``select_param``; when ``None`` and the function has
-        multiple outputs, the first output is used.
     copy
         If True (default), return copies of the input PipeFuncs; original instances are
         not modified.
@@ -512,14 +497,16 @@ def linear_chain(
 
     Notes
     -----
-    - If a downstream function already has a parameter equal to the selected upstream
-      output name, no rename is applied to avoid collisions.
-    - Bound parameters are skipped by default when auto-selecting.
+    - If a downstream function already has a parameter matching any upstream output name,
+      no rename is applied (prefer existing matches).
+    - When no matches exist, the first non-bound downstream parameter is renamed to the
+      first upstream output name.
     - If a function has zero parameters (and is not the first in the chain), a ValueError
       is raised.
 
     """
     from pipefunc import PipeFunc as _PipeFunc  # local import to avoid cyclic in typing
+    from pipefunc._utils import at_least_tuple
 
     if not functions:
         msg = "linear_chain requires at least one function"
@@ -543,19 +530,30 @@ def linear_chain(
     upstream = pfs[0]
     for i in range(1, len(pfs)):
         downstream = pfs[i]
-        upstream_out = _pick_output_name(upstream, select_output)
-
-        # If a parameter already matches upstream_out, prefer it; else select and rename
-        if upstream_out in downstream.parameters:
-            pass  # already connected by name
+        upstream_outputs = at_least_tuple(upstream.output_name)
+        # Prefer existing matches: if any downstream parameter matches any upstream output, do nothing
+        if any(name in downstream.parameters for name in upstream_outputs):
+            pass
         else:
-            target_param = _pick_primary_param(downstream, select_param)
-            # Apply rename on a copy to avoid mutating original list element (if copy=True)
-            downstream.update_renames({target_param: upstream_out}, update_from="current")
+            # Rename first non-bound downstream parameter to the first upstream output
+            params = list(downstream.parameters)
+            if not params:
+                msg = f"Function {downstream} has no parameters to receive upstream value."
+                raise ValueError(msg)
+            target = next((p for p in params if p not in downstream.bound), None)
+            if target is None:
+                msg = (
+                    f"All parameters of {downstream} are bound; cannot auto-select input parameter."
+                )
+                raise ValueError(msg)
+            downstream.update_renames({target: upstream_outputs[0]}, update_from="current")
 
         upstream = downstream
 
     return pfs
+
+
+# AsyncMap / launch_maps helpers
 
 
 def _validate_async_maps(async_maps: Sequence[AsyncMap]) -> None:

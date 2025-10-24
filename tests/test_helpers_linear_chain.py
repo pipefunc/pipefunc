@@ -66,11 +66,15 @@ def test_linear_chain_multi_output_default_first() -> None:
     assert pipeline.run("out2", kwargs={"x": 7}) == 7
 
 
-def test_linear_chain_multi_output_explicit_index() -> None:
-    # Select second output ('b') via select_output index
-    chained = linear_chain([f_multi, f_sink], select_output=1)
+def test_linear_chain_multi_output_match_by_name() -> None:
+    # If downstream parameter matches an upstream output name, that output is used.
+    @pipefunc(output_name="out2b")
+    def f_sink_b(b: int) -> int:  # matches the second output name of f_multi
+        return b
+
+    chained = linear_chain([f_multi, f_sink_b])
     pipeline = Pipeline(cast("list[Any]", chained))
-    assert pipeline.run("out2", kwargs={"x": 7}) == 70
+    assert pipeline.run("out2b", kwargs={"x": 7}) == 70
 
 
 @pipefunc(output_name="m2c", bound={"skip": 1})

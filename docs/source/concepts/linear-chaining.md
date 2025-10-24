@@ -64,21 +64,19 @@ Pipeline(chain).run("out", kwargs={"src": 4, "k": 2})  # -> 7
 
 ## Multi-output upstream
 
-By default, the first output name is forwarded. You can select a different one.
+`linear_chain` prefers existing matches. If a downstream parameter matches any upstream output name, that output is used. Otherwise, the first upstream output name is used.
 
 ```{code-cell} ipython3
 @pipefunc(("a", "b"))
 def split(x: int) -> tuple[int, int]:
     return x, 10 * x
 
-@pipefunc("sink")
-def sink(y: int) -> int: return y
+@pipefunc("sink_b")
+def sink_b(b: int) -> int:  # matches second output name
+    return b
 
-# Default -> forwards "a"
-Pipeline(linear_chain([split, sink])).run("sink", kwargs={"x": 7})  # -> 7
-
-# Explicitly forward the second output (index 1)
-Pipeline(linear_chain([split, sink], select_output=1)).run("sink", kwargs={"x": 7})  # -> 70
+# Uses "b" via the matching parameter name
+Pipeline(linear_chain([split, sink_b])).run("sink_b", kwargs={"x": 7})  # -> 70
 ```
 
 ## Bound parameters are skipped
@@ -95,20 +93,9 @@ def f2(skip: int, real_input: int) -> int: return real_input + skip
 Pipeline(linear_chain([f1, f2])).run("m2", kwargs={"src": 10})  # -> 12
 ```
 
-## Selecting the downstream parameter
+## Controlling which output to use
 
-Provide `select_param` to choose which parameter receives the upstream value.
-
-```{code-cell} ipython3
-@pipefunc("m1")
-def f1(x: int) -> int: return x + 1
-
-@pipefunc("m2")
-def f2(aux: int, data: int) -> int: return data * 2
-
-chain = linear_chain([f1, f2], select_param="data")
-Pipeline(chain).run("m2", kwargs={"x": 3, "aux": 0})  # -> 8
-```
+To use a specific upstream output, name the downstream parameter accordingly (or pre-rename the downstream `PipeFunc`).
 
 ## Plain callables work too
 
@@ -126,5 +113,4 @@ Pipeline(chain).run("h", kwargs={"z": 3})  # -> 11
 
 - No `mapspec` changes: existing mapspecs stay as-is; none are created or removed.
 - Middle functions must have at least one parameter to receive the upstream value.
-- `select_output` can be a name, index, or a callable `lambda pf: "desired_output"`.
 - `copy=True` (default) returns copies; set `copy=False` to modify your originals.
