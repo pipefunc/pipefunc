@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
     from ipywidgets import Widget
 
+    from pipefunc import PipeFunc
     from pipefunc._widgets.output_tabs import OutputTabs
     from pipefunc.map._result import ResultDict
     from pipefunc.map._run import AsyncMap
@@ -30,6 +31,7 @@ __all__ = [
     "gather_maps",
     "get_attribute_factory",
     "launch_maps",
+    "linear_chain",
 ]
 
 
@@ -379,6 +381,181 @@ def launch_maps(
         _tabs=tabs,
     )
     return asyncio.create_task(coro)
+
+
+# ---------------------------------------------------------------------------
+# Linear chaining helper
+# ---------------------------------------------------------------------------
+
+
+def _pick_output_name(
+    func: PipeFunc,
+    select_output: str | int | Callable[[PipeFunc], str] | None,
+) -> str:
+    """Pick a single output name from a PipeFunc, supporting multiple outputs.
+
+    Rules
+    - If ``select_output`` is a string, use it (must be one of the outputs).
+    - If ``select_output`` is an integer, use the corresponding index in the tuple output.
+    - If ``select_output`` is a callable, call it with the PipeFunc and expect a valid output name.
+    - If ``None`` and there is a single output (a string), use that; if multiple, use the first.
+    """
+    from pipefunc._utils import at_least_tuple
+
+    outputs = at_least_tuple(func.output_name)
+    if isinstance(select_output, str):
+        if select_output not in outputs:
+            msg = f"select_output={select_output!r} not in outputs {outputs} of {func}"
+            raise ValueError(msg)
+        return select_output
+    if isinstance(select_output, int):
+        try:
+            return outputs[select_output]
+        except IndexError as e:
+            msg = (
+                f"select_output index {select_output} out of range for outputs {outputs} of {func}"
+            )
+            raise ValueError(msg) from e
+    if callable(select_output):
+        name = select_output(func)
+        if name not in outputs:
+            msg = f"Callable select_output returned {name!r} which is not in outputs {outputs} of {func}"
+            raise ValueError(msg)
+        return name
+    # None -> default behavior
+    return outputs[0]
+
+
+def _pick_primary_param(
+    func: PipeFunc,
+    select_param: str | int | Callable[[PipeFunc], str] | None,
+    *,
+    skip_bound: bool = True,
+) -> str:
+    """Pick the parameter that should receive the upstream value.
+
+    Rules
+    - If ``select_param`` is a string, use it if present; otherwise raise.
+    - If ``select_param`` is an integer, use that positional index.
+    - If ``select_param`` is a callable, call it with the PipeFunc and use the returned name.
+    - If ``None``: pick the first parameter (by current names), skipping bound ones if ``skip_bound``.
+    """
+    params = list(func.parameters)
+    if not params:
+        msg = f"Function {func} has no parameters to receive upstream value."
+        raise ValueError(msg)
+
+    if isinstance(select_param, str):
+        if select_param not in params:
+            msg = f"select_param={select_param!r} not in parameters {tuple(params)} of {func}"
+            raise ValueError(msg)
+        return select_param
+    if isinstance(select_param, int):
+        try:
+            return params[select_param]
+        except IndexError as e:
+            msg = f"select_param index {select_param} out of range for parameters {tuple(params)} of {func}"
+            raise ValueError(msg) from e
+    if callable(select_param):
+        name = select_param(func)
+        if name not in params:
+            msg = f"Callable select_param returned {name!r} which is not in parameters {tuple(params)} of {func}"
+            raise ValueError(msg)
+        return name
+
+    # Auto-pick
+    if skip_bound:
+        for p in params:
+            if p not in func.bound:
+                return p
+        msg = f"All parameters of {func} are bound; cannot auto-select input parameter."
+        raise ValueError(msg)
+    return params[0]
+
+
+def linear_chain(
+    functions: Sequence[PipeFunc | Callable],
+    *,
+    select_param: str | int | Callable[[PipeFunc], str] | None = None,
+    select_output: str | int | Callable[[PipeFunc], str] | None = None,
+    copy: bool = True,
+) -> list[PipeFunc]:
+    """Return a new list of PipeFuncs connected linearly by applying minimal renames.
+
+    The i+1-th function's chosen input parameter is renamed to the i-th function's
+    chosen output name. Other parameters (including additional inputs) are untouched.
+
+    Parameters
+    ----------
+    functions
+        Sequence of PipeFuncs (or callables). Callables are wrapped as PipeFuncs with
+        ``output_name=f.__name__``.
+    select_param
+        Strategy for picking the parameter that receives the upstream value for each
+        function (except the first). Options:
+        - ``None`` (default): use the first parameter, skipping bound ones.
+        - ``str``: explicit parameter name.
+        - ``int``: index into the current parameter list.
+        - ``Callable[PipeFunc, str]``: returns the desired parameter name.
+    select_output
+        Strategy for picking the output name of each function to pass forward.
+        Accepts the same forms as ``select_param``; when ``None`` and the function has
+        multiple outputs, the first output is used.
+    copy
+        If True (default), return copies of the input PipeFuncs; original instances are
+        not modified.
+
+    Returns
+    -------
+    list[PipeFunc]
+        New PipeFunc objects with renames applied so the data flows linearly.
+
+    Notes
+    -----
+    - If a downstream function already has a parameter equal to the selected upstream
+      output name, no rename is applied to avoid collisions.
+    - Bound parameters are skipped by default when auto-selecting.
+    - If a function has zero parameters (and is not the first in the chain), a ValueError
+      is raised.
+
+    """
+    from pipefunc import PipeFunc as _PipeFunc  # local import to avoid cyclic in typing
+
+    if not functions:
+        msg = "linear_chain requires at least one function"
+        raise ValueError(msg)
+
+    # Normalize to PipeFunc instances
+    pfs: list[_PipeFunc] = []
+    for f in functions:
+        pf = (
+            f
+            if isinstance(f, _PipeFunc)
+            else _PipeFunc(f, output_name=getattr(f, "__name__", "output"))
+        )
+        pfs.append(pf.copy() if copy else pf)
+
+    # Nothing to connect if only one
+    if len(pfs) == 1:
+        return pfs
+
+    # Apply renames to connect each pair
+    upstream = pfs[0]
+    for i in range(1, len(pfs)):
+        downstream = pfs[i]
+        upstream_out = _pick_output_name(upstream, select_output)
+
+        # If a parameter already matches upstream_out, prefer it; else select and rename
+        if upstream_out in downstream.parameters:
+            pass  # already connected by name
+        else:
+            target_param = _pick_primary_param(downstream, select_param)
+            # Apply rename on a copy to avoid mutating original list element (if copy=True)
+            downstream.update_renames({target_param: upstream_out}, update_from="current")
+
+        upstream = downstream
+
+    return pfs
 
 
 def _validate_async_maps(async_maps: Sequence[AsyncMap]) -> None:
