@@ -9,24 +9,9 @@ jupytext:
 
 # Linear Chaining Helper
 
-`pipefunc.helpers.linear_chain` creates a linear sequence of `PipeFunc`s by applying minimal renames so the output of one function flows into the next. It does not alter or add any `mapspec`; it only adjusts argument names where needed.
+`pipefunc.helpers.linear_chain` connects a list of functions linearly by applying minimal renames so “output of one becomes input of the next.” It never alters `mapspec`—only names.
 
-The core use case is simple, composable array transforms: you maintain a toolbox of functions that take an array and return an array, and you assemble any subset of them (in any order) into a pipeline at runtime.
-
-```{contents} ToC
-:depth: 2
-```
-
-## Why use `linear_chain`?
-
-- Avoid boilerplate renames when building simple f1 → f2 → f3 pipelines.
-- Keep extra parameters intact: only the “main” input hops along; all other inputs remain as-is.
-- Works with multi-output functions (prefers matching parameter names; otherwise uses the first output).
-- Honors bound parameters (auto-selects the first non-bound parameter).
-
-## Composable array transforms (pick any subset)
-
-This pattern keeps each transform focused on a single array-to-array operation. At runtime, choose which transforms to include and in what order.
+Use it to compose simple array→array transforms: keep a small toolbox of transforms and pick any subset (in any order) at runtime.
 
 ```{code-cell} ipython3
 import numpy as np
@@ -43,10 +28,6 @@ def normalize(img: np.ndarray, eps: float = 1e-8) -> np.ndarray:
     rng = img.ptp()  # max - min
     return (img - img.min()) / (rng + eps)
 
-@pipefunc("gamma")
-def gamma(img: np.ndarray, g: float = 2.2) -> np.ndarray:
-    return np.power(np.clip(img, 0.0, 1.0), 1.0 / g)
-
 @pipefunc("threshold")
 def threshold(img: np.ndarray, t: float = 0.5) -> np.ndarray:
     return (img > t).astype(np.float32)
@@ -55,7 +36,6 @@ def threshold(img: np.ndarray, t: float = 0.5) -> np.ndarray:
 TRANSFORMS = {
     "to_float": to_float,
     "normalize": normalize,
-    "gamma": gamma,
     "threshold": threshold,
 }
 
@@ -68,46 +48,6 @@ pipe = Pipeline(chain)
 img = np.random.randint(0, 255, size=(64, 64), dtype=np.uint8)
 out = pipe.run("threshold", kwargs={"img": img, "t": 0.4})
 out.shape, out.dtype
-```
-
-## Basic example
-
-```{code-cell} ipython3
-from pipefunc import pipefunc, Pipeline
-from pipefunc.helpers import linear_chain
-
-@pipefunc("mid1")
-def f1(x: int) -> int:
-    return x + 1
-
-@pipefunc("mid2")
-def f2(input: int, k: int = 2) -> int:
-    return input * k
-
-@pipefunc("out")
-def f3(value: int) -> int:
-    return value - 3
-
-chain = linear_chain([f1, f2, f3])  # renames f2.input->"mid1", f3.value->"mid2"
-Pipeline(chain).run("out", kwargs={"x": 2, "k": 3})  # -> 6
-```
-
-## When names already match
-
-If a downstream parameter already equals the upstream output name, no rename is applied.
-
-```{code-cell} ipython3
-@pipefunc("m1")
-def f1(src: int) -> int: return src + 1
-
-@pipefunc("m2b")
-def f2b(m1: int, k: int = 5) -> int: return m1 * k
-
-@pipefunc("out")
-def f3(value: int) -> int: return value - 3
-
-chain = linear_chain([f1, f2b, f3])  # f2b unchanged
-Pipeline(chain).run("out", kwargs={"src": 4, "k": 2})  # -> 7
 ```
 
 ## Multi-output upstream
@@ -145,23 +85,13 @@ Pipeline(linear_chain([f1, f2])).run("m2", kwargs={"src": 10})  # -> 12
 
 To use a specific upstream output, name the downstream parameter accordingly (or pre-rename the downstream `PipeFunc`).
 
-## Plain callables work too
-
-Callables are wrapped as `PipeFunc`s with `output_name=f.__name__`.
-
-```{code-cell} ipython3
-def g(z: int) -> int: return z * 2
-def h(t: int) -> int: return t + 5
-
-chain = linear_chain([g, h])
-Pipeline(chain).run("h", kwargs={"z": 3})  # -> 11
-```
-
-## Notes
-
-- No `mapspec` changes: existing mapspecs stay as-is; none are created or removed.
-- Middle functions must have at least one parameter to receive the upstream value.
-- `copy=True` (default) returns copies; set `copy=False` to modify your originals.
+Behavior in a nutshell
+- Prefers matches: if a downstream parameter matches any upstream output name, no rename.
+- Otherwise renames the first non‑bound downstream parameter to the first upstream output.
+- Works with multi‑output: match by name (or pre‑rename the downstream `PipeFunc`).
+- No `mapspec` changes. For batches, either vectorize over the batch dimension or declare `mapspec` on the functions themselves.
+- Plain callables auto‑wrap as `PipeFunc` with `output_name=f.__name__`.
+- `copy=True` returns copies; set `copy=False` to modify originals.
 
 ### Batches of arrays
 
