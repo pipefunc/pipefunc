@@ -24,7 +24,7 @@ jupytext:
 
 ## Basic example
 
-```python
+```{code-cell} ipython3
 from pipefunc import pipefunc, Pipeline
 from pipefunc.helpers import linear_chain
 
@@ -48,7 +48,7 @@ Pipeline(chain).run("out", kwargs={"x": 2, "k": 3})  # -> 6
 
 If a downstream parameter already equals the upstream output name, no rename is applied.
 
-```python
+```{code-cell} ipython3
 @pipefunc("m1")
 def f1(src: int) -> int: return src + 1
 
@@ -66,7 +66,7 @@ Pipeline(chain).run("out", kwargs={"src": 4, "k": 2})  # -> 7
 
 By default, the first output name is forwarded. You can select a different one.
 
-```python
+```{code-cell} ipython3
 @pipefunc(("a", "b"))
 def split(x: int) -> tuple[int, int]:
     return x, 10 * x
@@ -85,7 +85,7 @@ Pipeline(linear_chain([split, sink], select_output=1)).run("sink", kwargs={"x": 
 
 `linear_chain` auto-selects the first non-bound parameter as the main input when needed.
 
-```python
+```{code-cell} ipython3
 @pipefunc("m1")
 def f1(src: int) -> int: return src + 1
 
@@ -99,7 +99,7 @@ Pipeline(linear_chain([f1, f2])).run("m2", kwargs={"src": 10})  # -> 12
 
 Provide `select_param` to choose which parameter receives the upstream value.
 
-```python
+```{code-cell} ipython3
 @pipefunc("m1")
 def f1(x: int) -> int: return x + 1
 
@@ -114,7 +114,7 @@ Pipeline(chain).run("m2", kwargs={"x": 3, "aux": 0})  # -> 8
 
 Callables are wrapped as `PipeFunc`s with `output_name=f.__name__`.
 
-```python
+```{code-cell} ipython3
 def g(z: int) -> int: return z * 2
 def h(t: int) -> int: return t + 5
 
