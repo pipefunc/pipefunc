@@ -11,6 +11,7 @@ Error Handling <error-handling>
 Type Checking <type-checking>
 Variants <variants>
 Caching <caching>
+Linear Chaining Helper <linear-chaining>
 Automatic CLI <cli>
 MCP Server Integration <mcp>
 SLURM integration <slurm>
