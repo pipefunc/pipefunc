@@ -9,7 +9,7 @@ jupytext:
 
 # Linear Chaining Helper
 
-`pipefunc.helpers.linear_chain` connects a list of functions linearly by applying minimal renames so “output of one becomes input of the next.” It never alters `mapspec`—only names.
+`pipefunc.helpers.linear_chain` connects a list of functions linearly by applying minimal renames so “output of one becomes input of the next.” It only renames arguments where needed; it doesn’t change how your functions compute or how batching works.
 
 Use it to compose simple array→array transforms: keep a small toolbox of transforms and pick any subset (in any order) at runtime.
 
