@@ -11,7 +11,7 @@ from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pipefunc._utils import dump, is_running_in_ipynb, load, requires
+from pipefunc._utils import at_least_tuple, dump, is_running_in_ipynb, load, requires
 from pipefunc.map._storage_array._file import FileArray
 
 if TYPE_CHECKING:
@@ -383,94 +383,6 @@ def launch_maps(
     return asyncio.create_task(coro)
 
 
-# Linear chaining helper
-
-
-def _pick_output_name(
-    func: PipeFunc,
-    select_output: str | int | Callable[[PipeFunc], str] | None,
-) -> str:
-    """Pick a single output name from a PipeFunc, supporting multiple outputs.
-
-    Rules
-    - If ``select_output`` is a string, use it (must be one of the outputs).
-    - If ``select_output`` is an integer, use the corresponding index in the tuple output.
-    - If ``select_output`` is a callable, call it with the PipeFunc and expect a valid output name.
-    - If ``None`` and there is a single output (a string), use that; if multiple, use the first.
-    """
-    from pipefunc._utils import at_least_tuple
-
-    outputs = at_least_tuple(func.output_name)
-    if isinstance(select_output, str):
-        if select_output not in outputs:
-            msg = f"select_output={select_output!r} not in outputs {outputs} of {func}"
-            raise ValueError(msg)
-        return select_output
-    if isinstance(select_output, int):
-        try:
-            return outputs[select_output]
-        except IndexError as e:
-            msg = (
-                f"select_output index {select_output} out of range for outputs {outputs} of {func}"
-            )
-            raise ValueError(msg) from e
-    if callable(select_output):
-        name = select_output(func)
-        if name not in outputs:
-            msg = f"Callable select_output returned {name!r} which is not in outputs {outputs} of {func}"
-            raise ValueError(msg)
-        return name
-    # None -> default behavior
-    return outputs[0]
-
-
-def _pick_primary_param(
-    func: PipeFunc,
-    select_param: str | int | Callable[[PipeFunc], str] | None,
-    *,
-    skip_bound: bool = True,
-) -> str:
-    """Pick the parameter that should receive the upstream value.
-
-    Rules
-    - If ``select_param`` is a string, use it if present; otherwise raise.
-    - If ``select_param`` is an integer, use that positional index.
-    - If ``select_param`` is a callable, call it with the PipeFunc and use the returned name.
-    - If ``None``: pick the first parameter (by current names), skipping bound ones if ``skip_bound``.
-    """
-    params = list(func.parameters)
-    if not params:
-        msg = f"Function {func} has no parameters to receive upstream value."
-        raise ValueError(msg)
-
-    if isinstance(select_param, str):
-        if select_param not in params:
-            msg = f"select_param={select_param!r} not in parameters {tuple(params)} of {func}"
-            raise ValueError(msg)
-        return select_param
-    if isinstance(select_param, int):
-        try:
-            return params[select_param]
-        except IndexError as e:
-            msg = f"select_param index {select_param} out of range for parameters {tuple(params)} of {func}"
-            raise ValueError(msg) from e
-    if callable(select_param):
-        name = select_param(func)
-        if name not in params:
-            msg = f"Callable select_param returned {name!r} which is not in parameters {tuple(params)} of {func}"
-            raise ValueError(msg)
-        return name
-
-    # Auto-pick
-    if skip_bound:
-        for p in params:
-            if p not in func.bound:
-                return p
-        msg = f"All parameters of {func} are bound; cannot auto-select input parameter."
-        raise ValueError(msg)
-    return params[0]
-
-
 def linear_chain(
     functions: Sequence[PipeFunc | Callable],
     *,
@@ -506,7 +418,6 @@ def linear_chain(
 
     """
     from pipefunc import PipeFunc as _PipeFunc  # local import to avoid cyclic in typing
-    from pipefunc._utils import at_least_tuple
 
     if not functions:
         msg = "linear_chain requires at least one function"
@@ -551,9 +462,6 @@ def linear_chain(
         upstream = downstream
 
     return pfs
-
-
-# AsyncMap / launch_maps helpers
 
 
 def _validate_async_maps(async_maps: Sequence[AsyncMap]) -> None:
