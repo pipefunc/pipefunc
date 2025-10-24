@@ -44,7 +44,10 @@ selected = [TRANSFORMS[name] for name in ("to_float", "normalize", "threshold")]
 
 chain = linear_chain(selected)
 pipe = Pipeline(chain)
+pipe.visualize()
+```
 
+```{code-cell} ipython3
 img = np.random.randint(0, 255, size=(64, 64), dtype=np.uint8)
 out = pipe.run("threshold", kwargs={"img": img, "t": 0.4})
 out.shape, out.dtype
