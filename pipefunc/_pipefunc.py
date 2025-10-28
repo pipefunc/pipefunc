@@ -1016,7 +1016,7 @@ class PipeFunc(Generic[P, R]):
 def pipefunc(
     output_name: OUTPUT_TYPE,
     *,
-    output_picker: Callable[[R, str], Any] | None = None,
+    output_picker: Callable[[Any, str], Any] | None = None,
     renames: dict[str, str] | None = None,
     defaults: dict[str, Any] | None = None,
     bound: dict[str, Any] | None = None,
