@@ -24,7 +24,7 @@ def test_nested_pipefunc_defaults() -> None:
     assert nf.__name__ == "NestedPipeFunc_c_d"
     assert nf.defaults == {"b": 2}
     assert nf.output_name == ("c", "d")
-    assert nf(a=1) == (3, 3)
+    assert nf.run(a=1) == (3, 3)
     assert pipeline(a=1) == (3, 3)
     r = pipeline.map(inputs={"a": 1}, parallel=False, storage="dict")
     assert r["c"].output == 3
@@ -33,7 +33,7 @@ def test_nested_pipefunc_defaults() -> None:
     # Need to do the same on the pipeline (since the nf is copied)
     pipeline["c"].update_defaults({"a": 5, "b": 10})
     assert nf.defaults == {"a": 5, "b": 10}
-    assert nf() == (15, 15)
+    assert nf.run() == (15, 15)
     assert nf.parameter_annotations == {"b": float}
     assert nf.output_annotation == {"c": NoAnnotation, "d": int}
     assert pipeline() == (15, 15)
@@ -68,11 +68,11 @@ def test_nested_pipefunc_bound() -> None:
     assert nf.parameters == ("a", "b")
     assert nf.bound == {"a": 1}
     assert nf.pipeline["c"].bound == {}
-    assert nf(a=10, b=2) == 3  # a is bound to 1, so input a=10 is ignored
+    assert nf.run(a=10, b=2) == 3  # a is bound to 1, so input a=10 is ignored
     nf.update_bound({"b": 5})
     assert nf.pipeline["c"].bound == {}
     assert nf.bound == {"a": 1, "b": 5}
-    assert nf(a=100, b=200) == 6  # a and b are bound to 1 and 5 respectively
+    assert nf.run(a=100, b=200) == 6  # a and b are bound to 1 and 5 respectively
 
 
 def test_nested_pipefunc_bound_in_nest() -> None:
@@ -98,16 +98,16 @@ def test_nested_pipefunc_bound_in_pipeline() -> None:
         return 2 * x * b
 
     nf = NestedPipeFunc([fa, fb], ("x", "y"))
-    assert nf(n_=1) == (3, 6)
+    assert nf.run(n_=1) == (3, 6)
     assert nf.defaults == {}
     assert nf.bound == {}
     pipeline_nested_test = Pipeline([nf])
     assert pipeline_nested_test(n_=1)
     with pytest.raises(ValueError, match=re.escape("Unexpected keyword arguments")):
         # if the child functions have bound, they are not parameters of the nested pipefunc!
-        nf(n_=1, b_=10000000)
-    assert nf.pipeline["y"](x=3) == 6
-    assert nf(n_=1) == (3, 6)
+        nf.run(n_=1, b_=10000000)
+    assert nf.pipeline["y"].run(x=3) == 6
+    assert nf.run(n_=1) == (3, 6)
     assert pipeline_nested_test.topological_generations.root_args == ["n_"]
     with pytest.raises(
         ValueError,
@@ -136,7 +136,7 @@ def test_nested_pipefunc_multiple_outputs_bound() -> None:
     nf2.update_bound({"x": 1})
     assert nf2.bound == {"x": 1}
     assert nf2.pipeline["e"].bound == {}
-    assert nf2(x=5, y=10) == (1, 10)
+    assert nf2.run(x=5, y=10) == (1, 10)
 
 
 def test_nested_pipefunc_mapspec() -> None:
@@ -299,7 +299,7 @@ def test_nested_pipefunc_with_scope() -> None:
     nf.update_scope("my_scope", "*", "*")
     assert nf.parameters == ("my_scope.a", "my_scope.b")
     assert nf.output_name == "my_scope.d"
-    assert nf(my_scope={"a": 1, "b": 2}) == 3
+    assert nf.run(my_scope={"a": 1, "b": 2}) == 3
 
 
 def test_nested_pipefunc_output_picker() -> None:
@@ -330,7 +330,7 @@ def test_nested_pipefunc_error_snapshot() -> None:
 
     nf = NestedPipeFunc([f, g])
     with pytest.raises(ValueError, match="Intentional error"):
-        nf(a=1, b=2)
+        nf.run(a=1, b=2)
     assert nf.error_snapshot is not None
     assert isinstance(nf.error_snapshot, ErrorSnapshot)
     assert nf.error_snapshot.args == ()
@@ -675,7 +675,7 @@ def test_nested_pipefunc_single_output_with_scope() -> None:
     # handle scopes in the same way as output_annotation yet
 
     # Verify execution still works
-    assert nf(my_scope={"a": 1, "b": 2.5}) == 3
+    assert nf.run(my_scope={"a": 1, "b": 2.5}) == 3
 
     # Create pipeline with the nested pipefunc
     pipeline = Pipeline([nf])
@@ -834,7 +834,7 @@ def test_nestedpipefunc_with_default_and_bound() -> None:
     # Bind one of the inputs
     nf = NestedPipeFunc([func1, func2], bound={"y": "bound_y_value"})
     assert nf.bound == {"y": "bound_y_value"}
-    result = nf(x=1, y="xx")
+    result = nf.run(x=1, y="xx")
     assert result == (14.0, "14.0_True")
 
 

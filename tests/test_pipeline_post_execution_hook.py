@@ -12,7 +12,7 @@ def test_post_execution_hook() -> None:
         return a + b
 
     # Test direct function call
-    result = f(a=1, b=2)
+    result = f.run(a=1, b=2)
     assert result == 3
     assert len(hook_calls) == 1
     assert hook_calls[0] == ("c", 3, {"a": 1, "b": 2})

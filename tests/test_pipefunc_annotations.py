@@ -34,7 +34,7 @@ def test_pipeline_function_annotations_multiple_outputs():
     assert add_func.parameter_annotations == {"x": int, "y": float}
     assert add_func.output_annotation == {"a_plus_one": int, "b_plus_one": float}
 
-    result = add_func(x=1, y=2.0)
+    result = add_func.run(x=1, y=2.0)
     assert result == (2, 3.0)
 
     assert str(add_func) == "add_numbers(...) → a_plus_one, b_plus_one"
