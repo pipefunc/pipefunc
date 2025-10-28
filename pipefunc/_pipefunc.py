@@ -17,8 +17,16 @@ import os
 import warnings
 import weakref
 from collections import defaultdict
-from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, get_args, get_origin
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    Literal,
+    ParamSpec,
+    TypeVar,
+    get_args,
+    get_origin,
+)
 
 import cloudpickle
 
@@ -40,18 +48,21 @@ from pipefunc.resources import Resources
 from pipefunc.typing import NoAnnotation, safe_get_type_hints
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
+
     import pydantic
 
     from pipefunc import Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
     from pipefunc.map._types import ShapeTuple
 
-T = TypeVar("T", bound=Callable[..., Any])
+P = ParamSpec("P")
+R = TypeVar("R")
 
 MAX_PARAMS_LEN = 15
 
 
-class PipeFunc(Generic[T]):
+class PipeFunc(Generic[P, R]):
     """Function wrapper class for pipeline functions with additional attributes.
 
     Parameters
@@ -197,10 +208,10 @@ class PipeFunc(Generic[T]):
 
     def __init__(
         self,
-        func: T,
-        output_name: OUTPUT_TYPE,
+        func: Callable[P, R] | PipeFunc[P, R],
+        output_name: str | tuple[str, ...],
         *,
-        output_picker: Callable[[Any, str], Any] | None = None,
+        output_picker: Callable[[R, str], Any] | None = None,
         renames: dict[str, str] | None = None,
         defaults: dict[str, Any] | None = None,
         bound: dict[str, Any] | None = None,
@@ -210,7 +221,7 @@ class PipeFunc(Generic[T]):
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
         internal_shape: int | Literal["?"] | ShapeTuple | None = None,
-        post_execution_hook: Callable[[PipeFunc, Any, dict[str, Any]], None] | None = None,
+        post_execution_hook: Callable[[PipeFunc[P, R], R, dict[str, Any]], None] | None = None,
         resources: dict
         | Resources
         | Callable[[dict[str, Any]], Resources | dict[str, Any]]
@@ -223,7 +234,7 @@ class PipeFunc(Generic[T]):
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
         self._pipelines: weakref.WeakSet[Pipeline] = weakref.WeakSet()
-        self.func: Callable[..., Any] = func
+        self.func: Callable[P, R] = func
         self.__name__ = _get_name(func)
         self._output_name: OUTPUT_TYPE = output_name
         self.debug = debug
@@ -652,7 +663,7 @@ class PipeFunc(Generic[T]):
         for name in at_least_tuple(self.output_name):
             _validate_identifier("output_name", name)
 
-    def copy(self, **update: Any) -> PipeFunc:
+    def copy(self, **update: Any) -> PipeFunc[P, R]:
         """Create a copy of the `PipeFunc` instance, optionally updating the attributes."""
         kwargs = {
             "func": self.func,
@@ -688,7 +699,10 @@ class PipeFunc(Generic[T]):
     def _rename_to_native(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         return {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
+        return self.func(*args, **kwargs)
+
+    def run(self, *args: Any, **kwargs: Any) -> R:
         """Call the wrapped function with the given arguments.
 
         Returns
@@ -727,7 +741,7 @@ class PipeFunc(Generic[T]):
                 self.resources,
             )
             try:
-                result = self.func(*args, **kwargs)
+                result = self.func(*args, **kwargs)  # pyright: ignore[reportCallIssue]
             except Exception as e:
                 if self.print_error:
                     print(
@@ -1002,7 +1016,7 @@ class PipeFunc(Generic[T]):
 def pipefunc(
     output_name: OUTPUT_TYPE,
     *,
-    output_picker: Callable[[Any, str], Any] | None = None,
+    output_picker: Callable[[R, str], Any] | None = None,
     renames: dict[str, str] | None = None,
     defaults: dict[str, Any] | None = None,
     bound: dict[str, Any] | None = None,
@@ -1022,7 +1036,7 @@ def pipefunc(
     scope: str | None = None,
     variant: str | dict[str | None, str] | None = None,
     variant_group: str | None = None,  # deprecated
-) -> Callable[[Callable[..., Any]], PipeFunc]:
+) -> Callable[[Callable[P, R]], PipeFunc[P, R]]:
     """A decorator that wraps a function in a PipeFunc instance.
 
     Parameters
@@ -1160,7 +1174,7 @@ def pipefunc(
 
     """
 
-    def decorator(f: Callable[..., Any]) -> PipeFunc:
+    def decorator(f: Callable[P, R]) -> PipeFunc[P, R]:
         """Wraps the original function in a PipeFunc instance.
 
         Parameters

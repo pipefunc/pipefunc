@@ -2589,9 +2589,9 @@ def _update_all_results(
 
 def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:
     if lazy:
-        return _LazyFunction(func, kwargs=func_args)
+        return _LazyFunction(func.run, kwargs=func_args)
     try:
-        return func(**func_args)
+        return func.run(**func_args)
     except Exception as e:
         handle_pipefunc_error(e, func, func_args)
         # handle_pipefunc_error raises but mypy doesn't know that
