@@ -885,6 +885,29 @@ def test_resource_failure_skips_executor_submission() -> None:
     assert isinstance(result["z"].output, PropagatedErrorSnapshot)
 
 
+def test_resource_failure_raise_mode() -> None:
+    """When error_handling='raise', resource failures surface immediately."""
+
+    call_count = 0
+
+    def failing_resources(_kwargs: dict[str, Any]) -> Resources:
+        nonlocal call_count
+        call_count += 1
+        msg = "resource failure"
+        raise RuntimeError(msg)
+
+    @pipefunc(output_name="z", resources=failing_resources)
+    def downstream(x: int) -> int:
+        return x * 2
+
+    pipeline = Pipeline([downstream])
+
+    with pytest.raises(RuntimeError, match="resource failure"):
+        pipeline.map({"x": 1}, error_handling="raise", parallel=False)
+
+    assert call_count == 1
+
+
 def test_non_mapspec_map_scope_resources_skipped_on_error_input() -> None:
     """Regression: map-scope resources on scalar functions must skip when inputs fail."""
 
