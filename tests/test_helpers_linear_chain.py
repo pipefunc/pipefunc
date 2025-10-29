@@ -131,6 +131,8 @@ def test_linear_chain_bound_match_still_connects() -> None:
         return m1 + value
 
     chained = linear_chain([f1, f2d])
+    assert all(name != "m1" for name in chained[1].bound)
+    assert any(name.startswith("__bound_m1") for name in chained[1].bound)
     pipeline = Pipeline(cast("list[Any]", chained))
     assert set(pipeline.root_args()) == {"src"}
     assert pipeline.run("m2d", kwargs={"src": 2}) == 10 + (2 + 1)

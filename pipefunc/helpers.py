@@ -447,7 +447,6 @@ def linear_chain(
         if any(name in free_params for name in upstream_outputs):
             pass
         else:
-            # Rename upstream output to the first available downstream parameter
             if not downstream.parameters:
                 msg = f"Function {downstream} has no parameters to receive upstream value."
                 raise ValueError(msg)
@@ -459,7 +458,18 @@ def linear_chain(
                 )
                 raise ValueError(msg)
 
-            upstream.update_renames({upstream_outputs[0]: target}, update_from="current")
+            desired_name = upstream_outputs[0]
+            if desired_name in downstream.parameters and desired_name in downstream.bound:
+                placeholder_base = f"__bound_{desired_name}"
+                placeholder = placeholder_base
+                suffix = 0
+                occupied = set(downstream.parameters) | set(at_least_tuple(downstream.output_name))
+                while placeholder in occupied:
+                    suffix += 1
+                    placeholder = f"{placeholder_base}_{suffix}"
+                downstream.update_renames({desired_name: placeholder}, update_from="current")
+
+            downstream.update_renames({target: desired_name}, update_from="current")
 
         upstream = downstream
 
