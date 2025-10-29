@@ -25,7 +25,7 @@ def test_async_map_block_synchronous(capsys: pytest.CaptureFixture[str]) -> None
             start=False,
             display_widgets=False,
         )
-        result = runner.block()
+        result = runner.result()
 
     assert result["y"].output.tolist() == [1, 2, 3]
     captured = capsys.readouterr().out
@@ -39,7 +39,7 @@ async def test_async_map_block_raises_in_running_loop() -> None:
         runner = pipeline.map_async({"x": range(3)}, executor=executor, display_widgets=False)
         with pytest.raises(
             RuntimeError,
-            match=r"Cannot call `block\(\)` while an event loop is running",
+            match=r"Cannot call `result\(\)` while an event loop is running",
         ):
-            runner.block()
+            runner.result()
         await runner.task

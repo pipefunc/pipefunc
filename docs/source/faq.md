@@ -21,7 +21,7 @@ Missing something or is something unclear? Please [open an issue](https://github
 
 ## How do I run `pipeline.map_async` inside a Python script?
 
-`pipeline.map_async` returns an `AsyncMap`. In notebooks you typically `await runner.task`, but for plain `.py` scripts you can stay synchronous by calling the `runner.block()` helper. It drives the asynchronous run to completion without requiring an event loop.
+`pipeline.map_async` returns an `AsyncMap`. In notebooks you typically `await runner.task`, but for plain `.py` scripts you can stay synchronous by calling `runner.result()`. It runs the asynchronous map to completion for you and returns the `ResultDict`.
 
 ```{literalinclude} concepts/map_async_in_script.py
 :language: python

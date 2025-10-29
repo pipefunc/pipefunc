@@ -237,14 +237,17 @@ class AsyncMap:
     @property
     def task(self) -> asyncio.Task[ResultDict]:
         if self._task is None:
-            msg = "The task has not been started. Call `start()` first or use `runner.block()`."
+            msg = (
+                "The task has not been started. Call `start()` inside an event loop or use"
+                " `runner.result()` from synchronous code."
+            )
             raise RuntimeError(msg)
         return self._task
 
     def result(self) -> ResultDict:
         """Wait for the pipeline to complete and return the results."""
         if is_running_in_ipynb():  # pragma: no cover
-            if self.task.done():
+            if self._task is not None and self.task.done():
                 return self.task.result()
             msg = (
                 "Cannot block the event loop when running in a Jupyter notebook."
@@ -252,8 +255,30 @@ class AsyncMap:
             )
             raise RuntimeError(msg)
 
-        loop = asyncio.get_event_loop()  # pragma: no cover
-        return loop.run_until_complete(self.task)  # pragma: no cover
+        if self._task is None:
+            ensure_block_allowed()
+
+            async def _run_and_return() -> ResultDict:
+                task = asyncio.create_task(self._run_pipeline())
+                self._task = task
+                self._attach_to_task(task)
+                try:
+                    return await task
+                finally:
+                    if not task.done():
+                        task.cancel()
+                        with suppress(asyncio.CancelledError):
+                            await task
+                    self._task = None
+
+            return asyncio.run(_run_and_return())
+
+        if self.task.done():
+            return self.task.result()
+
+        ensure_block_allowed()
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(self.task)
 
     def display(self) -> None:  # pragma: no cover
         """Display the pipeline widget."""
@@ -277,7 +302,7 @@ class AsyncMap:
             loop = asyncio.get_running_loop()
         except RuntimeError:
             warnings.warn(
-                "No running asyncio event loop; call `runner.block()` to run synchronously "
+                "No running asyncio event loop; call `runner.result()` to run synchronously "
                 "or start the task inside an async context.",
                 UserWarning,
                 stacklevel=2,
@@ -294,32 +319,6 @@ class AsyncMap:
         self.status_widget = maybe_async_task_status_widget(task)
         if self._display_widgets:
             self.display()
-
-    def block(self) -> ResultDict:
-        """Run the asynchronous map to completion from synchronous code."""
-        ensure_block_allowed()
-
-        if self._task is not None:
-            loop = asyncio.get_event_loop()
-            result = loop.run_until_complete(self.task)
-        else:
-
-            async def _run_blocking() -> ResultDict:
-                task = asyncio.create_task(self._run_pipeline())
-                self._task = task
-                self._attach_to_task(task)
-                try:
-                    return await task
-                finally:
-                    if not task.done():
-                        task.cancel()
-                        with suppress(asyncio.CancelledError):
-                            await task
-                    self._task = None
-
-            result = asyncio.run(_run_blocking())
-
-        return result
 
 
 def run_map_async(

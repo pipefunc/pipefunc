@@ -186,7 +186,7 @@ def ensure_block_allowed() -> None:
         asyncio.get_running_loop()
     except RuntimeError:
         return
-    msg = "Cannot call `block()` while an event loop is running; `await runner.task` instead."
+    msg = "Cannot call `result()` while an event loop is running; `await runner.task` instead."
     raise RuntimeError(msg)
 
 

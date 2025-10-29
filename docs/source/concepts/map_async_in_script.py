@@ -26,7 +26,7 @@ def main() -> None:
         display_widgets=False,
     )
 
-    result = runner.block()
+    result = runner.result()
     print(result["y"].output[:5])
 
 
