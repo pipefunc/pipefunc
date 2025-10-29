@@ -16,6 +16,7 @@ Use it to compose simple array→array transforms: keep a small toolbox of trans
 ```{code-cell} ipython3
 import numpy as np
 
+from pipefunc import Pipeline, pipefunc
 from pipefunc.helpers import linear_chain
 
 @pipefunc("to_float")
