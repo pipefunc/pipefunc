@@ -19,6 +19,7 @@ from pipefunc._pipefunc_utils import handle_pipefunc_error
 from pipefunc._utils import (
     at_least_tuple,
     dump,
+    ensure_block_allowed,
     get_ncores,
     is_running_in_ipynb,
     prod,
@@ -232,27 +233,59 @@ class AsyncMap:
     _display_widgets: bool
     _prepared: Prepared
     _task: asyncio.Task[ResultDict] | None = None
+    _result_cache: ResultDict | None = None
 
     @property
     def task(self) -> asyncio.Task[ResultDict]:
         if self._task is None:
-            msg = "The task has not been started. Call `start()` first."
+            msg = (
+                "The task has not been started. Call `start()` inside an event loop or use"
+                " `runner.result()` from synchronous code."
+            )
             raise RuntimeError(msg)
         return self._task
 
     def result(self) -> ResultDict:
         """Wait for the pipeline to complete and return the results."""
+        if self._result_cache is not None:
+            return self._result_cache
+
         if is_running_in_ipynb():  # pragma: no cover
-            if self.task.done():
-                return self.task.result()
+            if self._task is not None and self.task.done():
+                result = self.task.result()
+                self._result_cache = result
+                return result
             msg = (
                 "Cannot block the event loop when running in a Jupyter notebook."
                 " Use `await runner.task` instead."
             )
             raise RuntimeError(msg)
 
-        loop = asyncio.get_event_loop()  # pragma: no cover
-        return loop.run_until_complete(self.task)  # pragma: no cover
+        ensure_block_allowed()
+        if self._task is None:
+
+            async def _run_and_return() -> ResultDict:
+                task = asyncio.create_task(self._run_pipeline())
+                self._task = task
+                self._attach_to_task(task)
+                try:
+                    result = await task
+                finally:
+                    self._task = None
+                return result
+
+            result = asyncio.run(_run_and_return())
+            self._result_cache = result
+            return result
+
+        async def _await_task(task: asyncio.Task[ResultDict]) -> ResultDict:
+            return await task
+
+        loop = self.task.get_loop()
+        coro = _await_task(self.task)
+        result = asyncio.run_coroutine_threadsafe(coro, loop).result()
+        self._result_cache = result
+        return result
 
     def display(self) -> None:  # pragma: no cover
         """Display the pipeline widget."""
@@ -272,13 +305,36 @@ class AsyncMap:
             warnings.warn("Task is already running.", stacklevel=2)
             return self
 
-        self._task = asyncio.create_task(self._run_pipeline())
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            warnings.warn(
+                "No running asyncio event loop; call `runner.result()` to run synchronously "
+                "or start the task inside an async context.",
+                UserWarning,
+                stacklevel=2,
+            )
+            return self
+
+        self._task = loop.create_task(self._run_pipeline())
+        self._attach_to_task(self._task)
+        return self
+
+    def _attach_to_task(self, task: asyncio.Task[ResultDict]) -> None:
+        task.add_done_callback(self._cache_task_result)
         if self.progress is not None:
-            self.progress.attach_task(self._task)
-        self.status_widget = maybe_async_task_status_widget(self._task)
+            self.progress.attach_task(task)
+        self.status_widget = maybe_async_task_status_widget(task)
         if self._display_widgets:
             self.display()
-        return self
+
+    def _cache_task_result(self, task: asyncio.Task[ResultDict]) -> None:
+        if task.cancelled():
+            return
+        if task.exception() is None:
+            self._result_cache = task.result()
+        else:
+            self._result_cache = None
 
 
 def run_map_async(
