@@ -7,7 +7,7 @@ import math
 import time
 import warnings
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
-from contextlib import contextmanager, suppress
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
@@ -233,6 +233,7 @@ class AsyncMap:
     _display_widgets: bool
     _prepared: Prepared
     _task: asyncio.Task[ResultDict] | None = None
+    _result_cache: ResultDict | None = None
 
     @property
     def task(self) -> asyncio.Task[ResultDict]:
@@ -246,9 +247,14 @@ class AsyncMap:
 
     def result(self) -> ResultDict:
         """Wait for the pipeline to complete and return the results."""
+        if self._result_cache is not None:
+            return self._result_cache
+
         if is_running_in_ipynb():  # pragma: no cover
             if self._task is not None and self.task.done():
-                return self.task.result()
+                result = self.task.result()
+                self._result_cache = result
+                return result
             msg = (
                 "Cannot block the event loop when running in a Jupyter notebook."
                 " Use `await runner.task` instead."
@@ -263,22 +269,27 @@ class AsyncMap:
                 self._task = task
                 self._attach_to_task(task)
                 try:
-                    return await task
+                    result = await task
                 finally:
-                    if not task.done():
-                        task.cancel()
-                        with suppress(asyncio.CancelledError):
-                            await task
                     self._task = None
+                return result
 
-            return asyncio.run(_run_and_return())
-
-        if self.task.done():
-            return self.task.result()
+            result = asyncio.run(_run_and_return())
+            self._result_cache = result
+            return result
 
         ensure_block_allowed()
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(self.task)
+        loop = self.task.get_loop()
+
+        async def _await_task(task: asyncio.Task[ResultDict]) -> ResultDict:
+            return await task
+
+        result = asyncio.run_coroutine_threadsafe(
+            _await_task(self.task),
+            loop,
+        ).result()
+        self._result_cache = result
+        return result
 
     def display(self) -> None:  # pragma: no cover
         """Display the pipeline widget."""
@@ -314,11 +325,20 @@ class AsyncMap:
         return self
 
     def _attach_to_task(self, task: asyncio.Task[ResultDict]) -> None:
+        task.add_done_callback(self._cache_task_result)
         if self.progress is not None:
             self.progress.attach_task(task)
         self.status_widget = maybe_async_task_status_widget(task)
         if self._display_widgets:
             self.display()
+
+    def _cache_task_result(self, task: asyncio.Task[ResultDict]) -> None:
+        if task.cancelled():
+            return
+        if task.exception() is None:
+            self._result_cache = task.result()
+        else:
+            self._result_cache = None
 
 
 def run_map_async(
