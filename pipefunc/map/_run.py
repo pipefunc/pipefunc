@@ -9,7 +9,6 @@ import warnings
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
@@ -20,6 +19,7 @@ from pipefunc._pipefunc_utils import handle_pipefunc_error
 from pipefunc._utils import (
     at_least_tuple,
     dump,
+    ensure_block_allowed,
     get_ncores,
     is_running_in_ipynb,
     prod,
@@ -33,6 +33,7 @@ from ._adaptive_scheduler_slurm_executor import (
     maybe_multi_run_manager,
     maybe_update_slurm_executor_map,
     maybe_update_slurm_executor_single,
+    wait_task_with_monitor,
 )
 from ._load import _load_from_store, maybe_load_data
 from ._mapspec import MapSpec, _shape_to_key
@@ -324,12 +325,12 @@ class AsyncMap:
         if self._result_cache is not None:
             return self._result_cache
 
-        _ensure_block_allowed()
+        ensure_block_allowed()
 
         if self._task is not None:
             loop = asyncio.get_event_loop()
             result = loop.run_until_complete(
-                _wait_task_with_monitor(
+                wait_task_with_monitor(
                     self.task,
                     poll_interval,
                     self.multi_run_manager,
@@ -342,7 +343,7 @@ class AsyncMap:
                 self._task = task
                 self._attach_to_task(task)
                 try:
-                    return await _wait_task_with_monitor(
+                    return await wait_task_with_monitor(
                         task,
                         poll_interval,
                         self.multi_run_manager,
@@ -359,53 +360,6 @@ class AsyncMap:
         self._start_pending = False
         self._result_cache = result
         return result
-
-
-def _ensure_block_allowed() -> None:
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return
-    msg = "Cannot call `block()` while an event loop is running; await `runner.task` instead."
-    raise RuntimeError(msg)
-
-
-async def _wait_task_with_monitor(
-    task: asyncio.Task[ResultDict],
-    poll_interval: float | None,
-    multi_run_manager: MultiRunManager | None,
-) -> ResultDict:
-    monitor_task: asyncio.Task[None] | None = None
-    if poll_interval is not None and poll_interval > 0 and multi_run_manager is not None:
-
-        async def _monitor() -> None:
-            _print_multi_run_status(multi_run_manager)
-            try:
-                while not task.done():
-                    await asyncio.sleep(poll_interval)
-                    _print_multi_run_status(multi_run_manager)
-            finally:
-                _print_multi_run_status(multi_run_manager)
-
-        monitor_task = asyncio.create_task(_monitor())
-    try:
-        return await task
-    finally:
-        if monitor_task is not None:
-            monitor_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await monitor_task
-
-
-def _print_multi_run_status(multi_run_manager: MultiRunManager | None) -> None:
-    if multi_run_manager is None:
-        return
-    for output_name, run_manager in multi_run_manager.run_managers.items():
-        print(f"----- {output_name} -----")
-        current_time = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
-        print(f"Current time: {current_time}")
-        print(run_manager.info(format="text"))
-        print()
 
 
 def run_map_async(
