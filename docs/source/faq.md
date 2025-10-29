@@ -19,6 +19,21 @@ kernelspec:
 
 Missing something or is something unclear? Please [open an issue](https://github.com/pipefunc/pipefunc/issues/new)!
 
+## How do I run `pipeline.map_async` inside a Python script?
+
+`pipeline.map_async` returns an `AsyncMap`. In notebooks you typically `await runner.task`, but for plain `.py` scripts you can stay synchronous by calling the new `runner.block()` helper. It drives the asynchronous run to completion, optionally printing `adaptive_scheduler` progress snapshots.
+
+```{literalinclude} concepts/map_async_in_script.py
+:language: python
+```
+
+- The snippet above lives in `docs/source/concepts/map_async_in_script.py` so you can copy it as-is for your own scripts.
+- Keep `start=False` to suppress the automatic `start()` call that expects a running event loop.
+- Pass `display_widgets=False` to avoid the notebook-only widget warning in terminal scripts.
+- Swap the executor for `SlurmExecutor(...)` (or another backend) and set a `poll_interval` if you want periodic status prints from `adaptive_scheduler`'s `MultiRunManager`.
+
+If you *are* in an async context (e.g. a FastAPI endpoint), continue to `await runner.task` instead of calling `block()`.
+
 ## How is this different from Dask, AiiDA, Luigi, Prefect, Kedro, Apache Airflow, Snakemake, etc.?
 
 `pipefunc` fills a unique niche in the Python workflow ecosystem.

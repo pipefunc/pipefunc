@@ -7,8 +7,9 @@ import math
 import time
 import warnings
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
@@ -232,16 +233,27 @@ class AsyncMap:
     _display_widgets: bool
     _prepared: Prepared
     _task: asyncio.Task[ResultDict] | None = None
+    _start_pending: bool = False
+    _result_cache: ResultDict | None = None
 
     @property
     def task(self) -> asyncio.Task[ResultDict]:
         if self._task is None:
-            msg = "The task has not been started. Call `start()` first."
+            if self._start_pending:
+                msg = (
+                    "The task has not been started because no running asyncio event loop was "
+                    "available. Call `runner.block()` to execute synchronously or `runner.start()` "
+                    "inside an event loop."
+                )
+            else:
+                msg = "The task has not been started. Call `start()` first."
             raise RuntimeError(msg)
         return self._task
 
     def result(self) -> ResultDict:
         """Wait for the pipeline to complete and return the results."""
+        if self._result_cache is not None:
+            return self._result_cache
         if is_running_in_ipynb():  # pragma: no cover
             if self.task.done():
                 return self.task.result()
@@ -252,7 +264,9 @@ class AsyncMap:
             raise RuntimeError(msg)
 
         loop = asyncio.get_event_loop()  # pragma: no cover
-        return loop.run_until_complete(self.task)  # pragma: no cover
+        result = loop.run_until_complete(self.task)  # pragma: no cover
+        self._result_cache = result
+        return result
 
     def display(self) -> None:  # pragma: no cover
         """Display the pipeline widget."""
@@ -272,13 +286,127 @@ class AsyncMap:
             warnings.warn("Task is already running.", stacklevel=2)
             return self
 
-        self._task = asyncio.create_task(self._run_pipeline())
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            warnings.warn(
+                "No running asyncio event loop; call `runner.block()` to run synchronously "
+                "or start the task inside an async context.",
+                UserWarning,
+                stacklevel=2,
+            )
+            self._start_pending = True
+            return self
+
+        self._task = loop.create_task(self._run_pipeline())
+        self._start_pending = False
+        self._attach_to_task(self._task)
+        return self
+
+    def _cache_result(self, task: asyncio.Task[ResultDict]) -> None:
+        if task.cancelled():
+            return
+        if task.exception() is None:
+            self._result_cache = task.result()
+        else:
+            self._result_cache = None
+
+    def _attach_to_task(self, task: asyncio.Task[ResultDict]) -> None:
+        task.add_done_callback(self._cache_result)
         if self.progress is not None:
-            self.progress.attach_task(self._task)
-        self.status_widget = maybe_async_task_status_widget(self._task)
+            self.progress.attach_task(task)
+        self.status_widget = maybe_async_task_status_widget(task)
         if self._display_widgets:
             self.display()
-        return self
+
+    def block(self, *, poll_interval: float | None = None) -> ResultDict:
+        """Run the asynchronous map to completion from synchronous code."""
+        if self._result_cache is not None:
+            return self._result_cache
+
+        self._ensure_block_allowed()
+
+        result = (
+            self._block_existing_task(poll_interval)
+            if self._task is not None
+            else self._block_new_task(poll_interval)
+        )
+
+        self._start_pending = False
+        self._result_cache = result
+        return result
+
+    def _ensure_block_allowed(self) -> None:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        msg = "Cannot call `block()` while an event loop is running; await `runner.task` instead."
+        raise RuntimeError(msg)
+
+    def _block_existing_task(self, poll_interval: float | None) -> ResultDict:
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(
+            self._wait_task_with_monitor(self.task, poll_interval),
+        )
+
+    def _block_new_task(self, poll_interval: float | None) -> ResultDict:
+        async def _run_blocking() -> ResultDict:
+            task = asyncio.create_task(self._run_pipeline())
+            self._task = task
+            self._attach_to_task(task)
+            try:
+                return await self._wait_task_with_monitor(task, poll_interval)
+            finally:
+                if not task.done():
+                    task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await task
+                self._task = None
+
+        return asyncio.run(_run_blocking())
+
+    async def _wait_task_with_monitor(
+        self,
+        task: asyncio.Task[ResultDict],
+        poll_interval: float | None,
+    ) -> ResultDict:
+        monitor_task: asyncio.Task[None] | None = None
+        if poll_interval is not None and poll_interval > 0 and self.multi_run_manager is not None:
+
+            async def _monitor() -> None:
+                self._print_multi_run_status()
+                try:
+                    while not task.done():
+                        await asyncio.sleep(poll_interval)
+                        self._print_multi_run_status()
+                finally:
+                    self._print_multi_run_status()
+
+            monitor_task = asyncio.create_task(_monitor())
+        try:
+            return await task
+        finally:
+            if monitor_task is not None:
+                monitor_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await monitor_task
+
+    def _print_multi_run_status(self) -> None:
+        if self.multi_run_manager is None:
+            return
+        for output_name, run_manager in self.multi_run_manager.run_managers.items():
+            print(f"----- {output_name} -----")
+            current_time = (
+                datetime.now(timezone.utc)
+                .astimezone()
+                .strftime(
+                    "%Y-%m-%d %H:%M:%S %Z",
+                )
+            )
+            print(f"Current time: {current_time}")
+            print(run_manager.info(format="text"))
+            print()
 
 
 def run_map_async(
