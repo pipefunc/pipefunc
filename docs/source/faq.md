@@ -21,7 +21,7 @@ Missing something or is something unclear? Please [open an issue](https://github
 
 ## How do I run `pipeline.map_async` inside a Python script?
 
-`pipeline.map_async` returns an `AsyncMap`. In notebooks you typically `await runner.task`, but for plain `.py` scripts you can stay synchronous by calling the new `runner.block()` helper. It drives the asynchronous run to completion, optionally printing `adaptive_scheduler` progress snapshots.
+`pipeline.map_async` returns an `AsyncMap`. In notebooks you typically `await runner.task`, but for plain `.py` scripts you can stay synchronous by calling the `runner.block()` helper. It drives the asynchronous run to completion without requiring an event loop.
 
 ```{literalinclude} concepts/map_async_in_script.py
 :language: python
@@ -30,7 +30,7 @@ Missing something or is something unclear? Please [open an issue](https://github
 - The snippet above lives in `docs/source/concepts/map_async_in_script.py` so you can copy it as-is for your own scripts.
 - Keep `start=False` to suppress the automatic `start()` call that expects a running event loop.
 - Pass `display_widgets=False` to avoid the notebook-only widget warning in terminal scripts.
-- Swap the executor for `SlurmExecutor(...)` (or another backend) and set a `poll_interval` if you want periodic status prints from `adaptive_scheduler`'s `MultiRunManager`.
+- Swap the executor for `SlurmExecutor(...)` (or another backend) if you need cluster integration or custom execution behavior.
 
 If you *are* in an async context (e.g. a FastAPI endpoint), continue to `await runner.task` instead of calling `block()`.
 

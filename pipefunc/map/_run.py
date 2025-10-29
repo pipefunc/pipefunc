@@ -233,19 +233,11 @@ class AsyncMap:
     _display_widgets: bool
     _prepared: Prepared
     _task: asyncio.Task[ResultDict] | None = None
-    _start_pending: bool = False
 
     @property
     def task(self) -> asyncio.Task[ResultDict]:
         if self._task is None:
-            if self._start_pending:
-                msg = (
-                    "The task has not been started because no running asyncio event loop was "
-                    "available. Call `runner.block()` to execute synchronously or `runner.start()` "
-                    "inside an event loop."
-                )
-            else:
-                msg = "The task has not been started. Call `start()` first."
+            msg = "The task has not been started. Call `start()` first or use `runner.block()`."
             raise RuntimeError(msg)
         return self._task
 
@@ -290,11 +282,9 @@ class AsyncMap:
                 UserWarning,
                 stacklevel=2,
             )
-            self._start_pending = True
             return self
 
         self._task = loop.create_task(self._run_pipeline())
-        self._start_pending = False
         self._attach_to_task(self._task)
         return self
 
@@ -305,12 +295,9 @@ class AsyncMap:
         if self._display_widgets:
             self.display()
 
-    def block(self, *, poll_interval: float | None = None) -> ResultDict:
+    def block(self) -> ResultDict:
         """Run the asynchronous map to completion from synchronous code."""
         ensure_block_allowed()
-
-        # Keep the argument for compatibility even though polling is no longer implemented.
-        _ = poll_interval
 
         if self._task is not None:
             loop = asyncio.get_event_loop()
@@ -332,7 +319,6 @@ class AsyncMap:
 
             result = asyncio.run(_run_blocking())
 
-        self._start_pending = False
         return result
 
 

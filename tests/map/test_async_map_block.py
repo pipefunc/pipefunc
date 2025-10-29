@@ -25,7 +25,7 @@ def test_async_map_block_synchronous(capsys: pytest.CaptureFixture[str]) -> None
             start=False,
             display_widgets=False,
         )
-        result = runner.block(poll_interval=0.01)
+        result = runner.block()
 
     assert result["y"].output.tolist() == [1, 2, 3]
     captured = capsys.readouterr().out
