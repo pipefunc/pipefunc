@@ -261,8 +261,8 @@ class AsyncMap:
             )
             raise RuntimeError(msg)
 
+        ensure_block_allowed()
         if self._task is None:
-            ensure_block_allowed()
 
             async def _run_and_return() -> ResultDict:
                 task = asyncio.create_task(self._run_pipeline())
@@ -278,16 +278,12 @@ class AsyncMap:
             self._result_cache = result
             return result
 
-        ensure_block_allowed()
-        loop = self.task.get_loop()
-
         async def _await_task(task: asyncio.Task[ResultDict]) -> ResultDict:
             return await task
 
-        result = asyncio.run_coroutine_threadsafe(
-            _await_task(self.task),
-            loop,
-        ).result()
+        loop = self.task.get_loop()
+        coro = _await_task(self.task)
+        result = asyncio.run_coroutine_threadsafe(coro, loop).result()
         self._result_cache = result
         return result
 
