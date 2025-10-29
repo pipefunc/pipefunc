@@ -235,7 +235,6 @@ class AsyncMap:
     _prepared: Prepared
     _task: asyncio.Task[ResultDict] | None = None
     _start_pending: bool = False
-    _result_cache: ResultDict | None = None
 
     @property
     def task(self) -> asyncio.Task[ResultDict]:
@@ -253,8 +252,6 @@ class AsyncMap:
 
     def result(self) -> ResultDict:
         """Wait for the pipeline to complete and return the results."""
-        if self._result_cache is not None:
-            return self._result_cache
         if is_running_in_ipynb():  # pragma: no cover
             if self.task.done():
                 return self.task.result()
@@ -265,9 +262,7 @@ class AsyncMap:
             raise RuntimeError(msg)
 
         loop = asyncio.get_event_loop()  # pragma: no cover
-        result = loop.run_until_complete(self.task)  # pragma: no cover
-        self._result_cache = result
-        return result
+        return loop.run_until_complete(self.task)  # pragma: no cover
 
     def display(self) -> None:  # pragma: no cover
         """Display the pipeline widget."""
@@ -304,16 +299,7 @@ class AsyncMap:
         self._attach_to_task(self._task)
         return self
 
-    def _cache_result(self, task: asyncio.Task[ResultDict]) -> None:
-        if task.cancelled():
-            return
-        if task.exception() is None:
-            self._result_cache = task.result()
-        else:
-            self._result_cache = None
-
     def _attach_to_task(self, task: asyncio.Task[ResultDict]) -> None:
-        task.add_done_callback(self._cache_result)
         if self.progress is not None:
             self.progress.attach_task(task)
         self.status_widget = maybe_async_task_status_widget(task)
@@ -322,9 +308,6 @@ class AsyncMap:
 
     def block(self, *, poll_interval: float | None = None) -> ResultDict:
         """Run the asynchronous map to completion from synchronous code."""
-        if self._result_cache is not None:
-            return self._result_cache
-
         ensure_block_allowed()
 
         if self._task is not None:
@@ -358,7 +341,6 @@ class AsyncMap:
             result = asyncio.run(_run_blocking())
 
         self._start_pending = False
-        self._result_cache = result
         return result
 
 
