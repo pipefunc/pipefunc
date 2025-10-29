@@ -25,22 +25,11 @@ def test_async_map_block_synchronous(capsys: pytest.CaptureFixture[str]) -> None
             start=False,
             display_widgets=False,
         )
-
-        class _DummyRunManager:
-            def info(self, format: str = "text") -> str:  # noqa: ARG002, A002 - signature matches real API
-                return "dummy info"
-
-        class _DummyMultiRunManager:
-            def __init__(self) -> None:
-                self.run_managers = {"y": _DummyRunManager()}
-
-        runner.multi_run_manager = _DummyMultiRunManager()
         result = runner.block(poll_interval=0.01)
 
     assert result["y"].output.tolist() == [1, 2, 3]
     captured = capsys.readouterr().out
-    assert "----- y -----" in captured
-    assert "Current time:" in captured
+    assert captured == ""
 
 
 @pytest.mark.asyncio

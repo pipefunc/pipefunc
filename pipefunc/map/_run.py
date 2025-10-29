@@ -33,7 +33,6 @@ from ._adaptive_scheduler_slurm_executor import (
     maybe_multi_run_manager,
     maybe_update_slurm_executor_map,
     maybe_update_slurm_executor_single,
-    wait_task_with_monitor,
 )
 from ._load import _load_from_store, maybe_load_data
 from ._mapspec import MapSpec, _shape_to_key
@@ -310,15 +309,12 @@ class AsyncMap:
         """Run the asynchronous map to completion from synchronous code."""
         ensure_block_allowed()
 
+        # Keep the argument for compatibility even though polling is no longer implemented.
+        _ = poll_interval
+
         if self._task is not None:
             loop = asyncio.get_event_loop()
-            result = loop.run_until_complete(
-                wait_task_with_monitor(
-                    self.task,
-                    poll_interval,
-                    self.multi_run_manager,
-                ),
-            )
+            result = loop.run_until_complete(self.task)
         else:
 
             async def _run_blocking() -> ResultDict:
@@ -326,11 +322,7 @@ class AsyncMap:
                 self._task = task
                 self._attach_to_task(task)
                 try:
-                    return await wait_task_with_monitor(
-                        task,
-                        poll_interval,
-                        self.multi_run_manager,
-                    )
+                    return await task
                 finally:
                     if not task.done():
                         task.cancel()
