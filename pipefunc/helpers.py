@@ -409,10 +409,10 @@ def linear_chain(
 
     Notes
     -----
-    - If a downstream function already has a parameter matching any upstream output name,
-      no rename is applied (prefer existing matches).
-    - When no matches exist, the first non-bound downstream parameter is renamed to the
-      first upstream output name.
+    - If a downstream function already has an *unbound* parameter matching an upstream
+      output name, no rename is applied (prefer existing matches).
+    - When no free matches exist, the upstream output is renamed to the first
+      non-bound downstream parameter so the data flows forward.
     - If a function has zero parameters (and is not the first in the chain), a ValueError
       is raised.
 
@@ -442,22 +442,24 @@ def linear_chain(
     for i in range(1, len(pfs)):
         downstream = pfs[i]
         upstream_outputs = at_least_tuple(upstream.output_name)
-        # Prefer existing matches: if any downstream parameter matches any upstream output, do nothing
-        if any(name in downstream.parameters for name in upstream_outputs):
+        # Prefer existing matches among free parameters
+        free_params = [p for p in downstream.parameters if p not in downstream.bound]
+        if any(name in free_params for name in upstream_outputs):
             pass
         else:
-            # Rename first non-bound downstream parameter to the first upstream output
-            params = list(downstream.parameters)
-            if not params:
+            # Rename upstream output to the first available downstream parameter
+            if not downstream.parameters:
                 msg = f"Function {downstream} has no parameters to receive upstream value."
                 raise ValueError(msg)
-            target = next((p for p in params if p not in downstream.bound), None)
+
+            target = next(iter(free_params), None)
             if target is None:
                 msg = (
                     f"All parameters of {downstream} are bound; cannot auto-select input parameter."
                 )
                 raise ValueError(msg)
-            downstream.update_renames({target: upstream_outputs[0]}, update_from="current")
+
+            upstream.update_renames({upstream_outputs[0]: target}, update_from="current")
 
         upstream = downstream
 

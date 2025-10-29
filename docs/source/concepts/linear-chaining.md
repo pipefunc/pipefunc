@@ -56,7 +56,7 @@ out.shape, out.dtype
 
 ## Multi-output upstream
 
-`linear_chain` prefers existing matches. If a downstream parameter matches any upstream output name, that output is used. Otherwise, the first upstream output name is used.
+`linear_chain` prefers existing matches. If a downstream parameter that is *not bound* matches any upstream output name, that output is used. Otherwise, the upstream output is renamed to the first free downstream parameter.
 
 ```{code-cell} ipython3
 @pipefunc(("a", "b"))
@@ -73,7 +73,7 @@ Pipeline(linear_chain([split, sink_b])).run("sink_b", kwargs={"x": 7})  # -> 70
 
 ## Bound parameters are skipped
 
-`linear_chain` auto-selects the first non-bound parameter as the main input when needed.
+`linear_chain` auto-selects the first non-bound parameter as the main input by renaming the upstream output when needed.
 
 ```{code-cell} ipython3
 @pipefunc("m1")
@@ -90,8 +90,8 @@ Pipeline(linear_chain([f1, f2])).run("m2", kwargs={"src": 10})  # -> 12
 To use a specific upstream output, name the downstream parameter accordingly (or pre-rename the downstream `PipeFunc`).
 
 Behavior in a nutshell
-- Prefers matches: if a downstream parameter matches any upstream output name, no rename.
-- Otherwise renames the first non‑bound downstream parameter to the first upstream output.
+- Prefers matches: if an unbound downstream parameter matches an upstream output name, no rename.
+- Otherwise renames the upstream output to the first non‑bound downstream parameter.
 - Works with multi‑output: match by name (or pre‑rename the downstream `PipeFunc`).
 - No `mapspec` changes. For batches, either vectorize over the batch dimension or declare `mapspec` on the functions themselves.
 - Plain callables auto‑wrap as `PipeFunc` with `output_name=f.__name__`.

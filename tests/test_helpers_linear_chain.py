@@ -111,3 +111,35 @@ def test_linear_chain_accepts_plain_callables() -> None:
     assert all(isinstance(pf, PipeFunc) for pf in chained)
     pipeline = Pipeline(cast("list[Any]", chained))
     assert pipeline.run(chained[-1].output_name, kwargs={"z": 3}) == (3 * 2) + 5
+
+
+def test_linear_chain_requires_function() -> None:
+    with pytest.raises(ValueError, match="requires at least one function"):
+        linear_chain([])
+
+
+def test_linear_chain_single_function_returns_copy() -> None:
+    chained = linear_chain([f1])
+    assert len(chained) == 1
+    pipeline = Pipeline(cast("list[Any]", chained))
+    assert pipeline.run(chained[0].output_name, kwargs={"src": 3}) == 4
+
+
+def test_linear_chain_bound_match_still_connects() -> None:
+    @pipefunc(output_name="m2d", bound={"m1": 10})
+    def f2d(m1: int, value: int) -> int:
+        return m1 + value
+
+    chained = linear_chain([f1, f2d])
+    pipeline = Pipeline(cast("list[Any]", chained))
+    assert set(pipeline.root_args()) == {"src"}
+    assert pipeline.run("m2d", kwargs={"src": 2}) == 10 + (2 + 1)
+
+
+def test_linear_chain_all_params_bound_error() -> None:
+    @pipefunc(output_name="bound", bound={"fixed": 7})
+    def all_bound(fixed: int) -> int:
+        return fixed
+
+    with pytest.raises(ValueError, match="All parameters.*bound"):
+        linear_chain([f1, all_bound])
