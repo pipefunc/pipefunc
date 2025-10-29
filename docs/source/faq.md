@@ -32,7 +32,7 @@ Missing something or is something unclear? Please [open an issue](https://github
 - Pass `display_widgets=False` to avoid the notebook-only widget warning in terminal scripts.
 - Swap the executor for `SlurmExecutor(...)` (or another backend) if you need cluster integration or custom execution behavior.
 
-If you *are* in an async context (e.g. a FastAPI endpoint), continue to `await runner.task` instead of calling `block()`.
+If you *are* in an async context (e.g. a FastAPI endpoint), continue to `await runner.task` instead of calling `runner.result()`.
 
 ## How is this different from Dask, AiiDA, Luigi, Prefect, Kedro, Apache Airflow, Snakemake, etc.?
 
