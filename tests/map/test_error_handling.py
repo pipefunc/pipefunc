@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import Executor, Future
 from typing import Any
 
 import numpy as np
@@ -818,6 +819,70 @@ def test_continue_mode_preserves_map_scope_resources_for_clean_indices() -> None
     assert z_output[0] == 2
     assert isinstance(z_output[1], PropagatedErrorSnapshot)
     assert z_output[2] == 4
+
+
+def test_map_scope_resource_failure_propagates_errors() -> None:
+    """Map-scope resource errors should propagate when resources cannot be evaluated."""
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def fail_for_one(x: int) -> int:
+        if x == 1:
+            msg = "boom"
+            raise ValueError(msg)
+        return x
+
+    def map_scope_resources(kwargs: dict[str, Any]) -> Resources:
+        # Trigger a TypeError when encountering ErrorSnapshot entries
+        total = sum(kwargs["y"].to_array())  # type: ignore[arg-type]
+        return Resources(extra_args={"total": total})
+
+    @pipefunc(
+        output_name="z",
+        mapspec="y[i] -> z[i]",
+        resources=map_scope_resources,
+        resources_scope="map",
+        resources_variable="resources",
+    )
+    def downstream(y: int, resources: Resources) -> int:
+        return y + resources.extra_args["total"]
+
+    pipeline = Pipeline([fail_for_one, downstream])
+
+    result = pipeline.map({"x": [0, 1, 2]}, error_handling="continue", parallel=False)
+
+    z_output = result["z"].output
+
+    assert isinstance(z_output[0], PropagatedErrorSnapshot)
+    assert isinstance(z_output[1], PropagatedErrorSnapshot)
+    assert isinstance(z_output[2], PropagatedErrorSnapshot)
+
+
+def test_resource_failure_skips_executor_submission() -> None:
+    """If resources fail, we should not submit work to external executors."""
+
+    def failing_resources(_kwargs: dict[str, Any]) -> Resources:
+        msg = "resource failure"
+        raise RuntimeError(msg)
+
+    @pipefunc(output_name="z", resources=failing_resources)
+    def downstream(x: int) -> int:
+        return x * 2
+
+    pipeline = Pipeline([downstream])
+
+    class DummyExecutor(Executor):
+        def submit(self, *_args: Any, **_kwargs: Any) -> Future[Any]:  # type: ignore[override]
+            message = "executor.submit should not be called when resources fail"
+            raise AssertionError(message)
+
+    result = pipeline.map(
+        {"x": 1},
+        error_handling="continue",
+        parallel=True,
+        executor={"z": DummyExecutor()},
+    )
+
+    assert isinstance(result["z"].output, PropagatedErrorSnapshot)
 
 
 def test_non_mapspec_map_scope_resources_skipped_on_error_input() -> None:

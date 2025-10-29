@@ -45,10 +45,10 @@ def maybe_update_slurm_executor_single(
     func: PipeFunc,
     ex: Executor,
     executor: dict[OUTPUT_TYPE, Executor],
-    kwargs: dict[str, Any],
+    resources: Resources | None,
 ) -> Executor:
     if is_slurm_executor(ex) or _is_slurm_executor_type(ex):
-        ex = _slurm_executor_for_single(ex, func, kwargs)
+        ex = _slurm_executor_for_single(ex, func, resources)
         assert isinstance(executor, dict)
         executor[func.output_name] = ex  # type: ignore[assignment]
     return ex
@@ -112,11 +112,8 @@ def _slurm_executor_for_map(
 def _slurm_executor_for_single(
     executor: SlurmExecutor | type[SlurmExecutor],
     func: PipeFunc,
-    kwargs: dict[str, Any],
+    resources: Resources | None,
 ) -> Executor:
-    resources: Resources | None = (
-        func.resources(kwargs) if callable(func.resources) else func.resources  # type: ignore[has-type]
-    )
     executor_kwargs = _adaptive_scheduler_resource_dict(resources, clear=True)
     executor_kwargs["name"] = _slurm_name(func.output_name, executor)
     return _new_slurm_executor(executor, **executor_kwargs)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import shutil
 import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -16,9 +17,12 @@ import pytest
 from adaptive_scheduler import RunManager, SlurmExecutor, SlurmTask
 from adaptive_scheduler._executor import TaskID
 
+import pipefunc.map._adaptive_scheduler_slurm_executor as slurm_mod
+import pipefunc.map._prepare as prepare_mod
 from pipefunc import NestedPipeFunc, Pipeline, pipefunc
-from pipefunc.exceptions import PropagatedErrorSnapshot
+from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
 from pipefunc.map._result import ResultDict
+from pipefunc.map._run import _RESOURCE_EVALUATION_ERROR
 from pipefunc.map._storage_array._file import FileArray
 
 if TYPE_CHECKING:
@@ -578,6 +582,54 @@ async def test_setting_executor_type_in_resources(pipeline: Pipeline, tmp_path: 
         assert call_args.kwargs["executor_type"] == "ipyparallel"
         assert call_args.kwargs["cores_per_node"] == 2
         assert call_args.kwargs["nodes"] == 2
+
+
+def test_single_resources_failure_slurm_no_retry_unit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resource hook failures should not be retried in the Slurm helper."""
+
+    call_count = 0
+
+    def failing_resources(_kwargs: dict[str, Any]) -> dict[str, int]:
+        nonlocal call_count
+        call_count += 1
+        msg = "resource boom"
+        raise RuntimeError(msg)
+
+    @pipefunc(output_name="fail", resources=failing_resources)
+    def process(x: int) -> int:
+        return x * 2
+
+    pipeline = Pipeline([process])
+    executor = MockSlurmExecutor()
+
+    # NOTE: pipefunc forbids using a Slurm executor with the synchronous `Pipeline.map`
+    # API. We patch the guard here so we can exercise the single-function execution
+    # path while still going through the public pipeline entry point.
+    def _allow_slurm_validation(_executor_arg: Any, _in_async: bool) -> None:
+        return None
+
+    monkeypatch.setattr(slurm_mod, "validate_slurm_executor", _allow_slurm_validation)
+    monkeypatch.setattr(prepare_mod, "validate_slurm_executor", _allow_slurm_validation)
+
+    result = pipeline.map(
+        {"x": 5},
+        executor={"fail": executor},  # type: ignore[arg-type]
+        error_handling="continue",
+    )
+
+    assert call_count == 1
+    assert not executor._mock_tasks, "executor should not receive tasks when resources fail"
+    output = result["fail"].output
+    assert isinstance(output, PropagatedErrorSnapshot)
+    assert process.error_snapshot is None
+    assert _RESOURCE_EVALUATION_ERROR in output.error_info
+    resource_info = output.error_info[_RESOURCE_EVALUATION_ERROR]
+    assert resource_info.type == "full"
+    assert isinstance(resource_info.error, ErrorSnapshot)
+    error_func = resource_info.error.function
+    while isinstance(error_func, functools.partial) and "resources_callable" in error_func.keywords:
+        error_func = error_func.keywords["resources_callable"]
+    assert error_func is failing_resources
 
 
 @pytest.mark.asyncio
