@@ -57,7 +57,7 @@ out.shape, out.dtype
 
 ## Multi-output upstream
 
-`linear_chain` prefers existing matches. If a downstream parameter that is *not bound* matches any upstream output name, that output is used. Otherwise, the first free downstream parameter is renamed to the upstream output name (and any bound parameter with that name is tucked away under an internal alias).
+`linear_chain` prefers existing matches. If a downstream parameter that is *not bound* matches any upstream output name, that output is used. Otherwise, it renames the first free downstream parameter to the upstream output name. If the only matching parameter is bound, `linear_chain` raises a `ValueError` so you can resolve the collision explicitly.
 
 ```{code-cell} ipython3
 @pipefunc(("a", "b"))
@@ -74,7 +74,7 @@ Pipeline(linear_chain([split, sink_b])).run("sink_b", kwargs={"x": 7})  # -> 70
 
 ## Bound parameters are skipped
 
-`linear_chain` auto-selects the first non-bound parameter as the main input by renaming that downstream parameter when needed.
+`linear_chain` auto-selects the first non-bound parameter as the main input by renaming that downstream parameter when needed. If all matching parameters are bound, it raises an error instead of guessing.
 
 ```{code-cell} ipython3
 @pipefunc("m1")
@@ -92,7 +92,7 @@ To use a specific upstream output, name the downstream parameter accordingly (or
 
 Behavior in a nutshell
 - Prefers matches: if an unbound downstream parameter matches an upstream output name, no rename.
-- Otherwise renames the first non‑bound downstream parameter (renaming bound collisions out of the way automatically).
+- Otherwise renames the first non‑bound downstream parameter; if only bound parameters match, a `ValueError` prompts you to rename things manually.
 - Works with multi‑output: match by name (or pre‑rename the downstream `PipeFunc`).
 - No `mapspec` changes. For batches, either vectorize over the batch dimension or declare `mapspec` on the functions themselves.
 - Plain callables auto‑wrap as `PipeFunc` with `output_name=f.__name__`.

@@ -130,12 +130,8 @@ def test_linear_chain_bound_match_still_connects() -> None:
     def f2d(m1: int, value: int) -> int:
         return m1 + value
 
-    chained = linear_chain([f1, f2d])
-    assert all(name != "m1" for name in chained[1].bound)
-    assert any(name.startswith("__bound_m1") for name in chained[1].bound)
-    pipeline = Pipeline(cast("list[Any]", chained))
-    assert set(pipeline.root_args()) == {"src"}
-    assert pipeline.run("m2d", kwargs={"src": 2}) == 10 + (2 + 1)
+    with pytest.raises(ValueError, match="bound to a fixed value"):
+        linear_chain([f1, f2d])
 
 
 def test_linear_chain_all_params_bound_error() -> None:

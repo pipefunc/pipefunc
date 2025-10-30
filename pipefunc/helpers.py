@@ -459,15 +459,13 @@ def linear_chain(
                 raise ValueError(msg)
 
             desired_name = upstream_outputs[0]
-            if desired_name in downstream.parameters and desired_name in downstream.bound:
-                placeholder_base = f"__bound_{desired_name}"
-                placeholder = placeholder_base
-                suffix = 0
-                occupied = set(downstream.parameters) | set(at_least_tuple(downstream.output_name))
-                while placeholder in occupied:
-                    suffix += 1
-                    placeholder = f"{placeholder_base}_{suffix}"
-                downstream.update_renames({desired_name: placeholder}, update_from="current")
+            if desired_name in downstream.parameters and desired_name not in free_params:
+                msg = (
+                    f"Downstream function {downstream} has parameter '{desired_name}' bound to a fixed value, "
+                    "so linear_chain cannot automatically connect the upstream output. "
+                    "Rename it manually before calling linear_chain."
+                )
+                raise ValueError(msg)
 
             downstream.update_renames({target: desired_name}, update_from="current")
 
