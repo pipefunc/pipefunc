@@ -619,16 +619,15 @@ def _maybe_eval_resources(
     ):
         return None
 
-    skip_reason = "inputs_contain_errors"
     kw: dict[str, Any] | None
     if func.resources_scope == "map":
         if error_infos.map and func.resources_variable is None:
-            map_kwargs[_RESOURCE_EVALUATION_SKIPPED] = skip_reason
+            map_kwargs[_RESOURCE_EVALUATION_SKIPPED] = True
             kw = None
         else:
             kw = map_kwargs
     elif error_infos.element:
-        element_kwargs[_RESOURCE_EVALUATION_SKIPPED] = skip_reason
+        element_kwargs[_RESOURCE_EVALUATION_SKIPPED] = True
         kw = None
     else:
         kw = element_kwargs
@@ -725,7 +724,6 @@ _INTERNAL_RESOURCE_KEYS = {
     _RESOURCE_EVALUATION_ERROR,
     _RESOURCE_EVALUATION_SKIPPED,
 }
-_RESOURCE_EVALUATION_SKIPPED = "__pipefunc_internal_resource_skipped__"
 
 
 def _run_iteration(
