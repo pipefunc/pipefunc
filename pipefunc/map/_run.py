@@ -56,7 +56,6 @@ if TYPE_CHECKING:
     from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
     from pipefunc._widgets.progress_rich import RichProgressTracker
     from pipefunc.cache import _CacheBase
-    from pipefunc.resources import Resources
 
     from ._prepare import Prepared
     from ._progress import Status
@@ -603,75 +602,49 @@ def _create_error_infos(
     return _ErrorInfos(map_error_info, element_error_info)
 
 
-@dataclass
-class ResourceEvaluationResult:
-    resolved: Resources | None = None
-    error: ErrorSnapshot | None = None
-    skip_reason: str | None = None
-
-    @property
-    def skipped(self) -> bool:
-        return self.skip_reason is not None
-
-
-_RESOURCE_EVALUATION_RESULT = "__pipefunc_internal_resource_result__"
-
-
 def _maybe_eval_resources(
     func: PipeFunc,
     map_kwargs: dict[str, Any],
     element_kwargs: dict[str, Any],
     error_infos: _ErrorInfos,
     error_handling: Literal["raise", "continue"],
-) -> ResourceEvaluationResult:
-    def _store_result(target: dict[str, Any], result: ResourceEvaluationResult) -> None:
-        target[_RESOURCE_EVALUATION_RESULT] = result
-        if result.resolved is not None:
-            target[_EVALUATED_RESOURCES] = result.resolved
+) -> ErrorSnapshot | None:
+    existing_error = element_kwargs.get(_RESOURCE_EVALUATION_ERROR)
+    if existing_error is not None:
+        return existing_error
+    if (
+        _EVALUATED_RESOURCES in element_kwargs
+        or _RESOURCE_EVALUATION_SKIPPED in element_kwargs
+        or not callable(func.resources)  # type: ignore[has-type]
+    ):
+        return None
 
-    def _store_for_scope(result: ResourceEvaluationResult) -> None:
-        _store_result(element_kwargs, result)
-        if scope_is_map:
-            _store_result(map_kwargs, result)
+    skip_reason = "inputs_contain_errors"
+    kw: dict[str, Any] | None
+    if func.resources_scope == "map":
+        if error_infos.map and func.resources_variable is None:
+            map_kwargs[_RESOURCE_EVALUATION_SKIPPED] = skip_reason
+            kw = None
+        else:
+            kw = map_kwargs
+    elif error_infos.element:
+        element_kwargs[_RESOURCE_EVALUATION_SKIPPED] = skip_reason
+        kw = None
+    else:
+        kw = element_kwargs
 
-    scope_is_map = func.resources_scope == "map"
-
-    existing_result = element_kwargs.get(_RESOURCE_EVALUATION_RESULT)
-    if existing_result is None and scope_is_map:
-        existing_result = map_kwargs.get(_RESOURCE_EVALUATION_RESULT)
-        if existing_result is not None:
-            _store_for_scope(existing_result)
-    if existing_result is not None:
-        return existing_result
-
-    if not callable(func.resources):  # type: ignore[has-type]
-        return ResourceEvaluationResult()
-
-    skip_due_to_errors = (
-        bool(error_infos.map) and func.resources_variable is None
-        if scope_is_map
-        else bool(error_infos.element)
-    )
-    if skip_due_to_errors:
-        result = ResourceEvaluationResult(skip_reason="inputs_contain_errors")
-        _store_for_scope(result)
-        return result
-
-    kw = map_kwargs if scope_is_map else element_kwargs
+    if kw is None:
+        return None
 
     try:
-        resolved = func.resources(kw)  # type: ignore[has-type]
+        element_kwargs[_EVALUATED_RESOURCES] = func.resources(kw)  # type: ignore[has-type]
     except Exception as exc:
         if error_handling != "continue":
             raise
         snapshot = ErrorSnapshot(func.resources, exc, (kw,), {})
-        result = ResourceEvaluationResult(error=snapshot)
-        _store_for_scope(result)
-        return result
-
-    result = ResourceEvaluationResult(resolved=resolved)
-    _store_for_scope(result)
-    return result
+        element_kwargs[_RESOURCE_EVALUATION_ERROR] = snapshot
+        return snapshot
+    return None
 
 
 def _attach_resource_error(
@@ -694,15 +667,15 @@ def _prepare_kwargs_for_execution(
 ) -> tuple[dict[str, Any], _ErrorInfos]:
     selected_kwargs = _select_kwargs(func, map_kwargs, shape, shape_mask, index)
     error_infos = _create_error_infos(selected_kwargs, error_handling, map_error_info)
-    resource_eval = _maybe_eval_resources(
+    resource_error = _maybe_eval_resources(
         func,
         map_kwargs,
         selected_kwargs,
         error_infos,
         error_handling,
     )
-    if resource_eval.error is not None and error_handling == "continue":
-        error_infos = _attach_resource_error(error_infos, resource_eval.error)
+    if resource_error is not None and error_handling == "continue":
+        error_infos = _attach_resource_error(error_infos, resource_error)
     return selected_kwargs, error_infos
 
 
@@ -747,9 +720,12 @@ def _get_or_set_cache(
 
 _EVALUATED_RESOURCES = "__pipefunc_internal_evaluated_resources__"
 _RESOURCE_EVALUATION_ERROR = "__pipefunc_internal_resource_error__"
+_RESOURCE_EVALUATION_SKIPPED = "__pipefunc_internal_resource_skipped__"
 _INTERNAL_RESOURCE_KEYS = {
-    _RESOURCE_EVALUATION_RESULT,
+    _RESOURCE_EVALUATION_ERROR,
+    _RESOURCE_EVALUATION_SKIPPED,
 }
+_RESOURCE_EVALUATION_SKIPPED = "__pipefunc_internal_resource_skipped__"
 
 
 def _run_iteration(
@@ -1289,20 +1265,20 @@ def _maybe_execute_single(
 ) -> Any:
     args = (func, kwargs, store, cache, error_handling)  # args for _execute_single
     error_infos = _create_error_infos(kwargs, error_handling, None)
-    resource_eval = _maybe_eval_resources(
+    resource_error = _maybe_eval_resources(
         func,
         kwargs,
         kwargs,
         error_infos,
         error_handling,
     )
-    if resource_eval.error is not None and error_handling == "continue":
-        error_infos = _attach_resource_error(error_infos, resource_eval.error)
-    resource_failed = resource_eval.error is not None
-    resource_skipped = resource_eval.skipped
+    if resource_error is not None and error_handling == "continue":
+        error_infos = _attach_resource_error(error_infos, resource_error)
+    resource_failed = _RESOURCE_EVALUATION_ERROR in kwargs
+    resource_skipped = _RESOURCE_EVALUATION_SKIPPED in kwargs
     ex = _executor_for_func(func, executor)
     if ex is not None and not (resource_failed or resource_skipped):
-        resolved_resources = resource_eval.resolved
+        resolved_resources = kwargs.get(_EVALUATED_RESOURCES)
         if resolved_resources is None and not callable(func.resources):  # type: ignore[has-type]
             resolved_resources = func.resources
         assert executor is not None
@@ -1329,15 +1305,15 @@ def _execute_single(
     # Otherwise, run the function
     _load_data(kwargs)
     error_infos = _create_error_infos(kwargs, error_handling, None)
-    resource_eval = _maybe_eval_resources(
+    resource_error = _maybe_eval_resources(
         func,
         kwargs,
         kwargs,
         error_infos,
         error_handling,
     )
-    if resource_eval.error is not None and error_handling == "continue":
-        error_infos = _attach_resource_error(error_infos, resource_eval.error)
+    if resource_error is not None and error_handling == "continue":
+        error_infos = _attach_resource_error(error_infos, resource_error)
 
     def compute_fn() -> Any:
         # Early error detection for non-mapspec operations
