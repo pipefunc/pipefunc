@@ -747,9 +747,10 @@ def _run_iteration(
         except Exception as e:
             # Collect the snapshot in the worker and continue so chunk futures
             # still resolve and `_result` can map errors back to each index.
-            handle_pipefunc_error(e, func, selected, error_handling)
+            snapshot = handle_pipefunc_error(e, func, selected, error_handling)
             if error_handling == "continue":
-                return func.error_snapshot
+                assert snapshot is not None
+                return snapshot
             raise  # pragma: no cover
 
     return _get_or_set_cache(func, selected, cache, compute_fn)
@@ -1325,10 +1326,11 @@ def _execute_single(
         try:
             return func(**call_kwargs)
         except Exception as e:  # noqa: BLE001
-            handle_pipefunc_error(e, func, kwargs, error_handling)
+            snapshot = handle_pipefunc_error(e, func, kwargs, error_handling)
             # handle_pipefunc_error raises if error_handling == "raise"
             assert error_handling == "continue"
-            return func.error_snapshot
+            assert snapshot is not None
+            return snapshot
 
     return _get_or_set_cache(func, kwargs, cache, compute_fn)
 

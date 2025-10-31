@@ -18,12 +18,13 @@ def handle_pipefunc_error(
     func: PipeFunc,
     kwargs: dict[str, Any],
     error_handling: Literal["raise", "continue"] = "raise",
-) -> None:
+) -> ErrorSnapshot | None:
     """Handle an error that occurred while executing a PipeFunc."""
     renamed_kwargs = func._rename_to_native(kwargs)
-    func.error_snapshot = ErrorSnapshot(func.func, e, args=(), kwargs=renamed_kwargs)
+    snapshot = ErrorSnapshot(func.func, e, args=(), kwargs=renamed_kwargs)
+    func.error_snapshot = snapshot
     if error_handling == "continue":
-        return None
+        return snapshot
     if is_installed("rich"):
         import rich
 
@@ -36,4 +37,5 @@ def handle_pipefunc_error(
             " [dim italic]↓ Scroll down to see the full traceback.[/dim italic]",
         )
 
-    return handle_error(e, func, kwargs)
+    handle_error(e, func, kwargs)
+    return None  # pragma: no cover

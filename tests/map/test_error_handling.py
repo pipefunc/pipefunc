@@ -908,6 +908,51 @@ def test_resource_failure_raise_mode() -> None:
     assert call_count == 1
 
 
+def test_parallel_error_snapshot_race(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Snapshots returned from parallel failures must stay per-thread."""
+
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    import pipefunc._pipefunc_utils as utils
+
+    barrier = threading.Barrier(2)
+    original = utils.handle_pipefunc_error
+
+    def wrapped_handle(e, func, kwargs, error_handling="raise"):
+        snapshot = original(e, func, kwargs, error_handling)
+        if error_handling == "continue":
+            barrier.wait()
+            func.error_snapshot = utils.ErrorSnapshot(  # type: ignore[attr-defined]
+                func.func,
+                e,
+                args=(),
+                kwargs={"x": 999},
+            )
+        return snapshot
+
+    monkeypatch.setattr(utils, "handle_pipefunc_error", wrapped_handle)
+
+    @pipefunc(output_name="a", mapspec="x[i] -> a[i]")
+    def boom(x: int) -> int:  # pragma: no cover - executed via pipeline
+        msg = f"boom {x}"
+        raise ValueError(msg)
+
+    pipeline = Pipeline([boom])
+    executor = ThreadPoolExecutor(max_workers=2)
+
+    result = pipeline.map(
+        {"x": [0, 1]},
+        error_handling="continue",
+        parallel=True,
+        executor={"a": executor},
+    )
+
+    snapshots = result["a"].output
+    assert snapshots[0].kwargs == {"x": 0}
+    assert snapshots[1].kwargs == {"x": 1}
+
+
 def test_non_mapspec_map_scope_resources_skipped_on_error_input() -> None:
     """Regression: map-scope resources on scalar functions must skip when inputs fail."""
 
