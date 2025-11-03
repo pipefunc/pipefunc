@@ -77,8 +77,7 @@ all = [
 dev = [ # all + dev deps
     "black[jupyter]",
     "mypy",
-    "pre-commit",
-    "pre-commit-uv",
+    "prek",
     "ruff",
     "versioningit",
     "pipefunc[all,test,docs]",
