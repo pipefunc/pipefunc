@@ -80,6 +80,15 @@ def test_file_based_object_array_to_array(array_type: Callable[..., StorageBase]
     assert result[1, 0] is np.ma.masked
 
 
+def test_storage_array_dump_negative_indices(array_type: Callable[..., StorageBase]):
+    arr = array_type((2, 3))
+
+    arr.dump((-1, -1), {"z": 42})
+
+    assert arr[-1, -1] == {"z": 42}
+    assert arr[1, 2] == {"z": 42}
+
+
 def test_file_array_getitem_with_slicing(array_type: Callable[..., StorageBase]):
     shape = (2, 3, 4)
     arr = array_type(shape)
