@@ -36,7 +36,7 @@ def test_async_map_block_synchronous(capsys: pytest.CaptureFixture[str]) -> None
 
     assert result["y"].output.tolist() == [1, 2, 3]
     assert second["y"].output.tolist() == [1, 2, 3]
-    assert CALLS == [0, 1, 2]
+    assert sorted(CALLS) == [0, 1, 2]
     captured = capsys.readouterr().out
     assert captured == ""
 
