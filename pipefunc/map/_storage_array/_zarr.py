@@ -29,7 +29,7 @@ from zarr.storage import LocalStore, MemoryStore
 
 from pipefunc._utils import prod
 
-from ._base import StorageBase, register_storage, select_by_mask
+from ._base import StorageBase, normalize_key, register_storage, select_by_mask
 
 if TYPE_CHECKING:
     from pipefunc.map._types import ShapeTuple
@@ -383,7 +383,17 @@ class ZarrFileArray(StorageBase):
 
     def _store_scalar_encoded(self, indices: tuple[int, ...], encoded: np.bytes_) -> None:
         """Store a single serialized value at the provided indices."""
-        slice_key = tuple(slice(i, i + 1) for i in indices)
+        normalized_indices = cast(
+            "tuple[int, ...]",
+            normalize_key(
+                indices,
+                self.resolved_shape,
+                self.resolved_internal_shape,
+                self.shape_mask,
+                for_dump=True,
+            ),
+        )
+        slice_key = tuple(slice(i, i + 1) for i in normalized_indices)
         shaped = np.array([encoded], dtype=object).reshape(*(1,) * len(indices))
         self.array[slice_key] = shaped
 
