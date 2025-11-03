@@ -27,8 +27,9 @@ except ImportError:  # pragma: no cover - fallback for pre-3.1
 
 from zarr.storage import LocalStore, MemoryStore
 
+from pipefunc.map._shapes import shape_is_resolved
+
 from ._base import StorageBase, register_storage, select_by_mask
-from ._shapes import shape_is_resolved
 
 if TYPE_CHECKING:
     from pipefunc.map._types import ShapeTuple
@@ -203,13 +204,13 @@ class ZarrFileArray(StorageBase):
         assert shape_is_resolved(
             raw_chunks,
         ), "Chunk sizes must be resolved before creating a Zarr array"
-        chunks = _ensure_int_tuple(raw_chunks, what="Chunk sizes")
+        chunks = cast("tuple[int, ...]", _ensure_int_tuple(raw_chunks, what="Chunk sizes"))
 
         full_shape_raw = self.full_shape
         assert shape_is_resolved(
             full_shape_raw,
         ), "Array shape must be resolved before creating a Zarr array"
-        full_shape = _ensure_int_tuple(full_shape_raw, what="Array shape")
+        full_shape = cast("tuple[int, ...]", _ensure_int_tuple(full_shape_raw, what="Array shape"))
         self.array = _open_or_create_array(
             self.store,
             name="array",
