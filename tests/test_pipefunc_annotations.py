@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
 import numpy as np
 
 from pipefunc import PipeFunc, pipefunc
@@ -84,3 +88,33 @@ def test_pipefunc_from_class():
     assert isinstance(adder_func(a=1), Adder)
     assert adder_func.parameter_annotations == {"a": int}
     assert adder_func.output_annotation == {"sum": Adder}
+
+
+@dataclass
+class Foo:
+    name: str
+
+    @classmethod
+    def from_name(cls, name: str) -> Foo:
+        return cls(name)
+
+
+def test_pipefunc_with_classmethod_dataclass() -> None:
+    f = PipeFunc(Foo.from_name, output_name="foo")
+    assert f.parameter_annotations == {"name": str}
+    assert f.output_annotation == {"foo": Foo}
+
+
+class Bar:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    @classmethod
+    def from_name(cls, name: str) -> Bar:
+        return cls(name)
+
+
+def test_pipefunc_with_classmethod() -> None:
+    f = PipeFunc(Bar.from_name, output_name="foo")
+    assert f.parameter_annotations == {"name": str}
+    assert f.output_annotation == {"foo": Bar}

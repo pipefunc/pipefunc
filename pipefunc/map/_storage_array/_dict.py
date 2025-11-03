@@ -11,7 +11,13 @@ import numpy as np
 
 from pipefunc._utils import dump, load
 
-from ._base import StorageBase, normalize_key, register_storage, select_by_mask
+from ._base import (
+    StorageBase,
+    iterate_shape_indices,
+    normalize_key,
+    register_storage,
+    select_by_mask,
+)
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
@@ -50,6 +56,16 @@ class DictArray(StorageBase):
             mapping = {}
         self._dict: dict[tuple[int, ...], Any] = mapping  # type: ignore[assignment]
         self.load()
+
+    def __repr__(self) -> str:
+        folder = f"'{self.folder}'" if self.folder is not None else self.folder
+        return (
+            f"DictArray(folder={folder}, "
+            f"shape={self.shape}, "
+            f"internal_shape={self.internal_shape}, "
+            f"shape_mask={self.shape_mask}, "
+            f"mapping={self._dict})"
+        )
 
     def get_from_index(self, index: int) -> Any:
         """Return the data associated with the given linear index."""
@@ -141,13 +157,22 @@ class DictArray(StorageBase):
         data = _masked_empty(self.full_shape)
         mask = np.full(self.full_shape, fill_value=True, dtype=bool)
         for external_index, value in self._dict.items():
-            full_index = select_by_mask(
-                self.shape_mask,
-                external_index,
-                (slice(None),) * len(self.resolved_internal_shape),
-            )
-            data[full_index] = value
-            mask[full_index] = False
+            value_array = np.asarray(value)
+
+            if value_array.shape == self.resolved_internal_shape:
+                # Normal case - shapes match
+                full_index = select_by_mask(
+                    self.shape_mask,
+                    external_index,
+                    (slice(None),) * len(self.resolved_internal_shape),
+                )
+                data[full_index] = value_array
+                mask[full_index] = False
+            else:
+                for internal_index in iterate_shape_indices(self.resolved_internal_shape):
+                    full_index = select_by_mask(self.shape_mask, external_index, internal_index)
+                    data[full_index] = value_array[internal_index]
+                    mask[full_index] = False
         return np.ma.MaskedArray(data, mask=mask, dtype=object)
 
     @property
@@ -200,15 +225,17 @@ class DictArray(StorageBase):
             return
         path = self._path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        dump(self._dict, path)
+        dct = self._dict if isinstance(self._dict, dict) else dict(self._dict)
+        dump(dct, path)
 
     def load(self) -> None:
         """Load the dict storage from disk."""
         if self.folder is None:  # pragma: no cover
             return
-        if not self.folder.exists():
+        path = self._path()
+        if not path.exists():
             return
-        self._dict = load(self._path())
+        self._dict = load(path)
 
     @property
     def dump_in_subprocess(self) -> bool:

@@ -12,7 +12,16 @@ kernelspec:
   name: python3
 ---
 
-# Run Adaptive Sweeps in 1D, 2D, 3D, ND
+# Adaptive integration
+
+> Run Adaptive Sweeps in 1D, 2D, 3D, ND
+
+```{try-notebook}
+```
+
+```{contents} ToC
+:depth: 2
+```
 
 Using Adaptive sweeps instead of regular sweeps can save a lot of time.
 Currently, there is no deep integration in `pipefunc` to do adaptive sweeps.
@@ -44,7 +53,7 @@ from pipefunc.typing import Array
 
 @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
 def double_it(x: int, c: int) -> int:
-    return 2 * x + c
+    return x + c**2 / (c**2 + x**2)
 
 
 @pipefunc(output_name="sum_")
@@ -54,7 +63,7 @@ def take_sum(y: Array[int], d: int) -> float:
 
 pipeline = Pipeline([double_it, take_sum])
 
-inputs = {"x": [0, 1, 2, 3], "c": 1, "d": 2}
+inputs = {"x": [1, 2, 3, 4], "c": 1, "d": 2}
 run_folder = "my_run_folder"
 results = pipeline.map(inputs, run_folder=run_folder)
 ```
@@ -82,7 +91,7 @@ Now let's run this on a 2D grid of `c` and `d`:
 ```{code-cell} ipython3
 import numpy as np
 
-inputs = {"x": [0, 1, 2, 3], "c": np.linspace(0, 100, 20), "d": np.linspace(-1, 1, 20)}
+inputs = {"x": [1, 2, 3, 4], "c": np.linspace(0, 100, 20), "d": np.linspace(-1, 1, 20)}
 run_folder = "my_run_folder"
 results = pipeline2d.map(inputs, run_folder=run_folder)
 ```
@@ -121,7 +130,7 @@ from pipefunc.typing import Array
 
 @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
 def double_it(x: int, c: int) -> int:
-    return 2 * x + c
+    return x + c**2 / (c**2 + x**2)
 
 
 @pipefunc(output_name="sum_")
@@ -140,7 +149,7 @@ from pipefunc.map.adaptive import to_adaptive_learner
 run_folder_template = "adaptive_1d/run_folder_{}"
 learner1d = to_adaptive_learner(
     pipeline,
-    inputs={"x": [0, 1, 2, 3], "d": 1},
+    inputs={"x": [1, 2, 3, 4], "d": 1},
     adaptive_dimensions={"c": (0, 100)},
     adaptive_output="sum_",
     run_folder_template=run_folder_template,
@@ -185,7 +194,7 @@ datasets[0]  # just look at the first dataset
 run_folder_template = "adaptive_2d/run_folder_{}"
 learner2d = to_adaptive_learner(
     pipeline,
-    inputs={"x": [0, 1, 2, 3]},
+    inputs={"x": [1, 2, 3, 4]},
     adaptive_dimensions={"c": (0, 100), "d": (-1, 1)},
     adaptive_output="sum_",
     run_folder_template=run_folder_template,

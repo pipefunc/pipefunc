@@ -60,7 +60,7 @@ Whether you're working with data processing, scientific computations, machine le
 1. 🔍 **Parameter Sweep Utilities**: Generate parameter combinations for parameter sweeps and optimize the sweeps with result caching.
 1. 💡 **Flexible Function Arguments**: Call functions with different argument combinations, letting `pipefunc` determine which other functions to call based on the provided arguments.
 1. 🏗️ **Leverages giants**: Builds on top of [NetworkX](https://networkx.org/) for graph algorithms, [NumPy](https://numpy.org/) for multi-dimensional arrays, and optionally [Xarray](https://docs.xarray.dev/) for labeled multi-dimensional arrays, [Zarr](https://zarr.readthedocs.io/) to store results in memory/disk/cloud or any key-value store, and [Adaptive](https://adaptive.readthedocs.io/) for parallel sweeps.
-1. 🤓 **Nerd stats**: >700 tests with 100% test coverage, fully typed, only 3 required dependencies, _all_ Ruff Rules, _all_ public API documented.
+1. 🤓 **Nerd stats**: >1000 tests with 100% test coverage, fully typed, only 3 required dependencies, _all_ Ruff Rules, _all_ public API documented.
 
 ## :test_tube: How does it work?
 

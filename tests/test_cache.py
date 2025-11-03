@@ -1,15 +1,14 @@
 from __future__ import annotations
 
+import copy
 import pickle
+import tempfile
 import time
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
 
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 @pytest.mark.parametrize("shared", [True, False])
@@ -264,7 +263,7 @@ def test_file_cache_clear_with_lru_cache(cache_dir):
 
 
 @pytest.mark.parametrize("shared", [True, False])
-def test_file_cache_put_and_get_none(cache_dir, shared: bool):  # noqa: FBT001
+def test_file_cache_put_and_get_none(cache_dir, shared: bool):
     cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True, lru_shared=shared)
     cache.put("key1", None)
     assert cache.get("key1") is None
@@ -321,7 +320,7 @@ def test_disk_cache_clear(cache_dir):
 
 
 @pytest.mark.parametrize("shared", [True, False])
-def test_disk_cache_clear_with_lru_cache(cache_dir: Path, shared: bool):  # noqa: FBT001
+def test_disk_cache_clear_with_lru_cache(cache_dir: Path, shared: bool):
     cache = DiskCache(
         cache_dir=str(cache_dir),
         with_lru_cache=True,
@@ -363,14 +362,6 @@ def test_cache_pickling(cache_cls, shared, tmp_path):
     cache.put("key1", "value1", *duration1)
     cache.put("key2", "value2", *duration2)
 
-    if not shared:
-        with pytest.raises(
-            RuntimeError,
-            match="Cannot pickle non-shared cache instances",
-        ):
-            pickle.dumps(cache)
-        return
-
     pickled_cache = pickle.dumps(cache)
     unpickled_cache = pickle.loads(pickled_cache)  # noqa: S301
 
@@ -378,12 +369,12 @@ def test_cache_pickling(cache_cls, shared, tmp_path):
     assert unpickled_cache.get("key2") == "value2"
     assert len(unpickled_cache) == 2
 
-    assert shared
     assert unpickled_cache.shared == shared
     # Test that the unpickled cache is still shared
     duration3 = (3.0,) if cache_cls == HybridCache else ()
     unpickled_cache.put("key3", "value3", *duration3)
-    assert cache.get("key3") == "value3"
+    if cache_cls == DiskCache:
+        assert cache.get("key3") == "value3"
 
 
 def test_simple_cache():
@@ -404,3 +395,155 @@ def test_disk_cache_pickling(tmp_path: Path) -> None:
     cache.put("key1", "value1")
     cache2 = pickle.loads(pickle.dumps(cache))  # noqa: S301
     assert cache2.get("key1") == "value1"
+
+
+@pytest.mark.parametrize("permissions", [0o600, 0o660, 0o777, 0o644, None])
+def test_disk_cache_permissions(cache_dir: Path, permissions: int | None) -> None:
+    """Test that DiskCache sets file permissions correctly."""
+    cache = DiskCache(cache_dir=str(cache_dir), permissions=permissions)
+    cache.put("key1", "value1")
+    file_path = cache._get_file_path("key1")
+    assert file_path.exists()
+
+    if permissions is not None:
+        # stat().st_mode returns the full mode, including file type bits.
+        # We only want the permission bits, so we mask with 0o777.
+        actual_permissions = file_path.stat().st_mode & 0o777
+        assert actual_permissions == permissions
+
+
+@pytest.mark.parametrize("shared", [True, False])
+def test_pickling_and_deepcopy_hybrid(shared: bool) -> None:
+    # Create and populate cache
+    cache = HybridCache(max_size=5, shared=shared)
+    cache.put("key1", "value1", 0.1)
+    cache.put("key2", "value2", 0.2)
+
+    # Test pickling
+    pickled_cache = pickle.dumps(cache)
+    unpickled_cache = pickle.loads(pickled_cache)  # noqa: S301
+
+    assert "key1" in unpickled_cache
+    assert "key2" in unpickled_cache
+    assert unpickled_cache.get("key1") == "value1"
+    assert unpickled_cache.get("key2") == "value2"
+    assert unpickled_cache.shared == shared
+
+    # Test deep copying
+    copied_cache = copy.deepcopy(cache)
+
+    assert "key1" in copied_cache
+    assert "key2" in copied_cache
+    assert copied_cache.get("key1") == "value1"
+    assert copied_cache.get("key2") == "value2"
+    assert copied_cache.shared == shared
+
+    # Verify that changes to original don't affect copy
+    cache.put("key3", "value3", 0.3)
+    assert "key3" in cache
+    assert "key3" not in copied_cache
+
+
+@pytest.mark.parametrize("shared", [True, False])
+def test_pickling_and_deepcopy_lru(shared: bool) -> None:
+    # Create and populate cache
+    cache = LRUCache(max_size=5, shared=shared)
+    cache.put("key1", "value1")
+    cache.put("key2", "value2")
+
+    # Test pickling
+    pickled_cache = pickle.dumps(cache)
+    unpickled_cache = pickle.loads(pickled_cache)  # noqa: S301
+
+    assert "key1" in unpickled_cache
+    assert "key2" in unpickled_cache
+    assert unpickled_cache.get("key1") == "value1"
+    assert unpickled_cache.get("key2") == "value2"
+    assert unpickled_cache.shared == shared
+
+    # Test deep copying
+    copied_cache = copy.deepcopy(cache)
+
+    assert "key1" in copied_cache
+    assert "key2" in copied_cache
+    assert copied_cache.get("key1") == "value1"
+    assert copied_cache.get("key2") == "value2"
+    assert copied_cache.shared == shared
+
+    # Verify that changes to original don't affect copy
+    cache.put("key3", "value3")
+    assert "key3" in cache
+    assert "key3" not in copied_cache
+
+
+def test_pickling_and_deepcopy_simple() -> None:
+    # Create and populate cache
+    cache = SimpleCache()
+    cache.put("key1", "value1")
+    cache.put("key2", "value2")
+
+    # Test pickling
+    pickled_cache = pickle.dumps(cache)
+    unpickled_cache = pickle.loads(pickled_cache)  # noqa: S301
+
+    assert "key1" in unpickled_cache
+    assert "key2" in unpickled_cache
+    assert unpickled_cache.get("key1") == "value1"
+    assert unpickled_cache.get("key2") == "value2"
+
+    # Test deep copying
+    copied_cache = copy.deepcopy(cache)
+
+    assert "key1" in copied_cache
+    assert "key2" in copied_cache
+    assert copied_cache.get("key1") == "value1"
+    assert copied_cache.get("key2") == "value2"
+
+    # Verify that changes to original don't affect copy
+    cache.put("key3", "value3")
+    assert "key3" in cache
+    assert "key3" not in copied_cache
+
+
+@pytest.mark.parametrize("shared", [True, False])
+@pytest.mark.parametrize("with_lru", [True, False])
+def test_pickling_and_deepcopy_disk(shared: bool, with_lru: bool) -> None:
+    # Create a temporary directory for the cache
+    with tempfile.TemporaryDirectory() as temp_dir:
+        cache_dir = Path(temp_dir) / "cache"
+
+        # Create and populate cache
+        cache = DiskCache(
+            cache_dir=cache_dir,
+            max_size=5,
+            with_lru_cache=with_lru,
+            lru_shared=shared,
+        )
+        cache.put("key1", "value1")
+        cache.put("key2", "value2")
+
+        # Test pickling
+        pickled_cache = pickle.dumps(cache)
+        unpickled_cache = pickle.loads(pickled_cache)  # noqa: S301
+
+        assert "key1" in unpickled_cache
+        assert "key2" in unpickled_cache
+        assert unpickled_cache.get("key1") == "value1"
+        assert unpickled_cache.get("key2") == "value2"
+        if with_lru:
+            assert unpickled_cache.lru_cache.shared == shared
+
+        # Test deep copying
+        copied_cache = copy.deepcopy(cache)
+
+        assert "key1" in copied_cache
+        assert "key2" in copied_cache
+        assert copied_cache.get("key1") == "value1"
+        assert copied_cache.get("key2") == "value2"
+        if with_lru:
+            assert copied_cache.lru_cache.shared == shared
+
+        # Verify that disk cache is shared
+        cache.put("key3", "value3")
+        assert "key3" in cache
+        assert "key3" in copied_cache

@@ -3,20 +3,22 @@
 from __future__ import annotations
 
 import importlib.util
+import inspect
 import pickle
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, pipefunc
-from pipefunc._pipefunc import ErrorSnapshot
+from pipefunc.exceptions import ErrorSnapshot
 from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 has_psutil = importlib.util.find_spec("psutil") is not None
+has_pydantic = importlib.util.find_spec("pydantic") is not None
 
 
 @pytest.mark.skipif(not has_psutil, reason="psutil not installed")
@@ -191,6 +193,72 @@ def test_update_renames_with_mapspec() -> None:
     f.update_renames({}, overwrite=True)
     assert str(f.mapspec) == "a[i], b[j] -> c[i, j]"
     assert f.output_name == "c"
+
+
+def test_update_mapspec_axes() -> None:
+    """Test PipeFunc.update_mapspec_axes() method."""
+
+    # Test basic axis renaming
+    @pipefunc(output_name="c", mapspec="a[i, j], b[i, j] -> c[i, j]")
+    def f(a, b):
+        return a + b
+
+    assert str(f.mapspec) == "a[i, j], b[i, j] -> c[i, j]"
+    f.update_mapspec_axes({"i": "x", "j": "y"})
+    assert str(f.mapspec) == "a[x, y], b[x, y] -> c[x, y]"
+
+    # Test partial renaming (only one axis)
+    @pipefunc(output_name="result", mapspec="data[i, j] -> result[i, j]")
+    def g(data):
+        return data * 2
+
+    g.update_mapspec_axes({"i": "row"})
+    assert str(g.mapspec) == "data[row, j] -> result[row, j]"
+
+    # Test multiple axes with different names
+    @pipefunc(output_name="out", mapspec="x[i], y[j], z[k] -> out[i, j, k]")
+    def h(x, y, z):
+        return x + y + z
+
+    h.update_mapspec_axes({"i": "a", "j": "b", "k": "c"})
+    assert str(h.mapspec) == "x[a], y[b], z[c] -> out[a, b, c]"
+
+    # Test with None (slice) axes
+    @pipefunc(output_name="sliced", mapspec="data[:, j] -> sliced[j]")
+    def sliced_func(data):
+        return data
+
+    sliced_func.update_mapspec_axes({"j": "col"})
+    assert str(sliced_func.mapspec) == "data[:, col] -> sliced[col]"
+
+    # Test no-op when mapspec is None
+    @pipefunc(output_name="no_map")
+    def no_mapspec(x):
+        return x
+
+    assert no_mapspec.mapspec is None
+    no_mapspec.update_mapspec_axes({"i": "x"})  # Should not raise
+    assert no_mapspec.mapspec is None
+
+    # Test empty renames dict (no-op)
+    @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
+    def empty_rename(a):
+        return a
+
+    original_mapspec = str(empty_rename.mapspec)
+    empty_rename.update_mapspec_axes({})
+    assert str(empty_rename.mapspec) == original_mapspec
+
+    # Test cache clearing by checking that cached properties are recalculated
+    @pipefunc(output_name="c", mapspec="a[i, j] -> c[i, j]")
+    def cache_test(a):
+        return a
+
+    # Access a cached property
+    _ = cache_test.output_name
+    cache_test.update_mapspec_axes({"i": "x"})
+    # If cache wasn't cleared, this would fail
+    assert str(cache_test.mapspec) == "a[x, j] -> c[x, j]"
 
 
 def test_validate_update_defaults_and_renames_and_bound() -> None:
@@ -569,3 +637,180 @@ def test_defaults_dataclass_factory() -> None:
     pf2 = PipeFunc(TestClass, "container", defaults={"x0": [4, 5, 6]})
     assert pf2.defaults["x0"] == [4, 5, 6]
     assert pf2() == TestClass(x0=[4, 5, 6], y0=100)
+
+
+def test_default_and_bound() -> None:
+    @pipefunc("c", bound={"a": 2})
+    def f(a=1):
+        return a
+
+    _ = f.defaults
+    f.copy()
+
+    @dataclass
+    class Foo:
+        a: int = 1
+
+    f = PipeFunc(Foo, "d", bound={"a": 2})
+    _ = f.defaults
+    f.copy()
+
+
+@pytest.mark.skipif(not has_pydantic, reason="pydantic not installed")
+def test_default_and_bound_pydantic() -> None:
+    # Fixed in https://github.com/pipefunc/pipefunc/pull/525
+    import pydantic
+
+    class Foo(pydantic.BaseModel):
+        a: int = pydantic.Field(default=1)
+
+    f = PipeFunc(Foo, "d", bound={"a": 2})
+    _ = f.defaults  # accessing defaults should not modify state! (issue #525)
+    f.copy()
+
+
+def test_default_with_positional_args() -> None:
+    @pipefunc("c")
+    def f(a, b=1):
+        return a, b
+
+    assert f(1, 2) == (1, 2)
+    with pytest.raises(ValueError, match="Multiple values provided for parameter `a`"):
+        f(1, 2, a=2)
+
+    f.update_renames({"a": "x.a", "b": "x.b"}, update_from="original")
+    assert f(1) == (1, 1)
+    assert f(**{"x.a": 1, "x.b": 2}) == (1, 2)
+
+
+def test_nested_pipefunc_function_name() -> None:
+    def f(a, b):
+        return a + b
+
+    def g(f):
+        return f
+
+    nf = NestedPipeFunc([PipeFunc(f, "f"), PipeFunc(g, "g")], function_name="my_func")
+    assert nf.__name__ == "my_func"
+    nf.copy()
+
+
+def test_nested_pipefunc_renames() -> None:
+    def f(a, b):
+        return a + b
+
+    def g(f):
+        return f
+
+    # Rename output
+    nf = NestedPipeFunc([PipeFunc(f, "f"), PipeFunc(g, "g")], renames={"f": "f1"})
+    assert nf.renames == {"f": "f1"}
+    nf.copy()
+    assert nf(a=1, b=2) == (3, 3)
+
+    # Rename input
+    nf = NestedPipeFunc([PipeFunc(f, "f"), PipeFunc(g, "g")], renames={"a": "a1"})
+    assert nf.renames == {"a": "a1"}
+    nf.copy()
+    assert nf(a1=1, b=2) == (3, 3)
+
+    # Rename both input and output (with scope)
+    nf = NestedPipeFunc(
+        [PipeFunc(f, "f"), PipeFunc(g, "g")],
+        renames={"f": "x.f", "g": "x.g", "a": "x.a", "b": "x.b"},
+    )
+    assert nf(**{"x.a": 1, "x.b": 2}) == (3, 3)
+
+
+def test_pipefunc_with_class_with___call__() -> None:
+    class MyClass:
+        def __call__(self, a: int, b: int = 1) -> int:
+            return a + b
+
+    pf = PipeFunc(MyClass(), output_name="out")
+    assert pf(a=1, b=2) == 3
+
+    assert pf.defaults == {"b": 1}
+    assert pf.parameter_annotations == {"a": int, "b": int}
+    assert pf.output_annotation == {"out": int}
+    assert pf.__name__ == "MyClass"
+
+
+def test_nested_pipefunc_with_class_with___call__() -> None:
+    class MyClass:
+        def __call__(self, a: int, b: int = 1) -> int:
+            return a + b
+
+    def g(f: int) -> int:
+        return f
+
+    nf = NestedPipeFunc([PipeFunc(MyClass(), "f"), PipeFunc(g, "g")])
+    assert nf.defaults == {"b": 1}
+    assert nf(a=1, b=2) == (3, 3)
+    nf.copy()
+    assert nf.parameter_annotations == {"a": int, "b": int}
+    assert nf.output_annotation == {"f": int, "g": int}
+
+
+def test_wrapping_pipefunc_in_pipefunc() -> None:
+    @pipefunc(
+        output_name="test",
+        renames={"input": "input2"},
+        mapspec="input2[i] -> test[i]",
+    )
+    def test(input: Any) -> Any:  # noqa: A002
+        return input
+
+    assert test(input2=1) == 1
+    test2 = PipeFunc(
+        func=test,
+        output_name="test2",
+        renames={"input2": "input3"},
+        mapspec="input3[i] -> test2[i]",
+    )
+    assert test2(input3=1) == 1
+
+
+def test_wrapping_pipefunc_with_scope_in_pipefunc() -> None:
+    @pipefunc(
+        output_name="test",
+        renames={"input": "x.input2"},
+    )
+    def test(input: int) -> int:  # noqa: A002
+        return input
+
+    assert test.parameter_annotations == {"x.input2": int}
+    assert test.output_annotation == {"test": int}
+    parameter = test.original_parameters["input"]
+    assert isinstance(parameter, inspect.Parameter)
+    assert parameter.default is inspect.Parameter.empty
+    assert parameter.name == "input"
+    assert parameter.annotation == "int"
+
+    assert test(x={"input2": 1}) == 1
+    test2 = PipeFunc(
+        func=test,
+        output_name="test2",
+        renames={"x.input2": "x.input3"},
+    )
+    assert test2(x={"input3": 1}) == 1
+
+    parameter = test2.original_parameters["x.input2"]
+    assert isinstance(parameter, inspect.Parameter)
+    assert parameter.default is inspect.Parameter.empty
+    assert parameter.name == "x.input2"
+    assert parameter.annotation is int
+
+
+def test_renamed_inputs_error_snapshot():
+    @pipefunc(output_name="c", renames={"a": "b"})
+    def f(a):
+        if a < 0:
+            msg = "a cannot be negative"
+            raise ValueError(msg)
+        return a * 2
+
+    with pytest.raises(ValueError, match="a cannot be negative"):
+        f(b=-1)  # This will raise an error
+    with pytest.raises(ValueError, match="a cannot be negative"):
+        f.error_snapshot.reproduce()

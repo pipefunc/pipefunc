@@ -12,16 +12,12 @@ import contextlib
 import dataclasses
 import datetime
 import functools
-import getpass
 import inspect
 import os
-import platform
-import traceback
 import warnings
 import weakref
 from collections import defaultdict
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, get_args, get_origin
 
 import cloudpickle
@@ -32,10 +28,11 @@ from pipefunc._utils import (
     at_least_tuple,
     clear_cached_properties,
     format_function_call,
-    get_local_ip,
+    is_classmethod,
     is_pydantic_base_model,
     requires,
 )
+from pipefunc.exceptions import ErrorSnapshot
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
 from pipefunc.map._run import _EVALUATED_RESOURCES
@@ -43,8 +40,6 @@ from pipefunc.resources import Resources
 from pipefunc.typing import NoAnnotation, safe_get_type_hints
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     import pydantic
 
     from pipefunc import Pipeline
@@ -87,8 +82,12 @@ class PipeFunc(Generic[T]):
         the renamed argument names.
     profile
         Flag indicating whether the wrapped function should be profiled.
+        Profiling is only available for sequential execution.
     debug
         Flag indicating whether debug information should be printed.
+    print_error
+        Flag indicating whether errors raised during the function execution should
+        be printed.
     cache
         Flag indicating whether the wrapped function should be cached.
     mapspec
@@ -100,7 +99,7 @@ class PipeFunc(Generic[T]):
         ``mapspec`` context*. Can be an int or a tuple of ints, or "?" for unknown
         dimensions, or a tuple with a mix of both. If not provided, the shape will be
         inferred from the first execution of the function. If provided, the shape will be
-        validated against the actual shape of the output. This parameters is required only
+        validated against the actual shape of the output. This parameter is required only
         when a `mapspec` like `... -> out[i]` is used, indicating that the shape cannot be
         derived from the inputs. In case there are multiple outputs, provide the shape for
         one of the outputs. This works because the shape of all outputs are required to be
@@ -149,16 +148,25 @@ class PipeFunc(Generic[T]):
         or ``func(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
     variant
         Identifies this function as an alternative implementation in a
-        `VariantPipeline`. When multiple functions share the same `output_name`,
-        the variant allows selecting which implementation to use (e.g., "fast"
-        vs "accurate"). Only one variant can be selected for execution in
-        the pipeline.
+        `VariantPipeline` and specifies which variant groups it belongs to.
+        When multiple functions share the same `output_name`, variants allow
+        selecting which implementation to use during pipeline execution.
+
+        Can be specified in two formats:
+        - A string (e.g., ``"fast"``): Places the function in the default unnamed
+          group (None) with the specified variant name. Equivalent to ``{None: "fast"}``.
+        - A dictionary (e.g., ``{"algorithm": "fast", "optimization": "level1"}``):
+          Assigns the function to multiple variant groups simultaneously, with a
+          specific variant name in each group.
+
+        Functions with the same `output_name` but different variant specifications
+        represent alternative implementations. The {meth}`VariantPipeline.with_variant`
+        method selects which variants to use for execution. For example, you might
+        have "preprocessing" variants ("v1"/"v2") independent from "computation"
+        variants ("fast"/"accurate"), allowing you to select specific combinations
+        like ``{"preprocessing": "v1", "computation": "fast"}``.
     variant_group
-        Groups related variants together, allowing independent selection of
-        variants from different groups. For example, you might have a "preprocess"
-        group with variants "v1"/"v2" and a "compute" group with variants
-        "fast"/"accurate". If not provided and `variant` is specified, the variant
-        is placed in an unnamed group (None).
+        DEPRECATED in v0.58.0: Use `variant` instead.
 
     Returns
     -------
@@ -198,6 +206,7 @@ class PipeFunc(Generic[T]):
         bound: dict[str, Any] | None = None,
         profile: bool = False,
         debug: bool = False,
+        print_error: bool = True,
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
         internal_shape: int | Literal["?"] | ShapeTuple | None = None,
@@ -208,9 +217,9 @@ class PipeFunc(Generic[T]):
         | None = None,
         resources_variable: str | None = None,
         resources_scope: Literal["map", "element"] = "map",
-        variant: str | None = None,
-        variant_group: str | None = None,
         scope: str | None = None,
+        variant: str | dict[str | None, str] | None = None,
+        variant_group: str | None = None,  # deprecated
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
         self._pipelines: weakref.WeakSet[Pipeline] = weakref.WeakSet()
@@ -218,6 +227,7 @@ class PipeFunc(Generic[T]):
         self.__name__ = _get_name(func)
         self._output_name: OUTPUT_TYPE = output_name
         self.debug = debug
+        self.print_error = print_error
         self.cache = cache
         self.mapspec = _maybe_mapspec(mapspec)
         self.internal_shape: int | Literal["?"] | ShapeTuple | None = internal_shape
@@ -230,8 +240,8 @@ class PipeFunc(Generic[T]):
         self.resources = Resources.maybe_from_dict(resources)
         self.resources_variable = resources_variable
         self.resources_scope: Literal["map", "element"] = resources_scope
-        self.variant: str | None = variant
-        self.variant_group: str | None = variant_group
+        _maybe_variant_group_error(variant_group, variant)
+        self.variant = _ensure_variant(variant)
         self.profiling_stats: ProfilingStats | None
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")
@@ -458,7 +468,7 @@ class PipeFunc(Generic[T]):
         This method updates the names of the specified inputs and outputs by adding the provided
         scope as a prefix. The scope is added to the names using the format `f"{scope}.{name}"`.
         If an input or output name already starts with the scope prefix, it remains unchanged.
-        If their is an existing scope, it is replaced with the new scope.
+        If there is an existing scope, it is replaced with the new scope.
 
         Internally, simply calls `PipeFunc.update_renames` with  ``renames={name: f"{scope}.{name}", ...}``.
 
@@ -517,6 +527,33 @@ class PipeFunc(Generic[T]):
         renames = {name: _prepend_name_with_scope(name, scope) for name in all_parameters}
         self.update_renames(renames, update_from="current")
 
+    def update_mapspec_axes(self, renames: dict[str, str]) -> None:
+        """Update the MapSpec by renaming axes.
+
+        This method renames axes in the MapSpec while preserving the structure
+        of the array specifications. It uses the `MapSpec.rename_axes()` method
+        to perform type-safe axis renaming.
+
+        Parameters
+        ----------
+        renames
+            Dictionary mapping old axis names to new axis names.
+
+        Examples
+        --------
+        >>> @pipefunc(output_name="c", mapspec="a[i, j], b[i, j] -> c[i, j]")
+        ... def f(a, b):
+        ...     return a + b
+        >>> f.update_mapspec_axes({"i": "x", "j": "y"})
+        >>> str(f.mapspec)
+        'a[x, y], b[x, y] -> c[x, y]'
+
+        """
+        if self.mapspec is None:
+            return
+        self.mapspec = self.mapspec.rename_axes(renames)
+        self._clear_internal_cache()
+
     def update_bound(self, bound: dict[str, Any], *, overwrite: bool = False) -> None:
         """Update the bound arguments for the function that are fixed.
 
@@ -565,12 +602,6 @@ class PipeFunc(Generic[T]):
     def _validate(self) -> None:
         self._validate_names()
         self._validate_mapspec()
-        if self.variant is None and self.variant_group is not None:
-            msg = (
-                f"`variant_group={self.variant_group!r}` cannot be set without"
-                f" a corresponding `variant`."
-            )
-            raise ValueError(msg)
 
     def _validate_names(self) -> None:
         if common := set(self._defaults) & set(self._bound):
@@ -631,6 +662,7 @@ class PipeFunc(Generic[T]):
             "defaults": self._defaults,
             "bound": self._bound,
             "profile": self._profile,
+            "print_error": self.print_error,
             "debug": self.debug,
             "cache": self.cache,
             "mapspec": self.mapspec,
@@ -640,9 +672,9 @@ class PipeFunc(Generic[T]):
             "resources_variable": self.resources_variable,
             "resources_scope": self.resources_scope,
             "variant": self.variant,
-            "variant_group": self.variant_group,
+            "variant_group": None,  # deprecated
         }
-        assert_complete_kwargs(kwargs, PipeFunc, skip={"self", "scope"})
+        assert_complete_kwargs(kwargs, PipeFunc.__init__, skip={"self", "scope"})
         kwargs.update(update)
         return PipeFunc(**kwargs)  # type: ignore[arg-type,type-var]
 
@@ -652,6 +684,9 @@ class PipeFunc(Generic[T]):
         # This is a cached property because it is slow and otherwise called multiple times.
         # We assume that once it is set, it does not change during the lifetime of the object.
         return any(p.lazy for p in self._pipelines)
+
+    def _rename_to_native(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        return {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call the wrapped function with the given arguments.
@@ -671,8 +706,15 @@ class PipeFunc(Generic[T]):
             )
             raise ValueError(msg)
 
+        if args:  # Put positional arguments into kwargs
+            for p, v in zip(self.parameters, args):
+                if p in kwargs:
+                    msg = f"Multiple values provided for parameter `{p}`."
+                    raise ValueError(msg)
+                kwargs[p] = v
+            args = ()
         kwargs = self.defaults | kwargs | self._bound
-        kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
+        kwargs = self._rename_to_native(kwargs)
 
         with self._maybe_profiler():
             if self._evaluate_lazy:
@@ -687,11 +729,13 @@ class PipeFunc(Generic[T]):
             try:
                 result = self.func(*args, **kwargs)
             except Exception as e:
-                print(
-                    f"An error occurred while calling the function `{self.__name__}`"
-                    f" with the arguments `{args=}` and `{kwargs=}`.",
-                )
-                self.error_snapshot = ErrorSnapshot(self.func, e, args, kwargs)
+                if self.print_error:
+                    print(
+                        f"An error occurred while calling the function `{self.__name__}`"
+                        f" with the arguments `{args=}` and `{kwargs=}`.",
+                    )
+                renamed_kwargs = self._rename_to_native(kwargs)
+                self.error_snapshot = ErrorSnapshot(self.func, e, args, renamed_kwargs)
                 raise
 
         if self.debug:
@@ -699,6 +743,36 @@ class PipeFunc(Generic[T]):
         if self.post_execution_hook is not None:
             self.post_execution_hook(self, result, kwargs)
         return result
+
+    @functools.cached_property
+    def __signature__(self) -> inspect.Signature:
+        """Return the signature of `__call__` with renamed parameters.
+
+        If *any* of the output annotations are `NoAnnotation`, the return annotation
+        is set to `inspect.Parameter.empty`.
+        """
+        if self._output_picker is None:
+            output_annotations = self.output_annotation
+            if any(v is NoAnnotation for v in output_annotations.values()):
+                return_annotation = inspect.Parameter.empty
+            elif isinstance(self.output_name, tuple):
+                return_annotations = tuple(output_annotations[name] for name in self.output_name)
+                return_annotation = tuple[return_annotations]  # type: ignore[assignment, valid-type]
+            else:
+                return_annotation = output_annotations[self.output_name]
+        else:
+            return_annotation = inspect.Parameter.empty
+        parameters = [
+            inspect.Parameter(
+                name=name if "." not in name else _ScopedIdentifier(name),
+                kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                default=self.defaults.get(name, inspect.Parameter.empty),
+                annotation=self.parameter_annotations.get(name, inspect.Parameter.empty),
+            )
+            for name in self.parameters
+            if name not in self.bound
+        ]
+        return inspect.Signature(parameters, return_annotation=return_annotation)
 
     @property
     def profile(self) -> bool:
@@ -760,10 +834,11 @@ class PipeFunc(Generic[T]):
     def parameter_annotations(self) -> dict[str, Any]:
         """Return the type annotations of the wrapped function's parameters."""
         func = self.func
-        if isinstance(func, _NestedFuncWrapper):
-            func = func.func
-        if inspect.isclass(func) and not is_pydantic_base_model(func):
-            func = func.__init__
+        if not is_pydantic_base_model(func):
+            if inspect.isclass(func):
+                func = func.__init__
+            elif not inspect.isfunction(func) and not is_classmethod(func):
+                func = func.__call__  # type: ignore[operator]
         type_hints = safe_get_type_hints(func, include_extras=True)
         return {self.renames.get(k, k): v for k, v in type_hints.items() if k != "return"}
 
@@ -771,10 +846,10 @@ class PipeFunc(Generic[T]):
     def output_annotation(self) -> dict[str, Any]:
         """Return the type annotation of the wrapped function's output."""
         func = self.func
-        if isinstance(func, _NestedFuncWrapper):
-            func = func.func
         if inspect.isclass(func) and isinstance(self.output_name, str):
             return {self.output_name: func}
+        if not inspect.isfunction(func) and not is_classmethod(func):
+            func = func.__call__  # type: ignore[operator]
         if self._output_picker is None:
             hint = safe_get_type_hints(func, include_extras=True).get("return", NoAnnotation)
         else:
@@ -786,7 +861,13 @@ class PipeFunc(Generic[T]):
             return {self.output_name: hint}
         if get_origin(hint) is tuple:
             return dict(zip(self.output_name, get_args(hint)))
-        return {name: NoAnnotation for name in self.output_name}
+        if _is_named_tuple(hint):
+            field_hints = safe_get_type_hints(hint, include_extras=True)
+            return {
+                name: field_hints.get(original_name, NoAnnotation)
+                for name, original_name in zip(self.output_name, hint._fields)
+            }
+        return dict.fromkeys(self.output_name, NoAnnotation)
 
     @functools.cached_property
     def requires_mapping(self) -> bool:
@@ -833,7 +914,7 @@ class PipeFunc(Generic[T]):
         """Prepare the state of the current object for pickling.
 
         The state includes all picklable instance variables.
-        For non-picklable instance variable,  they are transformed
+        For non-picklable instance variables, they are transformed
         into a picklable form or ignored.
 
         Returns
@@ -908,6 +989,15 @@ class PipeFunc(Generic[T]):
             )
             raise ValueError(msg)
 
+    @functools.cached_property
+    def _cache_id(self) -> str:
+        """Return a unique identifier for the function used in cache keys."""
+        name = "-".join(at_least_tuple(self.output_name))
+        if hasattr(self.func, "__pipefunc_hash__"):
+            pipefunc_hash = self.func.__pipefunc_hash__()
+            return f"{name}-{pipefunc_hash}"
+        return name
+
 
 def pipefunc(
     output_name: OUTPUT_TYPE,
@@ -918,6 +1008,7 @@ def pipefunc(
     bound: dict[str, Any] | None = None,
     profile: bool = False,
     debug: bool = False,
+    print_error: bool = True,
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
     internal_shape: int | Literal["?"] | ShapeTuple | None = None,
@@ -929,8 +1020,8 @@ def pipefunc(
     resources_variable: str | None = None,
     resources_scope: Literal["map", "element"] = "map",
     scope: str | None = None,
-    variant: str | None = None,
-    variant_group: str | None = None,
+    variant: str | dict[str | None, str] | None = None,
+    variant_group: str | None = None,  # deprecated
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator that wraps a function in a PipeFunc instance.
 
@@ -962,6 +1053,9 @@ def pipefunc(
         Flag indicating whether the decorated function should be profiled.
     debug
         Flag indicating whether debug information should be printed.
+    print_error
+        Flag indicating whether errors raised during the function execution should
+        be printed.
     cache
         Flag indicating whether the decorated function should be cached.
     mapspec
@@ -973,7 +1067,7 @@ def pipefunc(
         ``mapspec`` context*. Can be an int or a tuple of ints, or "?" for unknown
         dimensions, or a tuple with a mix of both. If not provided, the shape will be
         inferred from the first execution of the function. If provided, the shape will be
-        validated against the actual shape of the output. This parameters is required only
+        validated against the actual shape of the output. This parameter is required only
         when a `mapspec` like `... -> out[i]` is used, indicating that the shape cannot be
         derived from the inputs. In case there are multiple outputs, provide the shape for
         one of the outputs. This works because the shape of all outputs are required to be
@@ -1022,16 +1116,25 @@ def pipefunc(
         or ``func(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
     variant
         Identifies this function as an alternative implementation in a
-        `VariantPipeline`. When multiple functions share the same `output_name`,
-        the variant allows selecting which implementation to use (e.g., "fast"
-        vs "accurate"). Only one variant can be selected for execution in
-        the pipeline.
+        `VariantPipeline` and specifies which variant groups it belongs to.
+        When multiple functions share the same `output_name`, variants allow
+        selecting which implementation to use during pipeline execution.
+
+        Can be specified in two formats:
+        - A string (e.g., ``"fast"``): Places the function in the default unnamed
+          group (None) with the specified variant name. Equivalent to ``{None: "fast"}``.
+        - A dictionary (e.g., ``{"algorithm": "fast", "optimization": "level1"}``):
+          Assigns the function to multiple variant groups simultaneously, with a
+          specific variant name in each group.
+
+        Functions with the same `output_name` but different variant specifications
+        represent alternative implementations. The {meth}`VariantPipeline.with_variant`
+        method selects which variants to use for execution. For example, you might
+        have "preprocessing" variants ("v1"/"v2") independent from "computation"
+        variants ("fast"/"accurate"), allowing you to select specific combinations
+        like ``{"preprocessing": "v1", "computation": "fast"}``.
     variant_group
-        Groups related variants together, allowing independent selection of
-        variants from different groups. For example, you might have a "preprocess"
-        group with variants "v1"/"v2" and a "compute" group with variants
-        "fast"/"accurate". If not provided and `variant` is specified, the variant
-        is placed in an unnamed group (None).
+        DEPRECATED in v0.58.0: Use `variant` instead.
 
     Returns
     -------
@@ -1079,6 +1182,7 @@ def pipefunc(
             bound=bound,
             profile=profile,
             debug=debug,
+            print_error=print_error,
             cache=cache,
             mapspec=mapspec,
             internal_shape=internal_shape,
@@ -1087,7 +1191,7 @@ def pipefunc(
             resources_variable=resources_variable,
             resources_scope=resources_scope,
             variant=variant,
-            variant_group=variant_group,
+            variant_group=variant_group,  # deprecated
             scope=scope,
         )
 
@@ -1103,7 +1207,11 @@ class NestedPipeFunc(PipeFunc):
         A sequence of at least 2 `PipeFunc` instances to combine into a single function.
     output_name
         The identifier for the output of the wrapped function. If ``None``, it is automatically
-        constructed from all the output names of the `PipeFunc` instances.
+        constructed from all the output names of the `PipeFunc` instances. Must be a subset of
+        the output names of the `PipeFunc` instances.
+    function_name
+        The name of the nested function, if ``None`` the name will be set
+        to ``"NestedPipeFunc_{output_name[0]}_{output_name[...]}"``.
     mapspec
         `~pipefunc.map.MapSpec` for the joint function. If ``None``, the mapspec is inferred
         from the individual `PipeFunc` instances. None of the `MapsSpec` instances should
@@ -1112,18 +1220,43 @@ class NestedPipeFunc(PipeFunc):
         Same as the `PipeFunc` class. However, if it is ``None`` here, it is inferred from
         from the `PipeFunc` instances. Specifically, it takes the maximum of the resources.
         Unlike the `PipeFunc` class, the `resources` argument cannot be a callable.
+    resources_scope
+        Same as the `PipeFunc` class.
+        Determines how resources are allocated in relation to the mapspec:
+
+        - "map": Allocate resources for the entire mapspec operation (default).
+        - "element": Allocate resources for each element in the mapspec.
+
+        If no mapspec is defined, this parameter is ignored.
+    cache
+        Flag indicating whether the wrapped function should be cached.
+        If None, cache will be set to True if any of the `PipeFunc` instances have caching enabled.
+    bound
+        Same as the `PipeFunc` class. Bind arguments to the functions. These are arguments
+        that are fixed. Even when providing different values, the bound values will be
+        used. Must be in terms of the renamed argument names.
     variant
+        Same as the `PipeFunc` class.
         Identifies this function as an alternative implementation in a
-        `VariantPipeline`. When multiple functions share the same `output_name`,
-        the variant allows selecting which implementation to use (e.g., "fast"
-        vs "accurate"). Only one variant can be selected for execution in
-        the pipeline.
+        `VariantPipeline` and specifies which variant groups it belongs to.
+        When multiple functions share the same `output_name`, variants allow
+        selecting which implementation to use during pipeline execution.
+
+        Can be specified in two formats:
+        - A string (e.g., ``"fast"``): Places the function in the default unnamed
+          group (None) with the specified variant name. Equivalent to ``{None: "fast"}``.
+        - A dictionary (e.g., ``{"algorithm": "fast", "optimization": "level1"}``):
+          Assigns the function to multiple variant groups simultaneously, with a
+          specific variant name in each group.
+
+        Functions with the same `output_name` but different variant specifications
+        represent alternative implementations. The {meth}`VariantPipeline.with_variant`
+        method selects which variants to use for execution. For example, you might
+        have "preprocessing" variants ("v1"/"v2") independent from "computation"
+        variants ("fast"/"accurate"), allowing you to select specific combinations
+        like ``{"preprocessing": "v1", "computation": "fast"}``.
     variant_group
-        Groups related variants together, allowing independent selection of
-        variants from different groups. For example, you might have a "preprocess"
-        group with variants "v1"/"v2" and a "compute" group with variants
-        "fast"/"accurate". If not provided and `variant` is specified, the variant
-        is placed in an unnamed group (None).
+        DEPRECATED in v0.58.0: Use `variant` instead.
 
     Attributes
     ----------
@@ -1144,37 +1277,48 @@ class NestedPipeFunc(PipeFunc):
         self,
         pipefuncs: list[PipeFunc],
         output_name: OUTPUT_TYPE | None = None,
+        function_name: str | None = None,
         *,
         renames: dict[str, str] | None = None,
         mapspec: str | MapSpec | None = None,
         resources: dict | Resources | None = None,
-        variant: str | None = None,
-        variant_group: str | None = None,
+        resources_scope: Literal["map", "element"] = "map",
+        bound: dict[str, Any] | None = None,
+        cache: bool | None = None,
+        variant: str | dict[str | None, str] | None = None,
+        variant_group: str | None = None,  # deprecated
     ) -> None:
         from pipefunc import Pipeline
 
         self._pipelines: weakref.WeakSet[Pipeline] = weakref.WeakSet()
         _validate_nested_pipefunc(pipefuncs, resources)
         self.resources = _maybe_max_resources(resources, pipefuncs)
+        self.resources_scope = resources_scope
         functions = [f.copy(resources=self.resources) for f in pipefuncs]
         self.pipeline = Pipeline(functions)  # type: ignore[arg-type]
-        _validate_single_leaf_node(self.pipeline.leaf_nodes)
         _validate_output_name(output_name, self._all_outputs)
         self._output_name: OUTPUT_TYPE = output_name or self._all_outputs
+        self.function_name = function_name
         self.debug = False  # The underlying PipeFuncs will handle this
-        self.cache = any(f.cache for f in self.pipeline.functions)
-        self.variant = variant
-        self.variant_group = variant_group
+        self.cache: bool = (
+            cache if cache is not None else any(f.cache for f in self.pipeline.functions)
+        )
+        _maybe_variant_group_error(variant_group, variant)
+        self.variant: dict[str | None, str] = _ensure_variant(variant)
         self._output_picker = None
         self._profile = False
+        self.print_error = True
         self._renames: dict[str, str] = renames or {}
+        self._bound: dict[str, Any] = bound or {}
         self._defaults: dict[str, Any] = {
-            k: v for k, v in self.pipeline.defaults.items() if k in self.parameters
+            k: v
+            for k, v in self.pipeline.defaults.items()
+            if k in self.parameters and k not in self._bound
         }
-        self._bound: dict[str, Any] = {}
         self.resources_variable = None  # not supported in NestedPipeFunc
         self.profiling_stats = None
         self.post_execution_hook = None
+        self.internal_shape = None
         self.mapspec = self._combine_mapspecs() if mapspec is None else _maybe_mapspec(mapspec)
         for f in self.pipeline.functions:
             f.mapspec = None  # MapSpec is handled by the NestedPipeFunc
@@ -1186,12 +1330,23 @@ class NestedPipeFunc(PipeFunc):
         kwargs = {
             "pipefuncs": self.pipeline.functions,
             "output_name": self._output_name,
+            "function_name": self.function_name,
             "renames": self._renames,
             "mapspec": self.mapspec,
             "resources": self.resources,
+            "resources_scope": self.resources_scope,
+            "bound": self._bound,
+            "cache": self.cache,
+            "variant": self.variant,
+            "variant_group": None,  # deprecated
         }
+        assert_complete_kwargs(kwargs, NestedPipeFunc.__init__, skip={"self"})
         kwargs.update(update)
-        return NestedPipeFunc(**kwargs)  # type: ignore[arg-type]
+        f = self.__class__(**kwargs)  # type: ignore[arg-type]
+        f._defaults = self._defaults.copy()
+        f._bound = self._bound.copy()
+        f.debug = self.debug
+        return f
 
     def _combine_mapspecs(self) -> MapSpec | None:
         mapspecs = [f.mapspec for f in self.pipeline.functions]
@@ -1200,7 +1355,7 @@ class NestedPipeFunc(PipeFunc):
         _validate_combinable_mapspecs(mapspecs)
         axes = mapspec_axes(mapspecs)  # type: ignore[arg-type]
         return MapSpec(
-            tuple(ArraySpec(n, axes[n]) for n in sorted(self.parameters)),
+            tuple(ArraySpec(n, axes[n]) for n in sorted(self.parameters) if n in axes),
             tuple(ArraySpec(n, axes[n]) for n in sorted(at_least_tuple(self.output_name))),
             _is_generated=True,
         )
@@ -1210,32 +1365,55 @@ class NestedPipeFunc(PipeFunc):
         parameters = set(self._all_inputs) - set(self._all_outputs)
         return {
             k: inspect.Parameter(
-                k,
-                inspect.Parameter.KEYWORD_ONLY,
-                # TODO: Do we need defaults here?
-                # default=...,  # noqa: ERA001
+                name=k if "." not in k else _ScopedIdentifier(k),
+                kind=inspect.Parameter.KEYWORD_ONLY,
+                # `default` and `annotations` not set because they requires `original_parameters`
+                default=inspect.Parameter.empty,
+                annotation=inspect.Parameter.empty,
             )
             for k in sorted(parameters)
         }
 
     @functools.cached_property
+    def output_annotation(self) -> dict[str, Any]:
+        return {
+            name: self.pipeline[original_name].output_annotation[original_name]
+            for name, original_name in zip(
+                at_least_tuple(self.output_name),
+                at_least_tuple(self._output_name),
+            )
+        }
+
+    @functools.cached_property
+    def parameter_annotations(self) -> dict[str, Any]:
+        """Return the type annotations of the wrapped function's parameters."""
+        annotations = self.pipeline.parameter_annotations
+        return {
+            p: annotations[p_original]
+            for p in self.parameters
+            if (p_original := self._inverse_renames.get(p, p)) in annotations
+        }
+
+    @functools.cached_property
     def _all_outputs(self) -> tuple[str, ...]:
-        outputs: set[str] = set()
-        for f in self.pipeline.functions:
-            outputs.update(at_least_tuple(f.output_name))
-        return tuple(sorted(outputs))
+        outputs: list[str] = []
+        for f in self.pipeline.sorted_functions:
+            outputs.extend(at_least_tuple(f.output_name))
+        return tuple(outputs)
 
     @functools.cached_property
     def _all_inputs(self) -> tuple[str, ...]:
         inputs: set[str] = set()
         for f in self.pipeline.functions:
-            inputs.update(f.parameters)
+            parameters_excluding_bound = set(f.parameters) - set(f._bound)
+            inputs.update(parameters_excluding_bound)
         return tuple(sorted(inputs))
 
     @functools.cached_property
     def func(self) -> Callable[..., tuple[Any, ...]]:  # type: ignore[override]
-        func = self.pipeline.func(self.pipeline.unique_leaf_node.output_name)
-        return _NestedFuncWrapper(func.call_full_output, self.output_name)
+        outputs = [f.output_name for f in self.pipeline.leaf_nodes]
+        func = self.pipeline.func(outputs)
+        return _NestedFuncWrapper(func.call_full_output, self._output_name, self.function_name)
 
     @functools.cached_property
     def __name__(self) -> str:  # type: ignore[override]
@@ -1269,90 +1447,24 @@ class _NestedFuncWrapper:
     order specified by the output_name.
     """
 
-    def __init__(self, func: Callable[..., dict[str, Any]], output_name: OUTPUT_TYPE) -> None:
+    def __init__(
+        self,
+        func: Callable[..., dict[str, Any]],
+        output_name: OUTPUT_TYPE,
+        function_name: str | None = None,
+    ) -> None:
         self.func: Callable[..., dict[str, Any]] = func
         self.output_name: OUTPUT_TYPE = output_name
-        self.__name__ = f"NestedPipeFunc_{'_'.join(at_least_tuple(output_name))}"
+        if function_name is not None:
+            self.__name__ = function_name
+        else:
+            self.__name__ = f"NestedPipeFunc_{'_'.join(at_least_tuple(output_name))}"
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         result_dict = self.func(*args, **kwds)
         if isinstance(self.output_name, str):
             return result_dict[self.output_name]
         return tuple(result_dict[name] for name in self.output_name)
-
-
-def _timestamp() -> str:
-    return datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
-
-
-@dataclass
-class ErrorSnapshot:
-    """A snapshot that represents an error in a function call."""
-
-    function: Callable[..., Any]
-    exception: Exception
-    args: tuple[Any, ...]
-    kwargs: dict[str, Any]
-    traceback: str = field(init=False)
-    timestamp: str = field(default_factory=_timestamp)
-    user: str = field(default_factory=getpass.getuser)
-    machine: str = field(default_factory=platform.node)
-    ip_address: str = field(default_factory=get_local_ip)
-    current_directory: str = field(default_factory=os.getcwd)
-
-    def __post_init__(self) -> None:
-        tb = traceback.format_exception(
-            type(self.exception),
-            self.exception,
-            self.exception.__traceback__,
-        )
-        self.traceback = "".join(tb)
-
-    def __str__(self) -> str:
-        args_repr = ", ".join(repr(a) for a in self.args)
-        kwargs_repr = ", ".join(f"{k}={v!r}" for k, v in self.kwargs.items())
-        func_name = f"{self.function.__module__}.{self.function.__qualname__}"
-
-        return (
-            "ErrorSnapshot:\n"
-            "--------------\n"
-            f"- 🛠 Function: {func_name}\n"
-            f"- 🚨 Exception type: {type(self.exception).__name__}\n"
-            f"- 💥 Exception message: {self.exception}\n"
-            f"- 📋 Args: ({args_repr})\n"
-            f"- 🗂 Kwargs: {{{kwargs_repr}}}\n"
-            f"- 🕒 Timestamp: {self.timestamp}\n"
-            f"- 👤 User: {self.user}\n"
-            f"- 💻 Machine: {self.machine}\n"
-            f"- 📡 IP Address: {self.ip_address}\n"
-            f"- 📂 Current Directory: {self.current_directory}\n"
-            "\n"
-            "🔁 Reproduce the error by calling `error_snapshot.reproduce()`.\n"
-            "📄 Or see the full stored traceback using `error_snapshot.traceback`.\n"
-            "🔍 Inspect `error_snapshot.args` and `error_snapshot.kwargs`.\n"
-            "💾 Or save the error to a file using `error_snapshot.save_to_file(filename)`"
-            " and load it using `ErrorSnapshot.load_from_file(filename)`."
-        )
-
-    def reproduce(self) -> Any | None:
-        """Attempt to recreate the error by calling the function with stored arguments."""
-        return self.function(*self.args, **self.kwargs)
-
-    def save_to_file(self, filename: str | Path) -> None:
-        """Save the error snapshot to a file using cloudpickle."""
-        with open(filename, "wb") as f:  # noqa: PTH123
-            cloudpickle.dump(self, f)
-
-    @classmethod
-    def load_from_file(cls, filename: str | Path) -> ErrorSnapshot:
-        """Load an error snapshot from a file using cloudpickle."""
-        with open(filename, "rb") as f:  # noqa: PTH123
-            return cloudpickle.load(f)
-
-    def _ipython_display_(self) -> None:  # pragma: no cover
-        from IPython.display import HTML, display
-
-        display(HTML(f"<pre>{self}</pre>"))
 
 
 def _validate_identifier(name: str, value: Any) -> None:
@@ -1393,12 +1505,6 @@ def _validate_nested_pipefunc(
         raise TypeError(msg)
 
 
-def _validate_single_leaf_node(leaf_nodes: list[PipeFunc]) -> None:
-    if len(leaf_nodes) > 1:
-        msg = f"The provided `pipefuncs` should have only one leaf node, not {len(leaf_nodes)}."
-        raise ValueError(msg)
-
-
 def _validate_output_name(output_name: OUTPUT_TYPE | None, all_outputs: tuple[str, ...]) -> None:
     if output_name is None:
         return
@@ -1418,14 +1524,21 @@ def _validate_combinable_mapspecs(mapspecs: list[MapSpec | None]) -> None:
     for m in mapspecs:
         assert m is not None
         if m.input_indices != set(m.output_indices):
-            msg = "Cannot combine MapSpecs with different input and output mappings."
+            msg = (
+                f"Cannot combine MapSpecs with different input and output mappings. Mapspec: `{m}`"
+            )
             raise ValueError(msg)
         if m.input_indices != first.input_indices:
-            msg = "Cannot combine MapSpecs with different input mappings."
+            msg = f"Cannot combine MapSpecs with different input mappings. Mapspec: `{m}`"
             raise ValueError(msg)
         if m.output_indices != first.output_indices:
-            msg = "Cannot combine MapSpecs with different output mappings."
+            msg = f"Cannot combine MapSpecs with different output mappings. Mapspec: `{m}`"
             raise ValueError(msg)
+
+
+def _is_named_tuple(hint: Any) -> bool:
+    """Check if a type hint is a NamedTuple."""
+    return inspect.isclass(hint) and issubclass(hint, tuple) and hasattr(hint, "_fields")
 
 
 def _default_output_picker(output: Any, name: str, output_name: OUTPUT_TYPE) -> Any:
@@ -1450,7 +1563,7 @@ def _prepend_name_with_scope(name: str, scope: str | None) -> str:
     if "." in name:
         old_scope, name = name.split(".", 1)
         warnings.warn(
-            f"Parameter '{name}' already has a scope '{old_scope}', replacing it with '{name}'.",
+            f"Parameter '{name}' already has a scope '{old_scope}', replacing it with '{scope}'.",
             stacklevel=3,
         )
     return f"{scope}.{name}"
@@ -1498,7 +1611,9 @@ def _get_name(func: Callable[..., Any]) -> str:
             *_, class_name, method_name = qualname.split(".")
             return f"{class_name}.{method_name}"
         return qualname  # pragma: no cover
-    return func.__name__
+    if inspect.isfunction(func) or hasattr(func, "__name__"):
+        return func.__name__
+    return type(func).__name__
 
 
 def _pydantic_defaults(
@@ -1508,6 +1623,7 @@ def _pydantic_defaults(
 ) -> dict[str, Any]:
     import pydantic
 
+    defaults = defaults.copy()  # Make a copy to avoid modifying the original
     if pydantic.__version__.split(".", 1)[0] == "1":  # pragma: no cover
         msg = "Pydantic version 1 defaults cannot be extracted."
         warnings.warn(msg, UserWarning, stacklevel=2)
@@ -1523,3 +1639,53 @@ def _pydantic_defaults(
         elif field_.default is not PydanticUndefined:
             defaults[new_name] = field_.default
     return defaults
+
+
+def _ensure_variant(variant: str | dict[str | None, str] | None) -> dict[str | None, str]:
+    """Ensure that the variant is in the correct format."""
+    # Convert string variant to dict with None as group
+    if isinstance(variant, str):
+        return {None: variant}
+    return variant or {}
+
+
+def _maybe_variant_group_error(
+    variant_group: str | None,
+    variant: str | dict[str | None, str] | None,
+) -> None:
+    if variant_group is not None:  # TODO: remove in 2025-09
+        msg = (
+            "The `variant_group` parameter has been removed in v0.58.0."
+            f" Use the `variant = {{{variant_group!r}: {variant!r}}}` parameter instead."
+        )
+        raise ValueError(msg)
+
+
+class _ScopedIdentifier(str):
+    """String subclass that represents a scoped identifier in a `inspect.Signature`.
+
+    Its main use is to allow
+    >>> Parameter(ScopedIdentifier("myscope.x"), kind=Parameter.POSITIONAL_OR_KEYWORD)
+    where the following is not possible
+    >>> Parameter("myscope.x", kind=Parameter.POSITIONAL_OR_KEYWORD)
+    because "myscope.x" is not a valid identifier.
+
+    Another alternative considered to represent a scoped parameter was to use TypedDict and
+    only include the scoped name in the key but this has more limitations such as not
+    containing defaults and making parameters KEYWORD_ONLY due to changed order.
+    """
+
+    __slots__ = ()
+
+    def isidentifier(self) -> bool:
+        """Check if the string is a valid identifier.
+
+        This method overrides the default isidentifier method to allow
+        for scoped identifiers (e.g., "myscope.x").
+        """
+        if "." not in self:  # pragma: no cover
+            return super().isidentifier()
+        if self.count(".") != 1:  # pragma: no cover
+            return False
+        scope, name = self.split(".")
+        return scope.isidentifier() and name.isidentifier()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 from numbers import Number
 from typing import (
     Annotated,
@@ -348,6 +349,7 @@ def test_is_type_compatible_with_generics_incoming_generic():
 def test_is_type_compatible_with_unresolvable():
     with pytest.warns(UserWarning, match="Unresolvable type"):
         assert is_type_compatible(Unresolvable("UndefinedType"), int)
+    with pytest.warns(UserWarning, match="Unresolvable type"):
         assert is_type_compatible(int, Unresolvable("UndefinedType"))
 
 
@@ -384,7 +386,7 @@ def test_safe_get_type_hints_generic_type():
 
     expected = {
         "a": list[int],
-        "b": Optional[str],  # noqa: UP007
+        "b": Optional[str],  # noqa: UP045
         "return": NoneType,
     }
     assert safe_get_type_hints(func) == expected
@@ -542,10 +544,10 @@ U = TypeVar("U", bound=int)
         (MockUnresolvable("UnresolvedType"), "UnresolvedType"),
         (ForwardRef("FutureType"), "FutureType"),
         (Union[int, str], "Union[int, str]"),  # noqa: UP007
-        (Optional[int], "Union[int, NoneType]"),  # noqa: UP007
+        (Optional[int], "Union[int, NoneType]"),  # noqa: UP045
         (list[int], "list[int]"),
         (dict[str, int], "dict[str, int]"),
-        (tuple[int, str, float], "tuple[int, str, float]"),
+        (tuple[int, str, float], "tuple[int, str, float]"),  # type: ignore[list-item]
         (Callable[[int, str], bool], "Callable[[int, str], bool]"),
         (Literal[1, 2, 3], "Literal[1, 2, 3]"),
         (T, "T"),
@@ -553,9 +555,9 @@ U = TypeVar("U", bound=int)
         (U, "U"),
         (Generic[T], "Generic[T]"),
         (Annotated[int, "metadata"], "Annotated[int, metadata]"),
-        (np.ndarray, "ndarray"),
-        (Array[int], "Array[int]"),
-        (np.ndarray[Any, np.dtype[np.object_]], "Array"),
+        (np.ndarray, "ndarray"),  # type: ignore[list-item]
+        (Array[int], "Array[int]"),  # type: ignore[list-item]
+        (np.ndarray[Any, np.dtype[np.object_]], "Array"),  # type: ignore[list-item]
         (Annotated[np.ndarray[Any, np.dtype[np.object_]], ArrayElementType[int]], "Array[int]"),
         (Union[int, Union[str, float]], "Union[int, str, float]"),  # noqa: UP007
         (list[tuple[int, str]], "list[tuple[int, str]]"),
@@ -638,3 +640,31 @@ def test_unexpected_type():
 
     weird = WeirdType()
     assert "WeirdType" in type_as_string(weird)
+
+
+@dataclass
+class Foo:
+    name: str
+
+    @classmethod
+    def from_name(cls, name: str) -> Foo:
+        return cls(name)
+
+
+def test_with_classmethod_dataclass() -> None:
+    type_hints = safe_get_type_hints(Foo.from_name)
+    assert type_hints == {"name": str, "return": Foo}
+
+
+class Bar:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    @classmethod
+    def from_name(cls, name: str) -> Bar:
+        return cls(name)
+
+
+def test_with_classmethod() -> None:
+    type_hints = safe_get_type_hints(Bar.from_name)
+    assert type_hints == {"name": str, "return": Bar}

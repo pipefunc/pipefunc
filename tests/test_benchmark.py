@@ -9,9 +9,9 @@ def pipeline() -> Pipeline:
     def f1(a, b, c, d, e):
         return a + b + c + d + e
 
-    @pipefunc(output_name="out2", defaults={"f": 1, "g": 1})
+    @pipefunc(output_name=("out2", "unused_out"), defaults={"f": 1, "g": 1})
     def f2(c, d, e, f, g, out1=1):
-        return c + d + e + f + g + out1
+        return c + d + e + f + g + out1, 1
 
     @pipefunc(output_name="out3", defaults={"h": 1, "i": 1})
     def f3(e, f, g, h, i, out1=1, out2=1):
@@ -67,6 +67,21 @@ def test_map_sequential_with_dict_storage(pipeline_mapspec: Pipeline) -> None:
         inputs={"a": a, "b": b},
         parallel=False,
         storage="dict",
+        show_progress=False,
+    )
+
+
+@pytest.mark.benchmark
+def test_map_sequential_with_dict_storage_eager(pipeline_mapspec: Pipeline) -> None:
+    a = list(range(10))
+    b = list(range(10))
+
+    pipeline_mapspec.map(
+        inputs={"a": a, "b": b},
+        parallel=False,
+        storage="dict",
+        show_progress=False,
+        scheduling_strategy="eager",
     )
 
 
@@ -94,6 +109,20 @@ def test_large_nd_sweep_from_faq(pipeline_nd: Pipeline) -> None:
     lst = list(range(n))
     pipeline_nd.map(
         inputs={"a": lst, "b": lst, "x": lst, "y": lst},
-        storage="dict",
         parallel=False,
+        storage="dict",
+        show_progress=False,
+    )
+
+
+@pytest.mark.benchmark
+def test_large_nd_sweep_from_faq_eager(pipeline_nd: Pipeline) -> None:
+    n = 15
+    lst = list(range(n))
+    pipeline_nd.map(
+        inputs={"a": lst, "b": lst, "x": lst, "y": lst},
+        parallel=False,
+        storage="dict",
+        show_progress=False,
+        scheduling_strategy="eager",
     )

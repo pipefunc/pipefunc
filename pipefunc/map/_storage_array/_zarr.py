@@ -64,11 +64,12 @@ class ZarrFileArray(StorageBase):
         if not isinstance(store, Store):
             store = LocalStore(str(self.folder))
         self.store = store
+        self.object_codec = object_codec  # Just for __repr__
         self.shape = tuple(shape)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
 
-        if object_codec is None:
+        if self.object_codec is None:
             object_codec = CloudPickleCodec()
 
         chunks = select_by_mask(self.shape_mask, (1,) * len(self.shape), self.internal_shape)
@@ -87,9 +88,19 @@ class ZarrFileArray(StorageBase):
             shape=self.shape,
             dtype=bool,
             fill_value=True,
-            object_codec=object_codec,
             chunks=1,
             **dict({name_path: "mask"}, **zarr_kwargs),
+        )
+
+    def __repr__(self) -> str:
+        folder = f"'{self.folder}'" if self.folder is not None else self.folder
+        return (
+            f"ZarrFileArray(folder={folder}, "
+            f"shape={self.shape}, "
+            f"internal_shape={self.internal_shape}, "
+            f"shape_mask={self.shape_mask}, "
+            f"store={self.store}, "
+            f"object_codec={self.object_codec})"
         )
 
     @property

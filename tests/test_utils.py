@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
+import types
 
 import cloudpickle
 import numpy as np
@@ -8,12 +10,16 @@ import pytest
 
 from pipefunc._utils import (
     _cached_load,
-    _is_equal,
     equal_dicts,
     format_args,
     format_function_call,
     format_kwargs,
+    get_ncores,
     handle_error,
+    infer_shape,
+    is_classmethod,
+    is_equal,
+    is_installed,
     is_min_version,
     is_pydantic_base_model,
     load,
@@ -21,6 +27,7 @@ from pipefunc._utils import (
 )
 
 has_pydantic = importlib.util.find_spec("pydantic") is not None
+has_polars = importlib.util.find_spec("polars") is not None
 
 
 @pytest.fixture(autouse=True)  # Automatically use in all tests
@@ -102,6 +109,18 @@ def test_cache_invalidation_on_file_size_change(tmp_path, modify_size):
     assert _cached_load.cache_info().misses == 2
 
 
+def test_get_ncores_slurm_executor(monkeypatch):
+    fake_module = types.ModuleType("adaptive_scheduler")
+
+    class FakeSlurmExecutor:
+        """Minimal stand-in for adaptive_scheduler.SlurmExecutor."""
+
+    fake_module.SlurmExecutor = FakeSlurmExecutor
+    monkeypatch.setitem(sys.modules, "adaptive_scheduler", fake_module)
+
+    assert get_ncores(FakeSlurmExecutor()) == 1
+
+
 def test_format_args_empty() -> None:
     assert format_args(()) == ""
     assert format_args((42,)) == "42"
@@ -120,7 +139,7 @@ def test_format_args_empty() -> None:
     assert format_function_call("func1", args, kwargs) == "func1('foo', func2='func2(arg)')"
 
 
-class CustomObject:
+class CustomObject:  # noqa: PLW1641
     def __init__(self, value):
         self.value = value
 
@@ -133,10 +152,10 @@ class CustomObject:
 def test_is_equal_dict() -> None:
     d1 = {"a": 1, "b": 2}
     d2 = {"a": 1, "b": 2}
-    assert _is_equal(d1, d2)
+    assert is_equal(d1, d2)
 
     d3 = {"a": 1, "b": 3}
-    assert not _is_equal(d1, d3)
+    assert not is_equal(d1, d3)
 
     assert not equal_dicts({"a": 1}, {"a": 1, "b": 3}, verbose=True)
     assert not equal_dicts({"a": 1}, {"b": 1}, verbose=True)
@@ -146,60 +165,151 @@ def test_is_equal_dict() -> None:
 def test_is_equal_numpy_array() -> None:
     a1 = np.array([1, 2, 3])
     a2 = np.array([1, 2, 3])
-    assert _is_equal(a1, a2)
+    assert is_equal(a1, a2)
 
     a3 = np.array([1, 2, 4])
-    assert not _is_equal(a1, a3)
+    assert not is_equal(a1, a3)
 
     a4 = np.array([1, 2, np.nan])
     a5 = np.array([1, 2, np.nan])
-    assert _is_equal(a4, a5)
+    assert is_equal(a4, a5)
 
 
 def test_is_equal_set() -> None:
     s1 = {1, 2, 3}
     s2 = {1, 2, 3}
-    assert _is_equal(s1, s2)
+    assert is_equal(s1, s2)
 
     s3 = {1, 2, 4}
-    assert not _is_equal(s1, s3)
+    assert not is_equal(s1, s3)
 
 
 def test_is_equal_list_and_tuple() -> None:
-    assert not _is_equal([1, 2, 3], (1, 2, 3))
-    assert _is_equal([1, 2, 3], [1, 2, 3])
-    assert not _is_equal([1, 2, 3], [1, 2, 4])
-    assert _is_equal([np.array([1, 2, 3])], [np.array([1, 2, 3])])
-    assert not _is_equal([1], [1, 2])
+    assert not is_equal([1, 2, 3], (1, 2, 3))
+    assert is_equal([1, 2, 3], [1, 2, 3])
+    assert not is_equal([1, 2, 3], [1, 2, 4])
+    assert is_equal([np.array([1, 2, 3])], [np.array([1, 2, 3])])
+    assert not is_equal([1], [1, 2])
 
 
 def test_is_equal_float() -> None:
-    assert _is_equal(1.0, 1.0)
-    assert _is_equal(1.0, 1.0000000001)
-    assert not _is_equal(1.0, 1.1)
+    assert is_equal(1.0, 1.0)
+    assert is_equal(1.0, 1.0000000001)
+    assert not is_equal(1.0, 1.1)
 
 
 def test_is_equal_custom_object() -> None:
     obj1 = CustomObject(1)
     obj2 = CustomObject(1)
-    assert _is_equal(obj1, obj2)
+    assert is_equal(obj1, obj2)
 
     obj3 = CustomObject(2)
-    assert not _is_equal(obj1, obj3)
+    assert not is_equal(obj1, obj3)
 
 
 def test_is_equal_iterable() -> None:
-    assert _is_equal([1, 2, 3], [1, 2, 3])
-    assert not _is_equal([1, 2, 3], [1, 2, 4])
-    assert _is_equal((1, 2, 3), (1, 2, 3))
-    assert not _is_equal((1, 2, 3), (1, 2, 4))
+    assert is_equal([1, 2, 3], [1, 2, 3])
+    assert not is_equal([1, 2, 3], [1, 2, 4])
+    assert is_equal((1, 2, 3), (1, 2, 3))
+    assert not is_equal((1, 2, 3), (1, 2, 4))
 
 
 def test_is_equal_other_types() -> None:
-    assert _is_equal(1, 1)
-    assert not _is_equal(1, 2)
-    assert _is_equal("abc", "abc")
-    assert not _is_equal("abc", "def")
+    assert is_equal(1, 1)
+    assert not is_equal(1, 2)
+    assert is_equal("abc", "abc")
+    assert not is_equal("abc", "def")
+
+
+def test_is_equal_nested_error() -> None:
+    class ErrorOnEq:  # noqa: PLW1641
+        def __eq__(self, other):
+            msg = "Comparison error"
+            raise ValueError(msg)
+
+    obj1 = ErrorOnEq()
+    obj2 = ErrorOnEq()
+
+    assert is_equal([obj1], [obj2], on_error="return_none") is None
+    with pytest.raises(ValueError, match="Comparison error"):
+        is_equal([obj1], [obj2], on_error="raise")
+
+
+def test_equal_dicts_with_pandas() -> None:
+    """Test equal_dicts with pandas DataFrames."""
+    if not is_installed("pandas"):
+        pytest.skip("pandas not installed")
+    import pandas as pd
+
+    df1 = pd.DataFrame({"x": [1, 2], "y": [3, 4]})
+    df2 = pd.DataFrame({"x": [1, 2], "y": [3, 4]})
+    df3 = pd.DataFrame({"x": [1, 2], "y": [3, 5]})
+    d1 = {"a": df1}
+    d2 = {"a": df2}
+    d3 = {"a": df3}
+    assert equal_dicts(d1, d2)
+    assert not equal_dicts(d1, d3)
+
+
+@pytest.mark.skipif(not has_polars, reason="polars not installed")
+def test_equal_dicts_with_polars() -> None:
+    """Test equal_dicts with polars DataFrames."""
+    import polars as pl
+
+    df1 = pl.DataFrame({"x": [1, 2], "y": [3, 4]})
+    df2 = pl.DataFrame({"x": [1, 2], "y": [3, 4]})
+    df3 = pl.DataFrame({"x": [1, 2], "y": [3, 5]})
+    d1 = {"a": df1}
+    d2 = {"a": df2}
+    d3 = {"a": df3}
+    assert equal_dicts(d1, d2)
+    assert not equal_dicts(d1, d3)
+
+
+@pytest.mark.skipif(not has_polars, reason="polars not installed")
+def test_equal_dicts_with_polars_nulls() -> None:
+    """Test equal_dicts with polars DataFrames containing null values."""
+    import polars as pl
+
+    # Test DataFrames with nulls
+    df1 = pl.DataFrame({"x": [1, None, 3], "y": [None, 4, 5]})
+    df2 = pl.DataFrame({"x": [1, None, 3], "y": [None, 4, 5]})
+    df3 = pl.DataFrame({"x": [1, 2, 3], "y": [None, 4, 5]})
+    d1 = {"a": df1}
+    d2 = {"a": df2}
+    d3 = {"a": df3}
+    assert equal_dicts(d1, d2)
+    assert not equal_dicts(d1, d3)
+
+    # Test Series with nulls
+    s1 = pl.Series("test", [1, None, 3])
+    s2 = pl.Series("test", [1, None, 3])
+    s3 = pl.Series("test", [1, 2, 3])
+    d1 = {"a": s1}
+    d2 = {"a": s2}
+    d3 = {"a": s3}
+    assert equal_dicts(d1, d2)
+    assert not equal_dicts(d1, d3)
+
+
+@pytest.mark.skipif(not has_polars, reason="polars not installed")
+def test_equal_dicts_with_polars_different_dtypes() -> None:
+    """Test equal_dicts with polars DataFrames with different dtypes."""
+    import polars as pl
+
+    # Same values but different dtypes should not be equal
+    df1 = pl.DataFrame({"x": [1, 2, 3]}, schema={"x": pl.Int64})
+    df2 = pl.DataFrame({"x": [1, 2, 3]}, schema={"x": pl.Int32})
+    d1 = {"a": df1}
+    d2 = {"a": df2}
+    assert not equal_dicts(d1, d2)
+
+    # Same for Series
+    s1 = pl.Series("test", [1, 2, 3], dtype=pl.Int64)
+    s2 = pl.Series("test", [1, 2, 3], dtype=pl.Int32)
+    d1 = {"a": s1}
+    d2 = {"a": s2}
+    assert not equal_dicts(d1, d2)
 
 
 def test_equal_dicts() -> None:
@@ -230,13 +340,15 @@ def test_equal_dicts() -> None:
     d12 = {"a": {"a": np.array([1, 2, 4])}}
     assert not equal_dicts(d11, d12, verbose=True)
 
-    class A:
+    class A:  # noqa: PLW1641
         def __eq__(self, other):
             msg = "Error"
             raise RuntimeError(msg)
 
     with pytest.warns(Warning, match="Errors comparing keys"):
         assert equal_dicts({"a": A()}, {"a": A()}, verbose=True) is None
+    with pytest.raises(RuntimeError, match="Error"):
+        equal_dicts({"a": A()}, {"a": A()}, on_error="raise")
 
 
 def test_requires() -> None:
@@ -249,16 +361,16 @@ def test_is_min_version() -> None:
     assert is_min_version("numpy", "1.0.0")
     assert not is_min_version("pipefunc", "999.0.0")
 
-    major, minor, patch = map(int, np.__version__.split("."))
+    major, minor, patch = map(int, np.__version__.split("."))  # noqa: RUF048
 
-    assert is_min_version("numpy", f"{major}.{minor}.{patch-1}")
-    assert not is_min_version("numpy", f"{major}.{minor}.{patch+1}")
+    assert is_min_version("numpy", f"{major}.{minor}.{patch - 1}")
+    assert not is_min_version("numpy", f"{major}.{minor}.{patch + 1}")
 
-    assert is_min_version("numpy", f"{major}.{minor-1}.{patch}")
-    assert not is_min_version("numpy", f"{major}.{minor+1}.{patch}")
+    assert is_min_version("numpy", f"{major}.{minor - 1}.{patch}")
+    assert not is_min_version("numpy", f"{major}.{minor + 1}.{patch}")
 
-    assert is_min_version("numpy", f"{major-1}.{minor}.{patch}")
-    assert not is_min_version("numpy", f"{major+1}.{minor}.{patch}")
+    assert is_min_version("numpy", f"{major - 1}.{minor}.{patch}")
+    assert not is_min_version("numpy", f"{major + 1}.{minor}.{patch}")
 
 
 def function_that_raises_empty_args() -> None:
@@ -311,3 +423,81 @@ def test_is_pydantic_base_model() -> None:
     assert is_pydantic_base_model(CustomModel)
     assert not is_pydantic_base_model(Foo)
     assert not is_pydantic_base_model(lambda x: x)
+
+
+def test_is_classmethod() -> None:
+    class Foo:
+        def method(self):
+            pass
+
+        @classmethod
+        def classmethod(cls):
+            pass
+
+        @staticmethod
+        def staticmethod():
+            pass
+
+        @property
+        def property(self):
+            pass
+
+        def __init__(self):
+            pass
+
+        class Nested:
+            @classmethod
+            def nested_classmethod(cls):
+                pass
+
+    assert not is_classmethod(Foo.method)
+    assert is_classmethod(Foo.classmethod)
+    assert not is_classmethod(Foo.staticmethod)
+    assert not is_classmethod(Foo.property)
+    assert not is_classmethod(Foo.__init__)
+    assert is_classmethod(Foo.Nested.nested_classmethod)
+    assert not is_classmethod(lambda x: x)
+    assert not is_classmethod(1)  # type: ignore[arg-type]
+    assert not is_classmethod("method")  # type: ignore[arg-type]
+
+
+def test_infer_shape() -> None:
+    """Test the infer_shape function with various inputs."""
+    # Test with a simple list
+    assert infer_shape([1, 2, 3]) == (3,)
+
+    # Test with a nested list
+    assert infer_shape([[1, 2], [3, 4]]) == (2, 2)
+    assert infer_shape([[1], [2], [3]]) == (3, 1)
+    assert infer_shape([[[1]], [[2]], [[3]]]) == (3, 1, 1)
+
+    # Test with a ragged lists
+    assert infer_shape([[[1], [2], [3]], [4, 5, 6]]) == (2, 3)
+    assert infer_shape([[1, 2, 3], [[4], [5], [6]]]) == (2, 3)
+    assert infer_shape([[[1]], [[2]], [3]]) == (3, 1)
+    assert infer_shape([[1], [2, 3]]) == (2,)
+
+    # Test with an empty list
+    assert infer_shape([]) == (0,)
+
+    # Test with a list of empty lists
+    assert infer_shape([[], []]) == (2, 0)
+
+    # Test with a NumPy array
+    assert infer_shape(np.array([[1, 2], [3, 4]])) == (2, 2)
+
+    # Test with a range object
+    assert infer_shape(range(5)) == (5,)
+
+    # Test with a scalar value
+    assert infer_shape(123) == ()
+
+    # Test with a string
+    assert infer_shape("hello") == ()
+
+    # Test with mixed list/tuple
+    assert infer_shape(([1, 2], (3, 4))) == (2, 2)
+    assert infer_shape(((1, 2), [3, 4])) == (2, 2)
+
+    # Test with different sub-shapes
+    assert infer_shape([[[1]], [[2, 3]]]) == (2, 1)

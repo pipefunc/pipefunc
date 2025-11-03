@@ -113,3 +113,11 @@ venv.bak/
 
 # other
 .ruff_cache
+*run_folder*
+weather_simulation_results/
+docs/source/*results
+docs/source/*run_folder*
+.codspeed
+.env*
+.code/
+uv.lock

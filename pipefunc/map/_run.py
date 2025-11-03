@@ -10,45 +10,52 @@ from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import numpy as np
 import numpy.typing as npt
 
+from pipefunc._pipefunc_utils import handle_pipefunc_error
 from pipefunc._utils import (
     at_least_tuple,
     dump,
+    ensure_block_allowed,
     get_ncores,
-    handle_error,
     is_running_in_ipynb,
-    load,
     prod,
 )
+from pipefunc._widgets.helpers import maybe_async_task_status_widget
 from pipefunc.cache import HybridCache, to_hashable
 
 from ._adaptive_scheduler_slurm_executor import (
+    is_slurm_executor,
     maybe_finalize_slurm_executors,
     maybe_multi_run_manager,
     maybe_update_slurm_executor_map,
     maybe_update_slurm_executor_single,
 )
+from ._load import _load_from_store, maybe_load_data
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
-from ._result import DirectValue, Result
+from ._result import DirectValue, Result, ResultDict
 from ._shapes import external_shape_from_mask, internal_shape_from_mask, shape_is_resolved
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
 if TYPE_CHECKING:
-    from collections import OrderedDict
-    from collections.abc import Callable, Generator, Iterable, Sequence
+    from collections.abc import Callable, Coroutine, Generator, Iterable, Sequence
 
+    import pydantic
     from adaptive_scheduler import MultiRunManager
 
     from pipefunc import PipeFunc, Pipeline
-    from pipefunc._pipeline._types import OUTPUT_TYPE
-    from pipefunc._widgets import ProgressTracker
+    from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
+    from pipefunc._widgets.async_status_widget import AsyncTaskStatusWidget
+    from pipefunc._widgets.progress_headless import HeadlessProgressTracker
+    from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
+    from pipefunc._widgets.progress_rich import RichProgressTracker
     from pipefunc.cache import _CacheBase
 
+    from ._prepare import Prepared
     from ._progress import Status
     from ._result import StoreType
     from ._run_info import RunInfo
@@ -57,21 +64,22 @@ if TYPE_CHECKING:
 
 def run_map(
     pipeline: Pipeline,
-    inputs: dict[str, Any],
+    inputs: dict[str, Any] | pydantic.BaseModel,
     run_folder: str | Path | None = None,
     internal_shapes: UserShapeDict | None = None,
     *,
     output_names: set[OUTPUT_TYPE] | None = None,
     parallel: bool = True,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
-    storage: str | dict[OUTPUT_TYPE, str] = "file_array",
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
+    storage: StorageType | None = None,
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-    show_progress: bool = False,
-) -> OrderedDict[str, Result]:
+    show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
+    return_results: bool = True,
+) -> ResultDict:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
     Parameters
@@ -138,6 +146,7 @@ def run_map(
 
         Available storage classes are registered in `pipefunc.map.storage_registry`.
         Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
+        Defaults to ``"file_array"`` if ``run_folder`` is provided, otherwise ``"dict"``.
     persist_memory
         Whether to write results to disk when memory based storage is used.
         Does not have any effect when file based storage is used.
@@ -152,10 +161,26 @@ def run_map(
         of providing the root arguments. If ``False``, all root arguments must be provided,
         and an exception is raised if any are missing.
     show_progress
-        Whether to display a progress bar. Only works if ``parallel=True``.
+        Whether to display a progress bar. Can be:
+
+        - ``True``: Display a progress bar. Auto-selects based on environment:
+          `ipywidgets` in Jupyter (if installed), otherwise `rich` (if installed).
+        - ``False``: No progress bar.
+        - ``"ipywidgets"``: Force `ipywidgets` progress bar (HTML-based).
+          Shown only if in a Jupyter notebook and `ipywidgets` is installed.
+        - ``"rich"``: Force `rich` progress bar (text-based).
+          Shown only if `rich` is installed.
+        - ``"headless"``: No progress bar, but the progress is still tracked internally.
+        - ``None`` (default): Shows `ipywidgets` progress bar *only if*
+          running in a Jupyter notebook and `ipywidgets` is installed.
+          Otherwise, no progress bar is shown.
+    return_results
+        Whether to return the results of the pipeline. If ``False``, the pipeline is run
+        without keeping the results in memory. Instead the results are only kept in the set
+        ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
     """
-    pipeline, run_info, store, outputs, parallel, executor, progress = prepare_run(
+    prep = prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -163,6 +188,7 @@ def run_map(
         output_names=output_names,
         parallel=parallel,
         executor=executor,
+        chunksizes=chunksizes,
         storage=storage,
         cleanup=cleanup,
         fixed_indices=fixed_indices,
@@ -170,49 +196,102 @@ def run_map(
         show_progress=show_progress,
         in_async=False,
     )
-    if progress is not None:
-        progress.display()
-    with _maybe_executor(executor, parallel) as ex:
-        for gen in pipeline.topological_generations.function_lists:
+
+    with _maybe_executor(prep.executor, prep.parallel) as ex:
+        for gen in prep.pipeline.topological_generations.function_lists:
             _run_and_process_generation(
                 generation=gen,
-                run_info=run_info,
-                store=store,
-                outputs=outputs,
+                run_info=prep.run_info,
+                store=prep.store,
+                outputs=prep.outputs,
                 fixed_indices=fixed_indices,
                 executor=ex,
-                chunksizes=chunksizes,
-                progress=progress,
-                cache=pipeline.cache,
+                chunksizes=prep.chunksizes,
+                progress=prep.progress,
+                return_results=return_results,
+                cache=prep.pipeline.cache,
             )
-    if progress is not None:  # final update
-        progress.update_progress(force=True)
-    _maybe_persist_memory(store, persist_memory)
-    return outputs
+    return _finalize_run_map(prep, persist_memory)
 
 
-class AsyncMap(NamedTuple):
-    task: asyncio.Task[OrderedDict[str, Result]]
+def _finalize_run_map(prep: Prepared, persist_memory: bool) -> ResultDict:
+    if prep.progress is not None:  # final update
+        prep.progress.update_progress(force=True)
+    _maybe_persist_memory(prep.store, persist_memory)
+    return prep.outputs
+
+
+@dataclass
+class AsyncMap:
+    """An object returned by `run_map_async` to manage an asynchronous pipeline execution."""
+
     run_info: RunInfo
-    progress: ProgressTracker | None
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None
     multi_run_manager: MultiRunManager | None
+    status_widget: AsyncTaskStatusWidget | None
+    _run_pipeline: Callable[[], Coroutine[Any, Any, ResultDict]]
+    _display_widgets: bool
+    _prepared: Prepared
+    _task: asyncio.Task[ResultDict] | None = None
+    _result_cache: ResultDict | None = None
 
-    def result(self) -> OrderedDict[str, Result]:
+    @property
+    def task(self) -> asyncio.Task[ResultDict]:
+        if self._task is None:
+            msg = (
+                "The task has not been started. Call `start()` inside an event loop or use"
+                " `runner.result()` from synchronous code."
+            )
+            raise RuntimeError(msg)
+        return self._task
+
+    def result(self) -> ResultDict:
+        """Wait for the pipeline to complete and return the results."""
+        if self._result_cache is not None:
+            return self._result_cache
+
         if is_running_in_ipynb():  # pragma: no cover
-            if self.task.done():
-                return self.task.result()
+            if self._task is not None and self.task.done():
+                result = self.task.result()
+                self._result_cache = result
+                return result
             msg = (
                 "Cannot block the event loop when running in a Jupyter notebook."
                 " Use `await runner.task` instead."
             )
             raise RuntimeError(msg)
 
-        loop = asyncio.get_event_loop()  # pragma: no cover
-        return loop.run_until_complete(self.task)  # pragma: no cover
+        ensure_block_allowed()
+        if self._task is None:
+
+            async def _run_and_return() -> ResultDict:
+                task = asyncio.create_task(self._run_pipeline())
+                self._task = task
+                self._attach_to_task(task)
+                try:
+                    result = await task
+                finally:
+                    self._task = None
+                return result
+
+            result = asyncio.run(_run_and_return())
+            self._result_cache = result
+            return result
+
+        async def _await_task(task: asyncio.Task[ResultDict]) -> ResultDict:
+            return await task
+
+        loop = self.task.get_loop()
+        coro = _await_task(self.task)
+        result = asyncio.run_coroutine_threadsafe(coro, loop).result()
+        self._result_cache = result
+        return result
 
     def display(self) -> None:  # pragma: no cover
         """Display the pipeline widget."""
         if is_running_in_ipynb():
+            if self.status_widget is not None:
+                self.status_widget.display()
             if self.progress is not None:
                 self.progress.display()
             if self.multi_run_manager is not None:
@@ -220,22 +299,62 @@ class AsyncMap(NamedTuple):
         else:
             print("⚠️ Display is only supported in Jupyter notebooks.")
 
+    def start(self) -> AsyncMap:
+        """Start the pipeline execution."""
+        if self._task is not None:
+            warnings.warn("Task is already running.", stacklevel=2)
+            return self
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            warnings.warn(
+                "No running asyncio event loop; call `runner.result()` to run synchronously "
+                "or start the task inside an async context.",
+                UserWarning,
+                stacklevel=2,
+            )
+            return self
+
+        self._task = loop.create_task(self._run_pipeline())
+        self._attach_to_task(self._task)
+        return self
+
+    def _attach_to_task(self, task: asyncio.Task[ResultDict]) -> None:
+        task.add_done_callback(self._cache_task_result)
+        if self.progress is not None:
+            self.progress.attach_task(task)
+        self.status_widget = maybe_async_task_status_widget(task)
+        if self._display_widgets:
+            self.display()
+
+    def _cache_task_result(self, task: asyncio.Task[ResultDict]) -> None:
+        if task.cancelled():
+            return
+        if task.exception() is None:
+            self._result_cache = task.result()
+        else:
+            self._result_cache = None
+
 
 def run_map_async(
     pipeline: Pipeline,
-    inputs: dict[str, Any],
+    inputs: dict[str, Any] | pydantic.BaseModel,
     run_folder: str | Path | None = None,
     internal_shapes: UserShapeDict | None = None,
     *,
     output_names: set[OUTPUT_TYPE] | None = None,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
-    storage: str | dict[OUTPUT_TYPE, str] = "file_array",
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
+    storage: StorageType | None = None,
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-    show_progress: bool = False,
+    show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
+    return_results: bool = True,
+    display_widgets: bool = True,
+    start: bool = True,
 ) -> AsyncMap:
     """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -301,6 +420,7 @@ def run_map_async(
 
         Available storage classes are registered in `pipefunc.map.storage_registry`.
         Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
+        Defaults to ``"file_array"`` if ``run_folder`` is provided, otherwise ``"dict"``.
     persist_memory
         Whether to write results to disk when memory based storage is used.
         Does not have any effect when file based storage is used.
@@ -315,10 +435,32 @@ def run_map_async(
         of providing the root arguments. If ``False``, all root arguments must be provided,
         and an exception is raised if any are missing.
     show_progress
-        Whether to display a progress bar.
+        Whether to display a progress bar. Can be:
+
+        - ``True``: Display a progress bar. Auto-selects based on environment:
+          `ipywidgets` in Jupyter (if installed), otherwise `rich` (if installed).
+        - ``False``: No progress bar.
+        - ``"ipywidgets"``: Force `ipywidgets` progress bar (HTML-based).
+          Shown only if in a Jupyter notebook and `ipywidgets` is installed.
+        - ``"rich"``: Force `rich` progress bar (text-based).
+          Shown only if `rich` is installed.
+        - ``"headless"``: No progress bar, but the progress is still tracked internally.
+        - ``None`` (default): Shows `ipywidgets` progress bar *only if*
+          running in a Jupyter notebook and `ipywidgets` is installed.
+          Otherwise, no progress bar is shown.
+    display_widgets
+        Whether to call ``IPython.display.display(...)`` on widgets.
+        Ignored if **outside** of a Jupyter notebook.
+    return_results
+        Whether to return the results of the pipeline. If ``False``, the pipeline is run
+        without keeping the results in memory. Instead the results are only kept in the set
+        ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+    start
+        Whether to start the pipeline immediately. If ``False``, the pipeline is not started until the
+        `start()` method on the `AsyncMap` instance is called.
 
     """
-    pipeline, run_info, store, outputs, _, executor_dict, progress = prepare_run(
+    prep = prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -326,6 +468,7 @@ def run_map_async(
         output_names=output_names,
         parallel=True,
         executor=executor,
+        chunksizes=chunksizes,
         storage=storage,
         cleanup=cleanup,
         fixed_indices=fixed_indices,
@@ -334,41 +477,63 @@ def run_map_async(
         in_async=True,
     )
 
-    multi_run_manager = maybe_multi_run_manager(executor_dict)
+    multi_run_manager = maybe_multi_run_manager(prep.executor)
 
-    async def _run_pipeline() -> OrderedDict[str, Result]:
-        with _maybe_executor(executor_dict, parallel=True) as ex:
+    async def _run_pipeline() -> ResultDict:
+        with _maybe_executor(prep.executor, parallel=True) as ex:
             assert ex is not None
-            for gen in pipeline.topological_generations.function_lists:
+            for gen in prep.pipeline.topological_generations.function_lists:
                 await _run_and_process_generation_async(
                     generation=gen,
-                    run_info=run_info,
-                    store=store,
-                    outputs=outputs,
+                    run_info=prep.run_info,
+                    store=prep.store,
+                    outputs=prep.outputs,
                     fixed_indices=fixed_indices,
                     executor=ex,
-                    chunksizes=chunksizes,
-                    progress=progress,
-                    cache=pipeline.cache,
+                    chunksizes=prep.chunksizes,
+                    progress=prep.progress,
+                    return_results=return_results,
+                    cache=prep.pipeline.cache,
                     multi_run_manager=multi_run_manager,
                 )
-        _maybe_persist_memory(store, persist_memory)
-        return outputs
+        _maybe_persist_memory(prep.store, persist_memory)
+        return prep.outputs
 
-    task = asyncio.create_task(_run_pipeline())
-    if progress is not None:
-        progress.attach_task(task)
-    if is_running_in_ipynb():  # pragma: no cover
-        if progress is not None:
-            progress.display()
-        if multi_run_manager is not None:
-            multi_run_manager.display()
-    return AsyncMap(task, run_info, progress, multi_run_manager)
+    return _finalize_run_map_async(
+        _run_pipeline,
+        prep,
+        multi_run_manager,
+        start,
+        display_widgets,
+        prep,
+    )
+
+
+def _finalize_run_map_async(
+    run_pipeline: Callable[[], Coroutine[Any, Any, ResultDict]],
+    prep: Prepared,
+    multi_run_manager: MultiRunManager | None,
+    start: bool,
+    display_widgets: bool,
+    prepared: Prepared,
+) -> AsyncMap:
+    async_map = AsyncMap(
+        run_info=prep.run_info,
+        progress=prep.progress,
+        multi_run_manager=multi_run_manager,
+        status_widget=None,
+        _run_pipeline=run_pipeline,
+        _display_widgets=display_widgets,
+        _prepared=prepared,
+    )
+    if start:
+        async_map.start()
+    return async_map
 
 
 def _maybe_persist_memory(
     store: dict[str, StoreType],
-    persist_memory: bool,  # noqa: FBT001
+    persist_memory: bool,
 ) -> None:
     if persist_memory:  # Only relevant for memory based storage
         for arr in store.values():
@@ -380,6 +545,7 @@ def _dump_single_output(
     func: PipeFunc,
     output: Any,
     store: dict[str, StoreType],
+    run_info: RunInfo,
 ) -> tuple[Any, ...]:
     if isinstance(func.output_name, tuple):
         new_output = []  # output in same order as func.output_name
@@ -387,13 +553,19 @@ def _dump_single_output(
             assert func.output_picker is not None
             _output = func.output_picker(output, output_name)
             new_output.append(_output)
-            _single_dump_single_output(_output, output_name, store)
+            _single_dump_single_output(_output, output_name, store, run_info)
         return tuple(new_output)
-    _single_dump_single_output(output, func.output_name, store)
+    _single_dump_single_output(output, func.output_name, store, run_info)
     return (output,)
 
 
-def _single_dump_single_output(output: Any, output_name: str, store: dict[str, StoreType]) -> None:
+def _single_dump_single_output(
+    output: Any,
+    output_name: str,
+    store: dict[str, StoreType],
+    run_info: RunInfo,
+) -> None:
+    run_info.resolve_downstream_shapes(output_name, store, output=output)
     storage = store[output_name]
     assert not isinstance(storage, StorageBase)
     if isinstance(storage, Path):
@@ -434,7 +606,7 @@ def _select_kwargs(
     input_keys = func.mapspec.input_keys(external_shape, index)  # type: ignore[arg-type]
     normalized_keys = {k: v[0] if len(v) == 1 else v for k, v in input_keys.items()}
     selected = {k: v[normalized_keys[k]] if k in normalized_keys else v for k, v in kwargs.items()}
-    _load_arrays(selected)
+    _load_data(selected)
     return selected
 
 
@@ -460,8 +632,12 @@ def _select_kwargs_and_eval_resources(
     return selected
 
 
-def _init_result_arrays(output_name: OUTPUT_TYPE, shape: ShapeTuple) -> list[np.ndarray] | None:
-    if not shape_is_resolved(shape):
+def _init_result_arrays(
+    output_name: OUTPUT_TYPE,
+    shape: ShapeTuple,
+    return_results: bool,
+) -> list[np.ndarray] | None:
+    if not return_results or not shape_is_resolved(shape):
         return None
     return [np.empty(prod(shape), dtype=object) for _ in at_least_tuple(output_name)]
 
@@ -481,7 +657,7 @@ def _get_or_set_cache(
 ) -> Any:
     if cache is None:
         return compute_fn()
-    cache_key = (func.output_name, to_hashable(kwargs))
+    cache_key = (func._cache_id, to_hashable(kwargs))
 
     if cache_key in cache:
         return cache.get(cache_key)
@@ -498,16 +674,40 @@ def _get_or_set_cache(
 _EVALUATED_RESOURCES = "__pipefunc_internal_evaluated_resources__"
 
 
-def _run_iteration(func: PipeFunc, selected: dict[str, Any], cache: _CacheBase | None) -> Any:
+def _run_iteration(
+    func: PipeFunc,
+    selected: dict[str, Any],
+    cache: _CacheBase | None,
+    in_executor: bool,
+) -> Any:
     def compute_fn() -> Any:
         try:
             return func(**selected)
         except Exception as e:
-            handle_error(e, func, selected)
-            # handle_error raises but mypy doesn't know that
+            if not in_executor:
+                # If we are in the executor, we need to handle the error in `_result`
+                handle_pipefunc_error(e, func, selected)
+                # handle_pipefunc_error raises but mypy doesn't know that
             raise  # pragma: no cover
 
     return _get_or_set_cache(func, selected, cache, compute_fn)
+
+
+def _try_shape(x: Any) -> tuple[int, ...]:
+    try:
+        return np.shape(x)
+    except ValueError:
+        # e.g., when inhomogeneous lists are passed
+        return ()
+
+
+@dataclass
+class _InternalShape:
+    shape: tuple[int, ...]
+
+    @classmethod
+    def from_outputs(cls, outputs: tuple[Any]) -> tuple[_InternalShape, ...]:
+        return tuple(cls(_try_shape(output)) for output in outputs)
 
 
 def _run_iteration_and_process(
@@ -519,12 +719,14 @@ def _run_iteration_and_process(
     arrays: Sequence[StorageBase],
     cache: _CacheBase | None = None,
     *,
+    in_executor: bool,
+    return_results: bool = True,
     force_dump: bool = False,
 ) -> tuple[Any, ...]:
     selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
-    output = _run_iteration(func, selected, cache)
+    output = _run_iteration(func, selected, cache, in_executor)
     outputs = _pick_output(func, output)
-    _update_array(
+    has_dumped = _update_array(
         func,
         arrays,
         shape,
@@ -534,6 +736,8 @@ def _run_iteration_and_process(
         in_post_process=False,
         force_dump=force_dump,
     )
+    if has_dumped and not return_results:
+        return _InternalShape.from_outputs(outputs)
     return outputs
 
 
@@ -547,7 +751,7 @@ def _update_array(
     *,
     in_post_process: bool,
     force_dump: bool = False,  # Only true in `adaptive.py`
-) -> None:
+) -> bool:
     # This function is called both in the main process (in post processing) and in the executor process.
     # It needs to only dump the data once.
     # If the data can be written during the function call inside the executor (e.g., a file array),
@@ -555,15 +759,17 @@ def _update_array(
     # We do this to offload the I/O and serialization overhead to the executor process if possible.
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
-
+    has_dumped = False
     for array, _output in zip(arrays, outputs):
         if not array.full_shape_is_resolved():
             _maybe_set_internal_shape(_output, array)
-        if force_dump or (array.dump_in_subprocess != in_post_process):
+        if force_dump or (array.dump_in_subprocess ^ in_post_process):
             if output_key is None:  # Only calculate the output key if needed
                 external_shape = external_shape_from_mask(shape, shape_mask)
                 output_key = func.mapspec.output_key(external_shape, index)  # type: ignore[arg-type]
             array.dump(output_key, _output)
+            has_dumped = True
+    return has_dumped
 
 
 def _indices_to_flat_index(
@@ -584,11 +790,12 @@ def _set_output(
     linear_index: int,
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
+    func: PipeFunc,
 ) -> None:
     external_shape = external_shape_from_mask(shape, shape_mask)
     internal_shape = internal_shape_from_mask(shape, shape_mask)
     external_index = _shape_to_key(external_shape, linear_index)
-    assert np.shape(output) == internal_shape
+    _validate_internal_shape(output, internal_shape, func)
     for internal_index in iterate_shape_indices(internal_shape):
         flat_index = _indices_to_flat_index(
             external_shape,
@@ -600,17 +807,39 @@ def _set_output(
         arr[flat_index] = output[internal_index]
 
 
+def _validate_internal_shape(
+    output: np.ndarray,
+    internal_shape: tuple[int, ...],
+    func: PipeFunc,
+) -> None:
+    shape = np.shape(output)[: len(internal_shape)]
+    if shape != internal_shape:
+        msg = (
+            f"Output shape {shape} of function '{func.__name__}'"
+            f" (output '{func.output_name}') does not match the expected"
+            f" internal shape {internal_shape} used in the `mapspec`"
+            f" '{func.mapspec}'. This error typically occurs when"
+            " a `PipeFunc` returns values with inconsistent shapes across"
+            " different invocations. Ensure that the output shape is"
+            " consistent for all inputs."
+        )
+        raise ValueError(msg)
+
+
 def _update_result_array(
-    result_arrays: list[np.ndarray],
+    result_arrays: list[np.ndarray] | None,
     index: int,
     output: list[Any],
     shape: tuple[int, ...],
     mask: tuple[bool, ...],
+    func: PipeFunc,
 ) -> None:
+    if result_arrays is None:
+        return
     for result_array, _output in zip(result_arrays, output):
         if not all(mask):
             _output = np.asarray(_output)  # In case _output is a list
-            _set_output(result_array, _output, index, shape, mask)
+            _set_output(result_array, _output, index, shape, mask, func)
         else:
             result_array[index] = _output
 
@@ -640,7 +869,7 @@ def _existing_and_missing_indices(
 @contextmanager
 def _maybe_executor(
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    parallel: bool,  # noqa: FBT001
+    parallel: bool,
 ) -> Generator[dict[OUTPUT_TYPE, Executor] | None, None, None]:
     if executor is None and parallel:
         with ProcessPoolExecutor() as new_executor:  # shuts down the executor after use
@@ -666,13 +895,15 @@ def _prepare_submit_map_spec(
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     status: Status | None,
+    return_results: bool,
+    in_executor: bool,
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
     shape = run_info.resolved_shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
-    result_arrays = _init_result_arrays(func.output_name, shape)
+    result_arrays = _init_result_arrays(func.output_name, shape, return_results)
     process_index = functools.partial(
         _run_iteration_and_process,
         func=func,
@@ -681,6 +912,8 @@ def _prepare_submit_map_spec(
         shape_mask=mask,
         arrays=arrays,
         cache=cache,
+        in_executor=in_executor,
+        return_results=return_results,
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
     existing, missing = _existing_and_missing_indices(arrays, fixed_mask)  # type: ignore[arg-type]
@@ -723,15 +956,17 @@ def _submit(
     func: Callable[..., Any],
     executor: Executor,
     status: Status | None,
-    progress: ProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
+    chunksize: int,
     *args: Any,
 ) -> Future:
     if status is None:
         return executor.submit(func, *args)
     assert progress is not None
-    status.mark_in_progress()
+    status.mark_in_progress(n=chunksize)
     fut = executor.submit(func, *args)
-    fut.add_done_callback(status.mark_complete)
+    mark_complete = functools.partial(status.mark_complete, n=chunksize)
+    fut.add_done_callback(mark_complete)
     if not progress.in_async:
         fut.add_done_callback(progress.update_progress)
     return fut
@@ -757,23 +992,30 @@ def _chunk_indices(indices: list[int], chunksize: int) -> Iterable[tuple[int, ..
 
 def _chunksize_for_func(
     func: PipeFunc,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     num_iterations: int,
     executor: Executor,
 ) -> int:
     if isinstance(chunksizes, int):
         return chunksizes
-    if chunksizes is not None:
-        chunksize = chunksizes.get(func.output_name, None)
-        if chunksize is None:
-            chunksize = chunksizes.get("", 1)
-        if callable(chunksize):
-            chunksize = chunksize(num_iterations)
-        if not isinstance(chunksize, int) or chunksize <= 0:
-            msg = f"Invalid chunksize {chunksize} for {func.output_name}"
-            raise ValueError(msg)
-        return chunksize
-    return _get_optimal_chunk_size(num_iterations, executor)
+    if chunksizes is None:
+        return _get_optimal_chunk_size(num_iterations, executor)
+    chunksize = None
+    if func.output_name in chunksizes:
+        chunksize = chunksizes[func.output_name]
+    elif "" in chunksizes:
+        chunksize = chunksizes[""]
+
+    if callable(chunksize):
+        chunksize = chunksize(num_iterations)
+
+    if chunksize is None:
+        chunksize = _get_optimal_chunk_size(num_iterations, executor)
+
+    if not isinstance(chunksize, int) or chunksize <= 0:
+        msg = f"Invalid chunksize {chunksize} for {func.output_name}"
+        raise ValueError(msg)
+    return chunksize
 
 
 def _get_optimal_chunk_size(
@@ -794,8 +1036,11 @@ def _get_optimal_chunk_size(
         balance between load distribution and overhead for most workloads
 
     """
+    if is_slurm_executor(executor):
+        return 1
     try:
         n_cores = get_ncores(executor)
+        n_cores = max(1, n_cores)
     except TypeError as e:
         warnings.warn(f"Automatic chunksize calculation failed with: {e}", stacklevel=2)
         n_cores = 1
@@ -812,10 +1057,12 @@ def _maybe_parallel_map(
     process_index: functools.partial[tuple[Any, ...]],
     indices: list[int],
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     status: Status | None,
-    progress: ProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
 ) -> list[Any]:
+    if not indices:
+        return []
     ex = _executor_for_func(func, executor)
     if ex is not None:
         assert executor is not None
@@ -823,7 +1070,7 @@ def _maybe_parallel_map(
         chunksize = _chunksize_for_func(func, chunksizes, len(indices), ex)
         chunks = list(_chunk_indices(indices, chunksize))
         process_chunk = functools.partial(_process_chunk, process_index=process_index)
-        return [_submit(process_chunk, ex, status, progress, chunk) for chunk in chunks]
+        return [_submit(process_chunk, ex, status, progress, len(chunk), chunk) for chunk in chunks]
     if status is not None:
         assert progress is not None
         process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
@@ -834,7 +1081,7 @@ def _maybe_parallel_map(
 def _wrap_with_status_update(
     func: Callable[..., Any],
     status: Status,
-    progress: ProgressTracker,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker,
 ) -> Callable[..., Any]:
     def wrapped(*args: Any) -> Any:
         status.mark_in_progress()
@@ -849,7 +1096,7 @@ def _wrap_with_status_update(
 def _maybe_execute_single(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     status: Status | None,
-    progress: ProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
     func: PipeFunc,
     kwargs: dict[str, Any],
     store: dict[str, StoreType],
@@ -857,54 +1104,14 @@ def _maybe_execute_single(
 ) -> Any:
     args = (func, kwargs, store, cache)  # args for _execute_single
     ex = _executor_for_func(func, executor)
-    if ex:
+    if ex is not None:
         assert executor is not None
         ex = maybe_update_slurm_executor_single(func, ex, executor, kwargs)
-        return _submit(_execute_single, ex, status, progress, *args)
+        return _submit(_execute_single, ex, status, progress, 1, *args)
     if status is not None:
         assert progress is not None
         return _wrap_with_status_update(_execute_single, status, progress)(*args)
     return _execute_single(*args)
-
-
-class _StoredValue(NamedTuple):
-    value: Any
-    exists: bool
-
-
-def _load_from_store(
-    output_name: OUTPUT_TYPE,
-    store: dict[str, StoreType],
-    *,
-    return_output: bool = True,
-) -> _StoredValue:
-    outputs: list[Any] = []
-    all_exist = True
-
-    for name in at_least_tuple(output_name):
-        storage = store[name]
-        if isinstance(storage, StorageBase):
-            outputs.append(storage)
-        elif isinstance(storage, Path):
-            if storage.is_file():
-                outputs.append(load(storage) if return_output else None)
-            else:
-                all_exist = False
-                outputs.append(None)
-        else:
-            assert isinstance(storage, DirectValue)
-            if storage.exists():
-                outputs.append(storage.value)
-            else:
-                all_exist = False
-                outputs.append(None)
-
-    if not return_output:
-        outputs = None  # type: ignore[assignment]
-    elif len(outputs) == 1:
-        outputs = outputs[0]
-
-    return _StoredValue(outputs, all_exist)
 
 
 def _execute_single(
@@ -919,28 +1126,22 @@ def _execute_single(
         return output
 
     # Otherwise, run the function
-    _load_arrays(kwargs)
+    _load_data(kwargs)
 
     def compute_fn() -> Any:
         try:
             return func(**kwargs)
         except Exception as e:
-            handle_error(e, func, kwargs)
-            # handle_error raises but mypy doesn't know that
+            handle_pipefunc_error(e, func, kwargs)
+            # handle_pipefunc_error raises but mypy doesn't know that
             raise  # pragma: no cover
 
     return _get_or_set_cache(func, kwargs, cache, compute_fn)
 
 
-def _maybe_load_array(x: Any) -> Any:
-    if isinstance(x, StorageBase):
-        return x.to_array()
-    return x
-
-
-def _load_arrays(kwargs: dict[str, Any]) -> None:
+def _load_data(kwargs: dict[str, Any]) -> None:
     for k, v in kwargs.items():
-        kwargs[k] = _maybe_load_array(v)
+        kwargs[k] = maybe_load_data(v)
 
 
 class _KwargsTask(NamedTuple):
@@ -950,14 +1151,16 @@ class _KwargsTask(NamedTuple):
 
 # NOTE: A similar async version of this function is provided below.
 def _run_and_process_generation(
+    *,
     generation: list[PipeFunc],
     run_info: RunInfo,
     store: dict[str, StoreType],
-    outputs: dict[str, Result],
+    outputs: ResultDict,
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
-    progress: ProgressTracker | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
+    return_results: bool,
     cache: _CacheBase | None = None,
 ) -> None:
     tasks = _submit_generation(
@@ -968,20 +1171,23 @@ def _run_and_process_generation(
         executor,
         chunksizes,
         progress,
+        return_results,
         cache,
     )
-    _process_generation(generation, tasks, store, outputs, run_info)
+    _process_generation(generation, tasks, store, outputs, run_info, return_results)
 
 
 async def _run_and_process_generation_async(
+    *,
     generation: list[PipeFunc],
     run_info: RunInfo,
     store: dict[str, StoreType],
-    outputs: dict[str, Result],
+    outputs: ResultDict,
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor],
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
-    progress: ProgressTracker | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
+    return_results: bool,
     cache: _CacheBase | None = None,
     multi_run_manager: MultiRunManager | None = None,
 ) -> None:
@@ -993,35 +1199,11 @@ async def _run_and_process_generation_async(
         executor,
         chunksizes,
         progress,
+        return_results,
         cache,
     )
     maybe_finalize_slurm_executors(generation, executor, multi_run_manager)
-    await _process_generation_async(generation, tasks, store, outputs, run_info)
-
-
-def _update_shapes_using_result(
-    func: PipeFunc,
-    outputs: dict[str, Result],
-    run_info: RunInfo,
-    store: dict[str, StoreType],
-) -> None:
-    for name, result in outputs.items():
-        _update_shape_using_result(func, name, result.output, run_info, store)
-
-
-def _update_shape_using_result(
-    func: PipeFunc,
-    name: str,
-    output: Any,
-    run_info: RunInfo,
-    store: dict[str, StoreType],
-) -> None:
-    shape = run_info.resolved_shapes.get(name, ())
-    if "?" in shape:
-        mapspec = func.mapspec
-        assert mapspec is not None
-        internal_shape = internal_shape_from_mask(np.shape(output), run_info.shape_masks[name])
-        run_info.resolve_downstream_shapes(store, {name: internal_shape})
+    await _process_generation_async(generation, tasks, store, outputs, run_info, return_results)
 
 
 # NOTE: A similar async version of this function is provided below.
@@ -1029,26 +1211,30 @@ def _process_generation(
     generation: list[PipeFunc],
     tasks: dict[PipeFunc, _KwargsTask],
     store: dict[str, StoreType],
-    outputs: dict[str, Result],
+    outputs: ResultDict,
     run_info: RunInfo,
+    return_results: bool,
 ) -> None:
     for func in generation:
-        _outputs = _process_task(func, tasks[func], store)
-        _update_shapes_using_result(func, _outputs, run_info, store)
-        outputs.update(_outputs)
+        _outputs = _process_task(func, tasks[func], store, run_info, return_results)
+        if return_results:
+            assert _outputs is not None
+            outputs.update(_outputs)
 
 
 async def _process_generation_async(
     generation: list[PipeFunc],
     tasks: dict[PipeFunc, _KwargsTask],
     store: dict[str, StoreType],
-    outputs: dict[str, Result],
+    outputs: ResultDict,
     run_info: RunInfo,
+    return_results: bool,
 ) -> None:
     for func in generation:
-        _outputs = await _process_task_async(func, tasks[func], store)
-        _update_shapes_using_result(func, _outputs, run_info, store)
-        outputs.update(_outputs)
+        _outputs = await _process_task_async(func, tasks[func], store, run_info, return_results)
+        if return_results:
+            assert _outputs is not None
+            outputs.update(_outputs)
 
 
 def _submit_func(
@@ -1057,15 +1243,29 @@ def _submit_func(
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
-    progress: ProgressTracker | None = None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
+    progress: IPyWidgetsProgressTracker
+    | RichProgressTracker
+    | HeadlessProgressTracker
+    | None = None,
+    return_results: bool = True,  # noqa: FBT002
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
     status = progress.progress_dict[func.output_name] if progress is not None else None
     cache = cache if func.cache else None
     if func.requires_mapping:
-        args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, status, cache)
+        args = _prepare_submit_map_spec(
+            func,
+            kwargs,
+            run_info,
+            store,
+            fixed_indices,
+            status,
+            return_results,
+            in_executor=bool(executor),
+            cache=cache,
+        )
         r = _maybe_parallel_map(
             func,
             args.process_index,
@@ -1115,8 +1315,9 @@ def _submit_generation(
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
-    progress: ProgressTracker | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
+    return_results: bool,
     cache: _CacheBase | None = None,
 ) -> dict[PipeFunc, _KwargsTask]:
     return {
@@ -1128,6 +1329,7 @@ def _submit_generation(
             executor,
             chunksizes,
             progress,
+            return_results,
             cache,
         )
         for func in generation
@@ -1139,7 +1341,9 @@ def _output_from_mapspec_task(
     store: dict[str, StoreType],
     args: _MapSpecArgs,
     outputs_list: list[list[Any]],
-) -> tuple[np.ndarray, ...]:
+    run_info: RunInfo,
+    return_results: bool,
+) -> tuple[np.ndarray, ...] | None:
     arrays: tuple[StorageBase, ...] = tuple(
         store[name]  # type: ignore[misc]
         for name in at_least_tuple(func.output_name)
@@ -1148,28 +1352,33 @@ def _output_from_mapspec_task(
     first = True
     for index, outputs in zip(args.missing, outputs_list):
         if first:
-            shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
+            shape = _maybe_resolve_shapes_from_map(func, store, args, outputs, return_results)
             first = False
-        assert args.result_arrays is not None
-        _update_result_array(args.result_arrays, index, outputs, shape, args.mask)
+        _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
         _update_array(func, arrays, shape, args.mask, index, outputs, in_post_process=True)
 
     first = True
     for index in args.existing:
         outputs = [array.get_from_index(index) for array in args.arrays]
         if first:
-            shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
+            shape = _maybe_resolve_shapes_from_map(func, store, args, outputs, return_results)
             first = False
-        assert args.result_arrays is not None
-        _update_result_array(args.result_arrays, index, outputs, shape, args.mask)
+        _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
 
     if not args.missing and not args.existing:  # shape variable does not exist
         shape = args.arrays[0].full_shape
+
+    for name in at_least_tuple(func.output_name):
+        run_info.resolve_downstream_shapes(name, store, shape=shape)
+
+    if args.result_arrays is None:
+        return None
     return tuple(x.reshape(shape) for x in args.result_arrays)  # type: ignore[union-attr]
 
 
 def _internal_shape(output: Any, storage: StorageBase) -> tuple[int, ...]:
-    return np.shape(output)[: len(storage.internal_shape)]
+    shape = output.shape if isinstance(output, _InternalShape) else np.shape(output)
+    return shape[: len(storage.internal_shape)]
 
 
 def _maybe_set_internal_shape(output: Any, storage: StorageBase) -> None:
@@ -1178,12 +1387,52 @@ def _maybe_set_internal_shape(output: Any, storage: StorageBase) -> None:
         storage.internal_shape = internal_shape
 
 
-def _result(x: Any | Future) -> Any:
-    return x.result() if isinstance(x, Future) else x
+def _raise_and_set_error_snapshot(
+    exc: Exception,
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    *,
+    index: int | None = None,
+    run_info: RunInfo | None = None,
+) -> None:
+    if index is not None:
+        assert run_info is not None, "run_info required when index is provided"
+        shape = run_info.resolved_shapes[func.output_name]
+        mask = run_info.shape_masks[func.output_name]
+        kwargs = _select_kwargs_and_eval_resources(func, kwargs, shape, mask, index)
+    kwargs = func._rename_to_native(kwargs)
+    handle_pipefunc_error(exc, func, kwargs)
 
 
-def _result_async(task: Future, loop: asyncio.AbstractEventLoop) -> asyncio.Future:
-    return asyncio.wrap_future(task, loop=loop)
+def _result(
+    x: Any | Future,
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    index: int | None = None,
+    run_info: RunInfo | None = None,
+) -> Any:
+    if isinstance(x, Future):
+        try:
+            return x.result()
+        except Exception as e:
+            _raise_and_set_error_snapshot(e, func, kwargs, index=index, run_info=run_info)
+            raise  # pragma: no cover
+    return x
+
+
+async def _result_async(
+    task: Future | Any,
+    loop: asyncio.AbstractEventLoop,
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    index: int | None = None,
+    run_info: RunInfo | None = None,
+) -> Any:
+    try:
+        return await asyncio.wrap_future(task, loop=loop)
+    except Exception as e:
+        _raise_and_set_error_snapshot(e, func, kwargs, index=index, run_info=run_info)
+        raise  # pragma: no cover
 
 
 def _to_result_dict(
@@ -1191,9 +1440,9 @@ def _to_result_dict(
     kwargs: dict[str, Any],
     output: tuple[Any, ...],
     store: dict[str, StoreType],
-) -> dict[str, Result]:
+) -> ResultDict:
     # Note that the kwargs still contain the StorageBase objects if mapspec was used.
-    return {
+    data = {
         output_name: Result(
             function=func.__name__,
             kwargs=kwargs,
@@ -1203,6 +1452,7 @@ def _to_result_dict(
         )
         for output_name, _output in zip(at_least_tuple(func.output_name), output)
     }
+    return ResultDict(data)
 
 
 # NOTE: A similar async version of this function is provided below.
@@ -1210,18 +1460,31 @@ def _process_task(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
     store: dict[str, StoreType],
-) -> dict[str, Result]:
+    run_info: RunInfo,
+    return_results: bool,
+) -> ResultDict | None:
     kwargs, task = kwargs_task
     if func.requires_mapping:
         r, args = task
-        chunk_outputs_list = [_result(x) for x in r]
+        chunk_outputs_list = [_result(x, func, kwargs, i, run_info) for i, x in enumerate(r)]
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
-        output = _output_from_mapspec_task(func, store, args, chained_outputs_list)
+        output = _output_from_mapspec_task(
+            func,
+            store,
+            args,
+            chained_outputs_list,
+            run_info,
+            return_results,
+        )
     else:
-        r = _result(task)
-        output = _dump_single_output(func, r, store)
-    return _to_result_dict(func, kwargs, output, store)
+        r = _result(task, func, kwargs)
+        output = _dump_single_output(func, r, store, run_info)
+
+    if return_results:
+        assert output is not None
+        return _to_result_dict(func, kwargs, output, store)
+    return None
 
 
 def _maybe_resolve_shapes_from_map(
@@ -1229,6 +1492,7 @@ def _maybe_resolve_shapes_from_map(
     store: dict[str, StoreType],
     args: _MapSpecArgs,
     outputs: list[Any],
+    return_results: bool,
 ) -> tuple[int, ...]:
     for output, name in zip(outputs, at_least_tuple(func.output_name)):
         array = store[name]
@@ -1237,7 +1501,7 @@ def _maybe_resolve_shapes_from_map(
     # Outside the loop above, just needs to do this once ⬇️
     assert isinstance(array, StorageBase)
     if args.result_arrays is None:
-        args.result_arrays = _init_result_arrays(func.output_name, array.full_shape)
+        args.result_arrays = _init_result_arrays(func.output_name, array.full_shape, return_results)
     return array.full_shape
 
 
@@ -1245,18 +1509,30 @@ async def _process_task_async(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
     store: dict[str, StoreType],
-) -> dict[str, Result]:
+    run_info: RunInfo,
+    return_results: bool,
+) -> ResultDict | None:
     kwargs, task = kwargs_task
     loop = asyncio.get_event_loop()
     if func.requires_mapping:
         r, args = task
-        futs = [_result_async(x, loop) for x in r]
+        futs = [_result_async(x, loop, func, kwargs, i, run_info) for i, x in enumerate(r)]
         chunk_outputs_list = await asyncio.gather(*futs)
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
-        output = _output_from_mapspec_task(func, store, args, chained_outputs_list)
+        output = _output_from_mapspec_task(
+            func,
+            store,
+            args,
+            chained_outputs_list,
+            run_info,
+            return_results,
+        )
     else:
         assert isinstance(task, Future)
-        r = await _result_async(task, loop)
-        output = _dump_single_output(func, r, store)
-    return _to_result_dict(func, kwargs, output, store)
+        r = await _result_async(task, loop, func, kwargs)
+        output = _dump_single_output(func, r, store, run_info)
+    if return_results:
+        assert output is not None
+        return _to_result_dict(func, kwargs, output, store)
+    return None

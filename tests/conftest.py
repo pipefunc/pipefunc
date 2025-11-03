@@ -16,7 +16,9 @@ def skip_if_missing(name: str, match: str | None = None) -> None:
 
 
 skip_if_missing("adaptive")
+skip_if_missing("griffe", match="*autodoc*")
 skip_if_missing("zarr")
 skip_if_missing("xarray")
-skip_if_missing("ipywidgets", match="*_widgets*")
-skip_if_missing("pydantic")
+skip_if_missing("ipywidgets", match="*_widget*")
+skip_if_missing("pydantic", match="*_cli*")
+skip_if_missing("pydantic", match="*_pydantic*")

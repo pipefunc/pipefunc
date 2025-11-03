@@ -12,7 +12,7 @@ from pipefunc._utils import at_least_tuple, requires
 from pipefunc.map._shapes import shape_is_resolved
 from pipefunc.resources import Resources
 
-from ._run import _func_kwargs, _load_arrays, _select_kwargs
+from ._run import _func_kwargs, _load_data, _select_kwargs
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -185,7 +185,6 @@ class _ResourcesContainer:
             else:
                 value = getattr(r, name)
             self.data[name].append(value)
-        # TODO: Allow setting any of EXECUTOR_TYPES
         self.data["executor_type"].append(_executor_type(index, r, func, run_info))
         self.data["extra_scheduler"].append(_extra_scheduler(index, r, func, run_info))
 
@@ -206,7 +205,7 @@ def _eval_resources(
 ) -> Resources:
     store = run_info.init_store()
     kwargs = _func_kwargs(func, run_info, store)
-    _load_arrays(kwargs)
+    _load_data(kwargs)
     if index is not None:
         shape = run_info.resolved_shapes[func.output_name]
         assert shape_is_resolved(shape)
@@ -253,6 +252,9 @@ def __extra_scheduler(resources: Resources) -> list[str]:
         extra_scheduler.append(f"--time={resources.time}")
     if resources.extra_args:
         for key, value in resources.extra_args.items():
+            if key == "executor_type":
+                # This is handled separately in _executor_type
+                continue
             extra_scheduler.append(f"--{key}={value}")
     return extra_scheduler
 
@@ -274,7 +276,12 @@ def _executor_type(
 
 
 def __executor_type(resources: Resources) -> EXECUTOR_TYPES:
-    return "sequential" if resources.parallelization_mode == "internal" else "process-pool"
+    executor_type = resources.extra_args.get("executor_type")
+    if executor_type is not None:
+        return resources.extra_args["executor_type"]
+    if resources.parallelization_mode == "internal":
+        return "sequential"
+    return None
 
 
 def _or(

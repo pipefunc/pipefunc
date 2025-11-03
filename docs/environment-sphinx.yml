@@ -14,24 +14,30 @@ dependencies:
   # optional-dependencies: adaptive
   - adaptive
   - adaptive-scheduler>=2.14.0
+  # optional-dependencies: autodoc
+  - griffe
+  - rich
+  # optional-dependencies: cli
+  - pydantic
+  - rich-argparse
+  # optional-dependencies: mcp
+  - fastmcp>=2.12.0
   # optional-dependencies: pandas
   - pandas
+  - xarray
   # optional-dependencies: plotting
   - bokeh
   - python-graphviz
-  - holoviews
+  - holoviews>=1.14.0
   - matplotlib
   # optional-dependencies: profiling
   - psutil
-  # optional-dependencies: rich
-  - rich
   # optional-dependencies: widgets
-  - graphviz-anywidget>=0.3.0
+  - graphviz-anywidget>=0.7.0
   - ipywidgets
-  # optional-dependencies: xarray
-  - xarray
   # optional-dependencies: zarr
-  - zarr
+  - zarr>=2,<3
+  - numcodecs<0.16.0
   # optional-dependencies: docs
   - emoji
   - jupytext
@@ -40,9 +46,11 @@ dependencies:
   - sphinx-autodoc-typehints
   - sphinx-book-theme
   - sphinx-copybutton
+  - sphinx-llms-txt
   - sphinx-notfound-page
   - sphinx-togglebutton
   - sphinx
+  - sphinxcontrib-mermaid
   - versioningit
   - nltk
   - scikit-image

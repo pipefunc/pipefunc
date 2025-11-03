@@ -100,7 +100,7 @@ def test_simple_from_step(tmp_path: Path, storage: str) -> None:
 
 
 @pytest.mark.parametrize("return_output", [True, False])
-def test_create_learners_loading_data(tmp_path: Path, return_output: bool) -> None:  # noqa: FBT001
+def test_create_learners_loading_data(tmp_path: Path, return_output: bool) -> None:
     counters = {"add": 0, "take_sum": 0}
 
     @pipefunc(output_name="z")
@@ -305,7 +305,7 @@ def test_create_learners_split_axes_with_reduction(tmp_path: Path, storage: str)
     pipeline.add_mapspec_axis("x", axis="j")
 
     inputs = {"x": np.array([[0, 1, 2, 3], [0, 1, 2, 3]])}
-    results = pipeline.map(inputs, tmp_path, parallel=False)
+    results = pipeline.map(inputs, tmp_path, parallel=False, storage="dict")
     learners = create_learners(
         pipeline,
         inputs,
@@ -352,8 +352,8 @@ def test_internal_shapes(storage: str, tmp_path: Path) -> None:
         inputs,
         tmp_path if storage == "file_array" else None,
         internal_shapes,  # type: ignore[arg-type]
-        storage=storage,
         parallel=False,
+        storage=storage,
     )
     learners = create_learners(
         pipeline,
@@ -519,6 +519,7 @@ def test_adaptive_run_dynamic_internal_shape():
         inputs={},
         adaptive_dimensions={"a": (0.0, 1.0)},
         adaptive_output="sum",
+        map_kwargs={"parallel": False, "storage": "dict"},
     )
 
     adaptive.runner.simple(learner, npoints_goal=10)

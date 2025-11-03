@@ -1,0 +1,15 @@
+[data-theme="dark"] details.hide.below-input summary span {
+  color: black !important;
+}
+
+[data-theme="dark"] label.xr-section-summary {
+  color: black !important;
+}
+
+[data-theme="dark"] .xr-wrap .xr-header div.xr-obj-type {
+  color: black !important;
+}
+
+[data-theme="dark"] li.xr-var-item {
+  color: white !important;
+}
