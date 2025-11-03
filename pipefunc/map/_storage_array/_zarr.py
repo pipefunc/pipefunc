@@ -6,7 +6,7 @@ import itertools
 import multiprocessing.managers
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, SupportsInt, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import cloudpickle
 import numpy as np
@@ -27,8 +27,6 @@ except ImportError:  # pragma: no cover - fallback for pre-3.1
 
 from zarr.storage import LocalStore, MemoryStore
 
-from pipefunc.map._shapes import shape_is_resolved
-
 from ._base import StorageBase, register_storage, select_by_mask
 
 if TYPE_CHECKING:
@@ -42,26 +40,12 @@ warnings.filterwarnings("ignore", category=UnstableSpecificationWarning)
 _FILL_VALUE = b""
 
 
-def _ensure_int_tuple(
-    values: tuple[int | str | SupportsInt, ...],
-    *,
-    what: str,
-) -> tuple[int, ...]:
-    ints: list[int] = []
-    for value in values:
-        if isinstance(value, str):
-            msg = f"{what} contained unresolved values"
-            raise TypeError(msg)
-        ints.append(int(value))
-    return tuple(ints)
-
-
 def _open_or_create_array(
     store: Store,
     *,
     name: str,
-    shape: tuple[Any, ...],
-    chunks: tuple[Any, ...],
+    shape: tuple[int, ...],
+    chunks: tuple[int, ...],
     dtype: Any,
     fill_value: Any,
 ) -> zarr.Array:
@@ -201,16 +185,10 @@ class ZarrFileArray(StorageBase):
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
 
         raw_chunks = select_by_mask(self.shape_mask, (1,) * len(self.shape), self.internal_shape)
-        assert shape_is_resolved(
-            raw_chunks,
-        ), "Chunk sizes must be resolved before creating a Zarr array"
-        chunks = cast("tuple[int, ...]", _ensure_int_tuple(raw_chunks, what="Chunk sizes"))
+        chunks: tuple[int, ...] = tuple(int(value) for value in raw_chunks)
 
         full_shape_raw = self.full_shape
-        assert shape_is_resolved(
-            full_shape_raw,
-        ), "Array shape must be resolved before creating a Zarr array"
-        full_shape = cast("tuple[int, ...]", _ensure_int_tuple(full_shape_raw, what="Array shape"))
+        full_shape: tuple[int, ...] = tuple(int(value) for value in full_shape_raw)
         self.array = _open_or_create_array(
             self.store,
             name="array",
@@ -222,7 +200,7 @@ class ZarrFileArray(StorageBase):
         self._mask = _open_or_create_array(
             self.store,
             name="mask",
-            shape=self.shape,
+            shape=self.resolved_shape,
             chunks=(1,) * len(self.shape) or (1,),
             dtype=bool,
             fill_value=True,
