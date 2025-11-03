@@ -40,7 +40,7 @@ pydantic = ["pydantic"]
 rich = ["rich"]
 widgets = ["graphviz-anywidget>=0.7.0", "ipywidgets"]
 xarray = ["xarray"]
-zarr = ["zarr>=2,<3", "numcodecs<0.16.0"]  # https://github.com/zarr-developers/numcodecs/issues/721
+zarr = ["zarr", "numcodecs"]
 test = [
     "coverage",
     "pytest-asyncio",
