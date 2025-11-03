@@ -40,7 +40,11 @@ why the behaviour is consistent across synchronous, parallel, and async runs.
 
 When a {class}`~pipefunc.PipeFunc` fails, it stores an
 {class}`~pipefunc.ErrorSnapshot` on the callable itself and on the owning
-pipeline.
+pipeline. The attribute reflects the most recent failure on that
+{class}`PipeFunc`. When multiple errors occur (for example in threaded or
+process-based executors) each failing invocation also returns its own snapshot,
+so the per-element objects in the result record the correct kwargs and
+exceptions even if the shared attribute is overwritten by later failures.
 
 ```{code-cell} ipython3
 from pipefunc import Pipeline, pipefunc
