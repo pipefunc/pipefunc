@@ -28,7 +28,6 @@ def pytest_all_deps(session: nox.Session) -> None:
             "adaptive",
             "autodoc",
             "cli",
-            "mcp",
             "pandas",
             "polars",
             "plotting",
@@ -38,7 +37,8 @@ def pytest_all_deps(session: nox.Session) -> None:
             "widgets",
             "xarray",
             # Currently, all work except:
-            # "zarr",
+            # "mcp",  # because 'fastmcp' -> 'cryptography'
+            # "zarr",  # because 'numcodecs' -> 'cryptography'
         ]
         session.install(f".[test,{','.join(extras)}]")
     else:
