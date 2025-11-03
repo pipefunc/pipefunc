@@ -186,18 +186,16 @@ class ZarrFileArray(StorageBase):
 
         self.object_codec = object_codec if object_codec is not None else CloudPickleCodec()
         self.shape = tuple(shape)
-        self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(self.shape)
+        self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
 
         raw_chunks = select_by_mask(self.shape_mask, (1,) * len(self.shape), self.internal_shape)
         chunks: tuple[int, ...] = tuple(int(value) for value in raw_chunks)
 
-        full_shape_raw = self.full_shape
-        full_shape: tuple[int, ...] = tuple(int(value) for value in full_shape_raw)
         self.array = _open_or_create_array(
             self.store,
             name="array",
-            shape=full_shape,
+            shape=self.full_shape,
             chunks=chunks,
             dtype=VariableLengthBytes(),
             fill_value=_FILL_VALUE,
