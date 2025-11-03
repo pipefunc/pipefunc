@@ -141,8 +141,8 @@ def _copy_store(source: Store, destination: Store, *, if_exists: str = "replace"
         raise ValueError(msg)
 
     async def _copy() -> None:
-        await source._open()
-        await destination._open()
+        await source._ensure_open()
+        await destination._ensure_open()
         prototype = default_buffer_prototype()
 
         async for key in source.list():
