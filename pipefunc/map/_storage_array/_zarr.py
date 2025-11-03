@@ -1,4 +1,4 @@
-"""Provides `zarr` integration for `pipefunc` (Zarr v3 only)."""
+"""Provides `zarr` integration for `pipefunc`."""
 
 from __future__ import annotations
 
@@ -26,6 +26,8 @@ except ImportError:  # pragma: no cover - fallback for pre-3.1
     from zarr.core.dtype import VariableLengthBytes  # type: ignore[attr-defined]
 
 from zarr.storage import LocalStore, MemoryStore
+
+from pipefunc._utils import prod
 
 from ._base import StorageBase, register_storage, select_by_mask
 
@@ -146,7 +148,10 @@ def _copy_store(source: Store, destination: Store, *, if_exists: str = "replace"
 
 
 class ZarrFileArray(StorageBase):
-    """Array interface to a Zarr store."""
+    """Array interface to a Zarr store.
+
+    Only exists if the `zarr` package is installed!
+    """
 
     storage_id = "zarr_file_array"
     requires_serialization = True
@@ -216,6 +221,16 @@ class ZarrFileArray(StorageBase):
             f"store={self.store}, "
             f"object_codec={self.object_codec})"
         )
+
+    @property
+    def size(self) -> int:
+        """Return number of elements in the array."""
+        return prod(self.resolved_shape)
+
+    @property
+    def rank(self) -> int:
+        """Return the rank of the array."""
+        return len(self.resolved_shape)
 
     def get_from_index(self, index: int) -> Any:
         """Return the data associated with the given linear index."""
@@ -307,7 +322,14 @@ class ZarrFileArray(StorageBase):
         return list(self._mask[:].flat)
 
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None:
-        """Dump ``value`` into the location associated with ``key``."""
+        """Dump ``value`` into the location associated with ``key``.
+
+        Examples
+        --------
+        >>> arr = ZarrFileArray(...)
+        >>> arr.dump((2, 1, 5), dict(a=1, b=2))
+
+        """
         if any(isinstance(k, slice) for k in key):
             for external_index in itertools.product(*self._slice_indices(key)):
                 if self.internal_shape:
@@ -384,7 +406,10 @@ class _SharedDictStore(MemoryStore):
 
 
 class ZarrMemoryArray(ZarrFileArray):
-    """Array interface to an in-memory Zarr store."""
+    """Array interface to an in-memory Zarr store.
+
+    Only exists if the `zarr` package is installed!
+    """
 
     storage_id = "zarr_memory"
     requires_serialization = False
@@ -442,7 +467,10 @@ class ZarrMemoryArray(ZarrFileArray):
 
 
 class ZarrSharedMemoryArray(ZarrMemoryArray):
-    """Array interface to a shared memory Zarr store."""
+    """Array interface to a shared memory Zarr store.
+
+    Only exists if the `zarr` package is installed!
+    """
 
     storage_id = "zarr_shared_memory"
     requires_serialization = True
@@ -474,17 +502,38 @@ class ZarrSharedMemoryArray(ZarrMemoryArray):
 
 
 class CloudPickleCodec(Codec):
-    """Codec to encode data as cloudpickled bytes."""
+    """Codec to encode data as cloudpickled bytes.
+
+    Useful for encoding an array of Python objects.
+
+    Parameters
+    ----------
+    protocol
+        The protocol used to pickle data.
+
+    Examples
+    --------
+    >>> from pipefunc.map._storage_array._zarr import CloudPickleCodec
+    >>> import numpy as np
+    >>> x = np.array(['foo', 'bar', 'baz'], dtype='object')
+    >>> f = CloudPickleCodec()
+    >>> f.decode(f.encode(x))
+    array(['foo', 'bar', 'baz'], dtype=object)
+
+    """
 
     codec_id = "cloudpickle"
 
     def __init__(self, protocol: int = cloudpickle.DEFAULT_PROTOCOL) -> None:
+        """Initialize the CloudPickleCodec codec."""
         self.protocol = protocol
 
     def encode(self, buf: Any) -> bytes:
+        """Encode the input buffer using CloudPickleCodec."""
         return cloudpickle.dumps(buf, protocol=self.protocol)
 
     def decode(self, buf: np.ndarray, out: np.ndarray | None = None) -> Any:
+        """Decode the input buffer using CloudPickleCodec."""
         buf = ensure_contiguous_ndarray(buf)
         dec = cloudpickle.loads(buf)
 
@@ -494,9 +543,11 @@ class CloudPickleCodec(Codec):
         return dec
 
     def get_config(self) -> dict[str, Any]:
+        """Get the configuration of the codec."""
         return {"id": self.codec_id, "protocol": self.protocol}
 
     def __repr__(self) -> str:
+        """Return a string representation of the codec."""
         return f"CloudPickleCodec(protocol={self.protocol})"
 
 
