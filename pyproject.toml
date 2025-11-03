@@ -5,7 +5,7 @@ requires = ["hatchling", "versioningit"]
 [project]
 name = "pipefunc"
 description = "A Python library for defining, managing, and executing function pipelines."
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dynamic = ["version"]
 maintainers = [{ name = "Bas Nijholt", email = "bas@nijho.lt" }]
 license = { text = "MIT" }
@@ -40,7 +40,7 @@ pydantic = ["pydantic"]
 rich = ["rich"]
 widgets = ["graphviz-anywidget>=0.7.0", "ipywidgets"]
 xarray = ["xarray"]
-zarr = ["zarr", "numcodecs"]
+zarr = ["zarr>=3,<4", "numcodecs"]
 test = [
     "coverage",
     "pytest-asyncio",
@@ -99,7 +99,7 @@ extras = [
     "rich",
     "rich-argparse",
     "xarray",
-    "zarr>=2,<3",
+    "zarr>=3,<4",
 ]
 
 [project.urls]

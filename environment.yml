@@ -36,7 +36,7 @@ dependencies:
   - graphviz-anywidget>=0.7.0
   - ipywidgets
   # optional-dependencies: zarr
-  - zarr
+  - zarr>=3,<4
   - numcodecs
   # optional-dependencies: test
   - coverage
