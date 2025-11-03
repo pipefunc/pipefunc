@@ -20,6 +20,6 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
       - name: Run pytest (minimal)
-        run: uvx nox -e pytest_min_deps-${{ matrix.python-version }}
+        run: uvx nox -e pytest_min_deps-${{ matrix.python-version }} -v
       - name: Run pytest (all dependencies)
-        run: uvx nox -e pytest_all_deps-${{ matrix.python-version }}
+        run: uvx nox -e pytest_all_deps-${{ matrix.python-version }} -v
