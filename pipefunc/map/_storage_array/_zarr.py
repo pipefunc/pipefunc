@@ -525,15 +525,46 @@ class CloudPickleCodec(Codec):
     codec_id = "cloudpickle"
 
     def __init__(self, protocol: int = cloudpickle.DEFAULT_PROTOCOL) -> None:
-        """Initialize the CloudPickleCodec codec."""
+        """Initialize the CloudPickleCodec codec.
+
+        Parameters
+        ----------
+        protocol
+            The protocol used to pickle data, by default `cloudpickle.DEFAULT_PROTOCOL`
+
+        """
         self.protocol = protocol
 
     def encode(self, buf: Any) -> bytes:
-        """Encode the input buffer using CloudPickleCodec."""
+        """Encode the input buffer using CloudPickleCodec.
+
+        Parameters
+        ----------
+        buf
+            The input buffer to encode.
+
+        Returns
+        -------
+            The cloudpickled data.
+
+        """
         return cloudpickle.dumps(buf, protocol=self.protocol)
 
     def decode(self, buf: np.ndarray, out: np.ndarray | None = None) -> Any:
-        """Decode the input buffer using CloudPickleCodec."""
+        """Decode the input buffer using CloudPickleCodec.
+
+        Parameters
+        ----------
+        buf
+            The cloudpickled data.
+        out
+            The output array to store the decoded data, by default None
+
+        Returns
+        -------
+            The decoded data.
+
+        """
         buf = ensure_contiguous_ndarray(buf)
         dec = cloudpickle.loads(buf)
 
@@ -543,7 +574,13 @@ class CloudPickleCodec(Codec):
         return dec
 
     def get_config(self) -> dict[str, Any]:
-        """Get the configuration of the codec."""
+        """Get the configuration of the codec.
+
+        Returns
+        -------
+            The configuration of the codec.
+
+        """
         return {"id": self.codec_id, "protocol": self.protocol}
 
     def __repr__(self) -> str:
