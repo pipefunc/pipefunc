@@ -29,7 +29,6 @@ def pytest_all_deps(session: nox.Session) -> None:
             "autodoc",
             "cli",
             "pandas",
-            "polars",
             "plotting",
             "profiling",
             "pydantic",
@@ -37,6 +36,7 @@ def pytest_all_deps(session: nox.Session) -> None:
             "widgets",
             "xarray",
             # Currently, all work except:
+            # "polars",  # because polars-runtime-32 compiling takes too long
             # "mcp",  # because 'fastmcp' -> 'cryptography'
             # "zarr",  # because 'numcodecs' -> 'cryptography'
         ]
