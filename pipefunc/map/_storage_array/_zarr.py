@@ -90,10 +90,16 @@ def _decode_scalar(codec: CloudPickleCodec, value: Any) -> Any:
     """
     if isinstance(value, np.ndarray) and value.shape == ():
         value = value.item()
-    if isinstance(value, (bytes, bytearray, np.bytes_)):
-        buffer = np.frombuffer(value, dtype="uint8")
-        return codec.decode(buffer)
-    return value
+    assert isinstance(value, (bytes, bytearray, np.bytes_))
+    buffer = np.frombuffer(value, dtype="uint8")
+    return codec.decode(buffer)
+
+
+def _decode_array(codec: CloudPickleCodec, value: np.ndarray) -> np.ndarray:
+    decoded = np.empty(value.shape, dtype=object)
+    for idx in np.ndindex(value.shape):
+        decoded[idx] = _decode_scalar(codec, value[idx])
+    return decoded
 
 
 def _decode_with_mask(
@@ -591,16 +597,6 @@ class CloudPickleCodec(Codec):
     def __repr__(self) -> str:
         """Return a string representation of the codec."""
         return f"CloudPickleCodec(protocol={self.protocol})"
-
-
-def _decode_array(
-    codec: CloudPickleCodec,
-    value: np.ndarray,
-) -> np.ndarray:
-    decoded = np.empty(value.shape, dtype=object)
-    for idx in np.ndindex(value.shape):
-        decoded[idx] = _decode_scalar(codec, value[idx])
-    return decoded
 
 
 register_codec(CloudPickleCodec)

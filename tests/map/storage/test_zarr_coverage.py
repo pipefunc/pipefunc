@@ -257,17 +257,3 @@ def test_zarr_shared_memory_array_dump_in_subprocess():
 
     arr = ZarrSharedMemoryArray(None, shape=(2, 2))
     assert arr.dump_in_subprocess is True
-
-
-# Lines 89, 97: Test _decode_scalar edge cases by manipulating internal data
-def test_decode_scalar_edge_cases():
-    """Test _decode_scalar with memoryview and non-bytes values."""
-    from pipefunc.map._storage_array._zarr import CloudPickleCodec, _decode_scalar
-
-    codec = CloudPickleCodec()
-
-    # Line 97: non-bytes value case (pass through values that aren't bytes)
-    # This happens when the value is already decoded or is not in bytes format
-    plain_value = 123
-    result = _decode_scalar(codec, plain_value)
-    assert result == 123
