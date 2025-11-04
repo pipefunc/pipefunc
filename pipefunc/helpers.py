@@ -27,11 +27,11 @@ if TYPE_CHECKING:
 __all__ = [
     "FileArray",  # To keep in the same namespace as FileValue
     "FileValue",
+    "chain",
     "collect_kwargs",
     "gather_maps",
     "get_attribute_factory",
     "launch_maps",
-    "linear_chain",
 ]
 
 
@@ -383,7 +383,7 @@ def launch_maps(
     return asyncio.create_task(coro)
 
 
-def linear_chain(
+def chain(
     functions: Sequence[PipeFunc | Callable],
     *,
     copy: bool = True,
@@ -420,7 +420,7 @@ def linear_chain(
     from pipefunc import PipeFunc as _PipeFunc  # local import to avoid cyclic in typing
 
     if not functions:
-        msg = "linear_chain requires at least one function"
+        msg = "chain requires at least one function"
         raise ValueError(msg)
 
     # Normalize to PipeFunc instances
@@ -462,7 +462,7 @@ def linear_chain(
         if first_param in downstream.bound:
             upstream_out = upstream_outputs[0]
             msg = (
-                f"linear_chain: First parameter '{first_param}' of {downstream.output_name} is bound.\n"
+                f"chain: First parameter '{first_param}' of {downstream.output_name} is bound.\n"
                 f"Solution: Either reorder parameters to put the data-flow parameter first,\n"
                 f"or rename a parameter to '{upstream_out}' to create an explicit match."
             )

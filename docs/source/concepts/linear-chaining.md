@@ -9,13 +9,13 @@ jupytext:
 
 # Linear Chaining Helper
 
-`pipefunc.helpers.linear_chain` connects functions linearly so the output of one becomes the input of the next.
+`pipefunc.helpers.chain` connects functions linearly so the output of one becomes the input of the next.
 
 ```{code-cell} ipython3
 import numpy as np
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc.helpers import linear_chain
+from pipefunc.helpers import chain
 
 @pipefunc("to_float")
 def to_float(img: np.ndarray) -> np.ndarray:
@@ -35,7 +35,7 @@ def gamma(img: np.ndarray, g: float = 2.2) -> np.ndarray:
 def threshold(img: np.ndarray, t: float = 0.5) -> np.ndarray:
     return (img > t).astype(np.float32)
 
-chain = linear_chain(
+chain = chain(
     [
         to_float,
         gamma,
@@ -70,5 +70,5 @@ def split(x: int) -> tuple[int, int]:
 def sink_b(b: int) -> int:  # parameter 'b' matches second output
     return b
 
-Pipeline(linear_chain([split, sink_b])).run("sink_b", kwargs={"x": 7})  # -> 70
+Pipeline(chain([split, sink_b])).run("sink_b", kwargs={"x": 7})  # -> 70
 ```
