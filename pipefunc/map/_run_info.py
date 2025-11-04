@@ -281,7 +281,7 @@ def _legacy_fix(data: dict, run_folder: Path) -> None:
 
     Error handling (#854)
     ---------------------
-    The ``error_handling`` field was introduced in v0.88.0. Older
+    The ``error_handling`` field was introduced in v0.89.0. Older
     ``run_info.json`` files omit it, so we inject the default value to keep
     ``RunInfo.load`` backward compatible.
 
@@ -295,7 +295,7 @@ def _legacy_fix(data: dict, run_folder: Path) -> None:
     """
     stored_run_folder = data["run_folder"]
 
-    # ``error_handling`` was introduced in v0.88.0; older run_info.json files lack it
+    # ``error_handling`` was introduced in v0.89.0; older run_info.json files lack it
     # which would otherwise cause RunInfo(**data) to raise.
     data.setdefault("error_handling", "raise")
 
