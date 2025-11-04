@@ -18,13 +18,8 @@ from zarr.abc.store import Store
 from zarr.api import synchronous as zs
 from zarr.core.buffer.core import default_buffer_prototype
 from zarr.core.sync import sync
+from zarr.dtype import VariableLengthBytes
 from zarr.errors import ArrayNotFoundError, UnstableSpecificationWarning
-
-try:  # pragma: no cover - import location changed in early v3 builds
-    from zarr.dtype import VariableLengthBytes
-except ImportError:  # pragma: no cover - fallback for pre-3.1
-    from zarr.core.dtype import VariableLengthBytes  # type: ignore[attr-defined]
-
 from zarr.storage import LocalStore, MemoryStore
 
 from pipefunc._utils import prod
