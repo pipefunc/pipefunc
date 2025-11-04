@@ -72,17 +72,3 @@ def sink_b(b: int) -> int:  # parameter 'b' matches second output
 
 Pipeline(linear_chain([split, sink_b])).run("sink_b", kwargs={"x": 7})  # -> 70
 ```
-
-## Bound parameters
-
-When using bound parameters, put the data-flow parameter first:
-
-```{code-cell} ipython3
-@pipefunc("m1")
-def f1(src: int) -> int: return src + 1
-
-@pipefunc("m2", bound={"skip": 1})
-def f2(real_input: int, skip: int) -> int: return real_input + skip
-
-Pipeline(linear_chain([f1, f2])).run("m2", kwargs={"src": 10})  # -> 12
-```
