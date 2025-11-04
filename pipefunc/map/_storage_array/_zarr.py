@@ -35,10 +35,6 @@ if TYPE_CHECKING:
     from pipefunc.map._types import ShapeTuple
 
 
-# Zarr emits an "Unstable specification" warning for VariableLengthBytes. We rely on it
-# intentionally, so silence that chatter for end users.
-warnings.filterwarnings("ignore", category=UnstableSpecificationWarning)
-
 _FILL_VALUE = b""
 
 
@@ -52,23 +48,29 @@ def _open_or_create_array(
     fill_value: Any,
 ) -> zarr.Array:
     """Open an array if it exists, otherwise create it."""
-    try:
-        array = zs.open_array(store=store, path=name)
-    except ArrayNotFoundError:
-        array = zs.create_array(
-            store=store,
-            name=name,
-            shape=shape,
-            dtype=dtype,
-            chunks=chunks,
-            fill_value=fill_value,
-            overwrite=False,
-        )
-    else:
-        if array.shape != shape:
-            msg = f"Existing array '{name}' has unexpected shape {array.shape}, expected {shape}."
-            raise ValueError(msg)
-    return array
+    # Suppress Zarr's UnstableSpecificationWarning for VariableLengthBytes
+    # We rely on it intentionally despite it being marked as unstable
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UnstableSpecificationWarning)
+        try:
+            array = zs.open_array(store=store, path=name)
+        except ArrayNotFoundError:
+            array = zs.create_array(
+                store=store,
+                name=name,
+                shape=shape,
+                dtype=dtype,
+                chunks=chunks,
+                fill_value=fill_value,
+                overwrite=False,
+            )
+        else:
+            if array.shape != shape:
+                msg = (
+                    f"Existing array '{name}' has unexpected shape {array.shape}, expected {shape}."
+                )
+                raise ValueError(msg)
+        return array
 
 
 def _encode_scalar(codec: CloudPickleCodec, value: Any) -> bytes:
