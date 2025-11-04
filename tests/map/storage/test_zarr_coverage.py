@@ -73,54 +73,6 @@ def test_decode_non_bytes():
     assert list(arr[1]) == [1, 2, 3]
 
 
-# Lines 126-127: Invalid if_exists parameter
-def test_copy_store_invalid_if_exists(tmp_path: Path):
-    """Test _copy_store with invalid if_exists parameter."""
-    from zarr.storage import LocalStore
-
-    from pipefunc.map._storage_array._zarr import _copy_store
-
-    source = LocalStore(str(tmp_path / "source"))
-    dest = LocalStore(str(tmp_path / "dest"))
-
-    with pytest.raises(ValueError, match="if_exists must be 'raise', 'replace', or 'skip'"):
-        _copy_store(source, dest, if_exists="invalid")
-
-
-# Lines 137, 139-140: Test if_exists modes in _copy_store
-def test_copy_store_if_exists_modes(tmp_path: Path):
-    """Test different if_exists modes in persist/load."""
-    # Create a ZarrMemoryArray with folder
-    arr = ZarrMemoryArray(tmp_path, shape=(2, 2))
-    arr.dump((0, 0), {"initial": 1})
-    arr.persist()
-
-    # Modify in-memory
-    arr.dump((1, 1), {"modified": 2})
-
-    # Create another array and load - tests skip and replace modes
-    arr2 = ZarrMemoryArray(tmp_path, shape=(2, 2))
-    assert arr2[0, 0] == {"initial": 1}
-
-    # Test if_exists="raise" by directly calling _copy_store
-    from zarr.storage import LocalStore, MemoryStore
-
-    from pipefunc.map._storage_array._zarr import _copy_store
-
-    source = LocalStore(str(tmp_path))
-    dest = MemoryStore()
-
-    # First copy succeeds
-    _copy_store(source, dest, if_exists="replace")
-
-    # Second copy with if_exists="raise" should fail
-    with pytest.raises(ValueError, match="already exists in destination store"):
-        _copy_store(source, dest, if_exists="raise")
-
-    # if_exists="skip" should not raise
-    _copy_store(source, dest, if_exists="skip")
-
-
 # Lines 181-182: Neither store nor folder provided
 def test_no_store_or_folder():
     """Test error when neither store nor folder is provided."""

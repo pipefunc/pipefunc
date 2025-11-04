@@ -117,11 +117,11 @@ def _decode_with_mask(
     return decoded, mask_array
 
 
-def _copy_store(source: Store, destination: Store, *, if_exists: str = "replace") -> None:
-    """Copy all keys from ``source`` into ``destination`` using the async Store API."""
-    if if_exists not in {"raise", "replace", "skip"}:
-        msg = "if_exists must be 'raise', 'replace', or 'skip'"
-        raise ValueError(msg)
+def _copy_store(source: Store, destination: Store) -> None:
+    """Copy all keys from ``source`` into ``destination`` using the async Store API.
+
+    Always overwrites existing keys in the destination ("replace" semantics).
+    """
 
     async def _copy() -> None:
         await source._ensure_open()
@@ -130,11 +130,6 @@ def _copy_store(source: Store, destination: Store, *, if_exists: str = "replace"
 
         async for key in source.list():
             exists = await destination.exists(key)
-            if exists and if_exists == "skip":
-                continue
-            if exists and if_exists == "raise":
-                msg = f"Key {key!r} already exists in destination store"
-                raise ValueError(msg)
             if exists and destination.supports_deletes:
                 await destination.delete(key)
             buffer = await source.get(key, prototype=prototype)
@@ -462,7 +457,7 @@ class ZarrMemoryArray(ZarrFileArray):
         persistent = self.persistent_store
         if persistent is None:
             return
-        _copy_store(self.store, persistent, if_exists="replace")
+        _copy_store(self.store, persistent)
 
     def load(self) -> None:
         """Load the memory storage from disk."""
@@ -472,7 +467,7 @@ class ZarrMemoryArray(ZarrFileArray):
         folder = self.folder
         if folder is None or not folder.exists():  # pragma: no cover
             return
-        _copy_store(persistent, self.store, if_exists="replace")
+        _copy_store(persistent, self.store)
 
     @property
     def dump_in_subprocess(self) -> bool:
