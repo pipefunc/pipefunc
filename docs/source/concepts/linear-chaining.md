@@ -9,7 +9,8 @@ jupytext:
 
 # Linear Chaining Helper
 
-`pipefunc.helpers.linear_chain` connects a list of functions linearly by applying minimal renames so “output of one becomes input of the next.” It only renames arguments where needed; it doesn’t change how your functions compute or how batching works.
+`pipefunc.helpers.linear_chain` connects a list of functions linearly by applying minimal renames so “output of one becomes input of the next.”
+It only renames arguments where needed; it doesn’t change how your functions compute or how batching works.
 
 Use it to compose simple array→array transforms: keep a small toolbox of transforms and pick any subset (in any order) at runtime.
 
@@ -55,9 +56,9 @@ out = pipe.run("output", kwargs={"img": img, "t": 0.4})
 out.shape, out.dtype
 ```
 
-## Multi-output upstream
+## Multi-output functions
 
-`linear_chain` prefers existing matches. If a downstream parameter that is *not bound* matches any upstream output name, that output is used. Otherwise, it renames the first free downstream parameter to the upstream output name. If the only matching parameter is bound, `linear_chain` raises a `ValueError` so you can resolve the collision explicitly.
+To select a specific output, name your parameter to match it:
 
 ```{code-cell} ipython3
 @pipefunc(("a", "b"))
@@ -65,39 +66,33 @@ def split(x: int) -> tuple[int, int]:
     return x, 10 * x
 
 @pipefunc("sink_b")
-def sink_b(b: int) -> int:  # matches second output name
+def sink_b(b: int) -> int:  # parameter 'b' matches second output
     return b
 
-# Uses "b" via the matching parameter name
 Pipeline(linear_chain([split, sink_b])).run("sink_b", kwargs={"x": 7})  # -> 70
 ```
 
-## Bound parameters are skipped
+## Bound parameters
 
-`linear_chain` auto-selects the first non-bound parameter as the main input by renaming that downstream parameter when needed. If all matching parameters are bound, it raises an error instead of guessing.
+When using bound parameters, put the data-flow parameter first:
 
 ```{code-cell} ipython3
 @pipefunc("m1")
 def f1(src: int) -> int: return src + 1
 
 @pipefunc("m2", bound={"skip": 1})
-def f2(skip: int, real_input: int) -> int: return real_input + skip
+def f2(real_input: int, skip: int) -> int: return real_input + skip
 
 Pipeline(linear_chain([f1, f2])).run("m2", kwargs={"src": 10})  # -> 12
 ```
 
-## Controlling which output to use
+## How it works
 
-To use a specific upstream output, name the downstream parameter accordingly (or pre-rename the downstream `PipeFunc`).
+- Parameter name matches upstream output → uses that match
+- Otherwise → renames first parameter to upstream output
+- Plain callables auto-wrap as `PipeFunc` with `output_name=f.__name__`
+- `copy=True` (default) returns copies; `copy=False` modifies originals
 
-Behavior in a nutshell
-- Prefers matches: if an unbound downstream parameter matches an upstream output name, no rename.
-- Otherwise renames the first non‑bound downstream parameter; if only bound parameters match, a `ValueError` prompts you to rename things manually.
-- Works with multi‑output: match by name (or pre‑rename the downstream `PipeFunc`).
-- No `mapspec` changes. For batches, either vectorize over the batch dimension or declare `mapspec` on the functions themselves.
-- Plain callables auto‑wrap as `PipeFunc` with `output_name=f.__name__`.
-- `copy=True` returns copies; set `copy=False` to modify originals.
-
-### Batches of arrays
+## Batches of arrays
 
 For a batch of arrays, either make each transform vectorized over the batch dimension or use `mapspec` on your functions to define element-wise mapping (e.g., `"img[i] -> out[i]"`). `linear_chain` intentionally does not set or change `mapspec`; declare it on your `@pipefunc(...)` where needed.

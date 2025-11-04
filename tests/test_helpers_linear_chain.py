@@ -79,16 +79,26 @@ def test_linear_chain_multi_output_match_by_name() -> None:
 
 @pipefunc(output_name="m2c", bound={"skip": 1})
 def f2c(skip: int, real_input: int) -> int:
-    # First parameter is bound; chaining should choose 'real_input'
+    # First parameter is bound; linear_chain should raise an error
     return real_input + skip
 
 
-def test_linear_chain_skips_bound_parameter() -> None:
-    chained = linear_chain([f1, f2c])
+def test_linear_chain_rejects_bound_first_parameter() -> None:
+    # When first parameter is bound and there's no explicit match, should raise
+    with pytest.raises(ValueError, match="First parameter 'skip'.*is bound"):
+        linear_chain([f1, f2c])
+
+
+def test_linear_chain_bound_first_param_with_explicit_match() -> None:
+    # But if there's an explicit name match, it should work
+    @pipefunc(output_name="m2e", bound={"config": 1})
+    def f2e(config: int, m1: int) -> int:  # m1 matches upstream output
+        return m1 + config
+
+    chained = linear_chain([f1, f2e])
     pipeline = Pipeline(cast("list[Any]", chained))
-    # root args: f1.src (input) only, since f2c.skip is bound and real_input is fed from f1.m1
-    assert set(pipeline.root_args()) == {"src"}
-    assert pipeline.run("m2c", kwargs={"src": 10}) == (10 + 1) + 1
+    # Should work because 'm1' explicitly matches the upstream output name
+    assert pipeline.run("m2e", kwargs={"src": 10}) == (10 + 1) + 1
 
 
 def test_linear_chain_raises_on_zero_param_middle() -> None:
@@ -130,7 +140,9 @@ def test_linear_chain_bound_match_still_connects() -> None:
     def f2d(m1: int, value: int) -> int:
         return m1 + value
 
-    with pytest.raises(ValueError, match="bound to a fixed value"):
+    # Even if the bound parameter matches the upstream output name,
+    # we still reject it because the first parameter is bound
+    with pytest.raises(ValueError, match="First parameter 'm1'.*is bound"):
         linear_chain([f1, f2d])
 
 

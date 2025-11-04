@@ -390,8 +390,8 @@ def linear_chain(
 ) -> list[PipeFunc]:
     """Return a new list of PipeFuncs connected linearly by applying minimal renames.
 
-    The i+1-th function's chosen input parameter is renamed to the i-th function's
-    chosen output name. Other parameters (including additional inputs) are untouched.
+    The i+1-th function's first parameter is renamed to the i-th function's output name,
+    creating a linear data flow. Other parameters (including additional inputs) are untouched.
 
     Parameters
     ----------
@@ -411,8 +411,8 @@ def linear_chain(
     -----
     - If a downstream function already has an *unbound* parameter matching an upstream
       output name, no rename is applied (prefer existing matches).
-    - When no free matches exist, the upstream output is renamed to the first
-      non-bound downstream parameter so the data flows forward.
+    - When no explicit match exists, the first parameter is renamed to the upstream output.
+      The first parameter must not be bound; if it is, a ValueError is raised.
     - If a function has zero parameters (and is not the first in the chain), a ValueError
       is raised.
 
@@ -439,35 +439,38 @@ def linear_chain(
 
     # Apply renames to connect each pair
     upstream = pfs[0]
-    for i in range(1, len(pfs)):
-        downstream = pfs[i]
+    for downstream in pfs[1:]:
         upstream_outputs = at_least_tuple(upstream.output_name)
-        # Prefer existing matches among free parameters
         free_params = [p for p in downstream.parameters if p not in downstream.bound]
+
+        # Prefer existing matches among free parameters
         if any(name in free_params for name in upstream_outputs):
-            pass
-        else:
-            if not downstream.parameters:
-                msg = f"Function {downstream} has no parameters to receive upstream value."
-                raise ValueError(msg)
+            upstream = downstream
+            continue
 
-            target = next(iter(free_params), None)
-            if target is None:
-                msg = (
-                    f"All parameters of {downstream} are bound; cannot auto-select input parameter."
-                )
-                raise ValueError(msg)
+        # No explicit match - validate and rename first parameter
+        if not downstream.parameters:
+            msg = f"Function {downstream} has no parameters to receive upstream value."
+            raise ValueError(msg)
 
-            desired_name = upstream_outputs[0]
-            if desired_name in downstream.parameters and desired_name not in free_params:
-                msg = (
-                    f"Downstream function {downstream} has parameter '{desired_name}' bound to a fixed value, "
-                    "so linear_chain cannot automatically connect the upstream output. "
-                    "Rename it manually before calling linear_chain."
-                )
-                raise ValueError(msg)
+        if not free_params:
+            msg = f"All parameters of {downstream} are bound; cannot auto-select input parameter."
+            raise ValueError(msg)
 
-            downstream.update_renames({target: desired_name}, update_from="current")
+        # Require first parameter to be non-bound for auto-selection
+        first_param = downstream.parameters[0]
+        if first_param in downstream.bound:
+            upstream_out = upstream_outputs[0]
+            msg = (
+                f"linear_chain: First parameter '{first_param}' of {downstream.output_name} is bound.\n"
+                f"Solution: Either reorder parameters to put the data-flow parameter first,\n"
+                f"or rename a parameter to '{upstream_out}' to create an explicit match."
+            )
+            raise ValueError(msg)
+
+        # Rename first parameter to upstream output
+        desired_name = upstream_outputs[0]
+        downstream.update_renames({first_param: desired_name}, update_from="current")
 
         upstream = downstream
 
