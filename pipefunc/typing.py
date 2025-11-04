@@ -308,10 +308,14 @@ def safe_get_type_hints(
     memo = TypeCheckMemo(globals=_globals, locals=None)
     resolved_hints = {}
     for arg, hint in hints.items():
+        processed_hint = type(None) if hint is None else hint
         try:
-            resolved_hints[arg] = _resolve_type(hint, memo)
-        except (NameError, Exception):  # noqa: PERF203
-            resolved_hints[arg] = Unresolvable(str(hint))
+            resolved = _resolve_type(processed_hint, memo)
+            if resolved is None:
+                resolved = type(None)
+            resolved_hints[arg] = resolved
+        except (NameError, Exception):
+            resolved_hints[arg] = Unresolvable(str(processed_hint))
 
     return resolved_hints
 
