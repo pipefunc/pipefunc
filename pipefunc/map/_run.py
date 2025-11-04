@@ -828,7 +828,7 @@ def _try_shape(x: Any) -> tuple[int, ...]:
 
 
 @dataclass
-class _ErrorMarker:
+class ErrorStub:
     """Lightweight marker indicating an error occurred (for return_results=False).
 
     When return_results=False, we don't need the full ErrorSnapshot with its
@@ -841,6 +841,7 @@ class _ErrorMarker:
     is_propagated: bool  # True for PropagatedErrorSnapshot, False for ErrorSnapshot
 
 
+
 @dataclass
 class _InternalShape:
     shape: tuple[int, ...]
@@ -848,7 +849,7 @@ class _InternalShape:
     @classmethod
     def from_outputs(cls, outputs: tuple[Any]) -> tuple[Any, ...]:
         return tuple(
-            _ErrorMarker(is_propagated=isinstance(output, PropagatedErrorSnapshot))
+            ErrorStub(is_propagated=isinstance(output, PropagatedErrorSnapshot))
             if isinstance(output, (ErrorSnapshot, PropagatedErrorSnapshot))
             else cls(_try_shape(output))
             for output in outputs
@@ -856,10 +857,10 @@ class _InternalShape:
 
 
 def _entry_contains_error(entry: Any) -> bool:
-    if isinstance(entry, (ErrorSnapshot, PropagatedErrorSnapshot, _ErrorMarker)):
+    if isinstance(entry, (ErrorSnapshot, PropagatedErrorSnapshot, ErrorStub)):
         return True
     return any(
-        isinstance(value, (ErrorSnapshot, PropagatedErrorSnapshot, _ErrorMarker))
+        isinstance(value, (ErrorSnapshot, PropagatedErrorSnapshot, ErrorStub))
         for value in at_least_tuple(entry)
     )
 

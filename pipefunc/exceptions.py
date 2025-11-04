@@ -8,11 +8,14 @@ import os
 import platform
 import traceback
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import cloudpickle
 
 from pipefunc._utils import get_local_ip
+
+# Stable reason domain for propagated errors
+Reason = Literal["input_is_error", "array_contains_errors"]
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -119,25 +122,12 @@ class PropagatedErrorSnapshot:
 
     error_info: dict[str, ErrorInfo]  # parameter -> error details
     skipped_function: Callable[..., Any]
-    reason: str  # "input_is_error", "array_contains_errors", etc.
+    reason: Reason  # normalized reason label
     attempted_kwargs: dict[str, Any]  # kwargs that were not errors
     timestamp: str = field(default_factory=_timestamp)
     # No heavy payloads; root causes are only returned for "full" cases.
 
-    def get_root_causes(self) -> list[ErrorSnapshot]:
-        """Extract all original ErrorSnapshot objects."""
-        root_causes = []
-        for info in self.error_info.values():
-            if info.type == "full" and info.error is not None:
-                if isinstance(info.error, PropagatedErrorSnapshot):
-                    root_causes.extend(info.error.get_root_causes())
-                else:
-                    root_causes.append(info.error)
-            elif info.type == "partial":
-                # Would need to extract from the array
-                # For now, we don't store the full array, just metadata
-                pass
-        return root_causes
+    
 
     def __str__(self) -> str:
         """Return a string representation of the propagated error snapshot."""

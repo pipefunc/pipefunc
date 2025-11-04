@@ -48,23 +48,27 @@ def test_error_info_creation():
     assert error_info.error_count == count
 
 
-def test_create_propagated_error_default_reason():
-    """Test create_propagated_error with default reason (no errors)."""
-    # This tests the case where error_info is empty, triggering default_reason
-    error_info = {}
+def test_create_propagated_error_reason_selection():
+    """create_propagated_error picks canonical reason based on error_info."""
+    # Full error -> input_is_error
     func = lambda x: x * 2  # noqa: E731
-    kwargs = {"x": 5}
+    full_err = ErrorSnapshot(function=func, exception=ValueError("oops"), args=(), kwargs={})
+    err_info_full = {"x": ErrorInfo.from_full_error(full_err)}
+    propagated_full = create_propagated_error(err_info_full, func, {"x": 5})
+    assert propagated_full.reason == "input_is_error"
+    assert propagated_full.skipped_function == func
+    # attempted_kwargs excludes keys that are errors
+    assert propagated_full.attempted_kwargs == {}
 
-    propagated = create_propagated_error(
-        error_info,
-        func,
-        kwargs,
-        default_reason="custom_default",
-    )
-
-    assert propagated.reason == "custom_default"
-    assert propagated.skipped_function == func
-    assert propagated.attempted_kwargs == kwargs
+    # Partial error -> array_contains_errors
+    err_info_partial = {
+        "y": ErrorInfo.from_partial_error((3,), (np.array([1]),), 1),
+    }
+    propagated_partial = create_propagated_error(err_info_partial, func, {"y": np.array([1, 2, 3]), "q": 7})
+    assert propagated_partial.reason == "array_contains_errors"
+    assert propagated_partial.skipped_function == func
+    # attempted_kwargs keeps non-error kwargs
+    assert propagated_partial.attempted_kwargs == {"q": 7}
 
 
 def test_propagate_input_errors_with_raise_mode():

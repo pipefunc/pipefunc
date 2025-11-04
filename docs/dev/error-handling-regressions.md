@@ -37,14 +37,11 @@ after fixes. It serves as an anchor if the chat context is lost.
   errors; then have `get_root_causes()` resolve them.
 - Test: `test_get_root_causes_in_reduction_returns_upstream_errors` (added).
 
-## 3) Reason string consistency (polish, not a failing bug)
+## 3) Reason string consistency (addressed)
 
-- Today: reasons include `"input_is_error"`, `"array_contains_errors"`, and a
-  default `"input_contains_errors"` (rarely used in practice).
-- Risk: minor naming drift and extra value.
-- Suggestion: constrain to a small Literal/Enum and document.
-- No regression test added since current behavior is consistent; this is a
-  naming polish.
+- Now constrained to a small Literal domain: `{"input_is_error", "array_contains_errors"}`.
+- The legacy placeholder `"input_contains_errors"` is removed from internals.
+- Existing tests that assert specific reasons remain valid.
 
 ## 4) Container-recursive error scanning (enhancement, not a failing bug)
 
@@ -56,4 +53,3 @@ after fixes. It serves as an anchor if the chat context is lost.
   `PropagatedErrorSnapshot`.
 - Status: Design choice vs. convenience; not asserted by docs. No regression
   test added.
-

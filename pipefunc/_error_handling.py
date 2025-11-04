@@ -97,8 +97,6 @@ def create_propagated_error(
     error_info: dict[str, ErrorInfo],
     skipped_function: Callable[..., Any],
     kwargs: dict[str, Any],
-    *,
-    default_reason: str = "input_contains_errors",
 ) -> PropagatedErrorSnapshot:
     """Create a PropagatedErrorSnapshot from error information.
 
@@ -110,8 +108,6 @@ def create_propagated_error(
         The function that was skipped due to errors.
     kwargs
         All keyword arguments passed to the function.
-    default_reason
-        Default reason to use when not specified.
 
     Returns
     -------
@@ -121,10 +117,10 @@ def create_propagated_error(
     # Determine the reason based on error types
     if any(info.type == "full" for info in error_info.values()):
         reason = "input_is_error"
-    elif any(info.type == "partial" for info in error_info.values()):
-        reason = "array_contains_errors"
     else:
-        reason = default_reason
+        # At least one partial error must be present for propagation to occur
+        # (error_info is non-empty here). Normalize to the canonical name.
+        reason = "array_contains_errors"
 
     return PropagatedErrorSnapshot(
         error_info=error_info,
