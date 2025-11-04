@@ -7,7 +7,7 @@ jupytext:
     jupytext_version: 1.16.4
 ---
 
-# Linear Chaining Helper
+# Function Chaining Helper
 
 `pipefunc.helpers.chain` connects functions linearly so the output of one becomes the input of the next.
 

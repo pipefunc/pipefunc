@@ -15,7 +15,7 @@ Automatic CLI <cli>
 MCP Server Integration <mcp>
 SLURM integration <slurm>
 Resource Management <resource-management>
-Linear Chaining Helper <linear-chaining>
+Function Chaining Helper <chaining>
 Simplifying Pipelines <simplifying-pipelines>
 Adaptive integration <adaptive-integration>
 Testing <testing>
