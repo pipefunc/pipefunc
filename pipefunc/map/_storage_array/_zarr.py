@@ -71,10 +71,10 @@ def _open_or_create_array(
     return array
 
 
-def _encode_scalar(codec: CloudPickleCodec, value: Any) -> np.bytes_:
+def _encode_scalar(codec: CloudPickleCodec, value: Any) -> bytes:
     if isinstance(value, np.ndarray) and value.shape == ():
         value = value.item()
-    return np.bytes_(codec.encode(value))
+    return codec.encode(value)
 
 
 def _encode_array(codec: CloudPickleCodec, value: np.ndarray) -> np.ndarray:
@@ -377,7 +377,7 @@ class ZarrFileArray(StorageBase):
         """Indicates if the storage can be dumped in a subprocess."""
         return True
 
-    def _store_scalar_encoded(self, indices: tuple[int, ...], encoded: np.bytes_) -> None:
+    def _store_scalar_encoded(self, indices: tuple[int, ...], encoded: bytes) -> None:
         """Store a single serialized value at the provided indices."""
         normalized_indices = cast(
             "tuple[int, ...]",
