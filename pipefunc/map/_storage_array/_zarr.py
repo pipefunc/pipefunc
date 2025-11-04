@@ -129,9 +129,6 @@ def _copy_store(source: Store, destination: Store) -> None:
         prototype = default_buffer_prototype()
 
         async for key in source.list():
-            exists = await destination.exists(key)
-            if exists and destination.supports_deletes:
-                await destination.delete(key)
             buffer = await source.get(key, prototype=prototype)
             if buffer is not None:
                 await destination.set(key, buffer)
@@ -273,7 +270,10 @@ class ZarrFileArray(StorageBase):
         if decoded.shape == ():
             if mask_array.item():
                 return np.ma.masked
-            return self._normalize_decoded(decoded.item())
+            decoded_value = decoded.item()
+            if isinstance(decoded_value, list):
+                return np.array(decoded_value, dtype=object)
+            return decoded_value
         return np.ma.masked_array(decoded, mask=mask_array, dtype=object)
 
     def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray:
@@ -387,12 +387,6 @@ class ZarrFileArray(StorageBase):
         slice_key = tuple(slice(i, i + 1) for i in normalized_indices)
         shaped = np.array([encoded], dtype=object).reshape(*(1,) * len(indices))
         self.array[slice_key] = shaped
-
-    def _normalize_decoded(self, value: Any) -> Any:
-        """Normalize decoded values to match legacy behaviour."""
-        if isinstance(value, list):
-            return np.array(value, dtype=object)
-        return value
 
 
 class _SharedDictStore(MemoryStore):

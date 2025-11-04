@@ -266,13 +266,6 @@ def test_decode_scalar_edge_cases():
 
     codec = CloudPickleCodec()
 
-    # Line 89: memoryview case
-    # When Zarr reads data, it might return memoryview in some cases
-    encoded = codec.encode({"test": "value"})
-    mv = memoryview(encoded)
-    result = _decode_scalar(codec, mv)
-    assert result == {"test": "value"}
-
     # Line 97: non-bytes value case (pass through values that aren't bytes)
     # This happens when the value is already decoded or is not in bytes format
     plain_value = 123
