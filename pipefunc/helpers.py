@@ -11,7 +11,7 @@ from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pipefunc._utils import dump, is_running_in_ipynb, load, requires
+from pipefunc._utils import at_least_tuple, dump, is_running_in_ipynb, load, requires
 from pipefunc.map._storage_array._file import FileArray
 
 if TYPE_CHECKING:
@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
     from ipywidgets import Widget
 
+    from pipefunc import PipeFunc
     from pipefunc._widgets.output_tabs import OutputTabs
     from pipefunc.map._result import ResultDict
     from pipefunc.map._run import AsyncMap
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
 __all__ = [
     "FileArray",  # To keep in the same namespace as FileValue
     "FileValue",
+    "chain",
     "collect_kwargs",
     "gather_maps",
     "get_attribute_factory",
@@ -379,6 +381,100 @@ def launch_maps(
         _tabs=tabs,
     )
     return asyncio.create_task(coro)
+
+
+def chain(
+    functions: Sequence[PipeFunc | Callable],
+    *,
+    copy: bool = True,
+) -> list[PipeFunc]:
+    """Return a new list of PipeFuncs connected linearly by applying minimal renames.
+
+    The i+1-th function's first parameter is renamed to the i-th function's output name,
+    creating a linear data flow. Other parameters (including additional inputs) are untouched.
+
+    Parameters
+    ----------
+    functions
+        Sequence of PipeFuncs (or callables). Callables are wrapped as PipeFuncs with
+        ``output_name=f.__name__``.
+    copy
+        If True (default), return copies of the input PipeFuncs; original instances are
+        not modified.
+
+    Returns
+    -------
+    list[PipeFunc]
+        New PipeFunc objects with renames applied so the data flows linearly.
+
+    Notes
+    -----
+    - If a downstream function already has an *unbound* parameter matching an upstream
+      output name, no rename is applied (prefer existing matches).
+    - When no explicit match exists, the first parameter is renamed to the upstream output.
+      The first parameter must not be bound; if it is, a ValueError is raised.
+    - If a function has zero parameters (and is not the first in the chain), a ValueError
+      is raised.
+
+    """
+    from pipefunc import PipeFunc as _PipeFunc  # local import to avoid cyclic in typing
+
+    if not functions:
+        msg = "chain requires at least one function"
+        raise ValueError(msg)
+
+    # Normalize to PipeFunc instances
+    pfs: list[_PipeFunc] = []
+    for f in functions:
+        pf = (
+            f
+            if isinstance(f, _PipeFunc)
+            else _PipeFunc(f, output_name=getattr(f, "__name__", "output"))
+        )
+        pfs.append(pf.copy() if copy else pf)
+
+    # Nothing to connect if only one
+    if len(pfs) == 1:
+        return pfs
+
+    # Apply renames to connect each pair
+    upstream = pfs[0]
+    for downstream in pfs[1:]:
+        upstream_outputs = at_least_tuple(upstream.output_name)
+        free_params = [p for p in downstream.parameters if p not in downstream.bound]
+
+        # Prefer existing matches among free parameters
+        if any(name in free_params for name in upstream_outputs):
+            upstream = downstream
+            continue
+
+        # No explicit match - validate and rename first parameter
+        if not downstream.parameters:
+            msg = f"Function {downstream} has no parameters to receive upstream value."
+            raise ValueError(msg)
+
+        if not free_params:
+            msg = f"All parameters of {downstream} are bound; cannot auto-select input parameter."
+            raise ValueError(msg)
+
+        # Require first parameter to be non-bound for auto-selection
+        first_param = downstream.parameters[0]
+        if first_param in downstream.bound:
+            upstream_out = upstream_outputs[0]
+            msg = (
+                f"chain: First parameter '{first_param}' of {downstream.output_name} is bound.\n"
+                f"Solution: Either reorder parameters to put the data-flow parameter first,\n"
+                f"or rename a parameter to '{upstream_out}' to create an explicit match."
+            )
+            raise ValueError(msg)
+
+        # Rename first parameter to upstream output
+        desired_name = upstream_outputs[0]
+        downstream.update_renames({first_param: desired_name}, update_from="current")
+
+        upstream = downstream
+
+    return pfs
 
 
 def _validate_async_maps(async_maps: Sequence[AsyncMap]) -> None:
