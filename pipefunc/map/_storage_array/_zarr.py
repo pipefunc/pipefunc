@@ -182,7 +182,9 @@ class ZarrFileArray(StorageBase):
             assert root is not None
             self.store = LocalStore(str(root))
 
-        self.object_codec = object_codec if object_codec is not None else CloudPickleCodec()
+        self.object_codec = (
+            object_codec if object_codec is not None else CloudPickleCodec()
+        )  # Used for encoding and in __repr__
         self.shape = tuple(shape)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
@@ -399,20 +401,17 @@ class ZarrFileArray(StorageBase):
 
 
 class _SharedDictStore(MemoryStore):
-    """MemoryStore backed by a multiprocessing.Manager dictionary.
-
-    Parameters
-    ----------
-    shared_dict
-        Shared dictionary to use as the underlying storage, by default ``None``.
-        If ``None``, a new shared dictionary will be created.
-
-    """
+    """Custom Store subclass using a shared dictionary."""
 
     def __init__(self, shared_dict: multiprocessing.managers.DictProxy | None = None) -> None:
-        """Initialize the shared-memory-backed store.
+        """Initialize the _SharedDictStore.
 
-        See class docstring for a description of the parameters.
+        Parameters
+        ----------
+        shared_dict
+            Shared dictionary to use as the underlying storage, by default None
+            If None, a new shared dictionary will be created.
+
         """
         if shared_dict is None:
             shared_dict = multiprocessing.Manager().dict()
@@ -454,7 +453,7 @@ class ZarrMemoryArray(ZarrFileArray):
     @property
     def persistent_store(self) -> Store | None:
         """Return the persistent store."""
-        if self.folder is None:  # pragma: no cover - defensive
+        if self.folder is None:  # pragma: no cover
             return None
         return LocalStore(self.folder)
 
@@ -468,10 +467,10 @@ class ZarrMemoryArray(ZarrFileArray):
     def load(self) -> None:
         """Load the memory storage from disk."""
         persistent = self.persistent_store
-        if persistent is None:  # pragma: no cover - defensive
+        if persistent is None:  # pragma: no cover
             return
         folder = self.folder
-        if folder is None or not folder.exists():  # pragma: no cover - defensive
+        if folder is None or not folder.exists():  # pragma: no cover
             return
         _copy_store(persistent, self.store, if_exists="replace")
 
@@ -530,7 +529,7 @@ class CloudPickleCodec(Codec):
 
     Examples
     --------
-    >>> from pipefunc.map._storage_array._zarr import CloudPickleCodec
+    >>> from pipefunc.map._storage._zarr import CloudPickleCodec
     >>> import numpy as np
     >>> x = np.array(['foo', 'bar', 'baz'], dtype='object')
     >>> f = CloudPickleCodec()
