@@ -168,6 +168,7 @@ class ZarrFileArray(StorageBase):
         store: Store | str | Path | None = None,
         object_codec: Any = None,
     ) -> None:
+        """Initialize the ZarrFileArray."""
         if internal_shape and shape_mask is None:
             msg = "shape_mask must be provided if internal_shape is provided"
             raise ValueError(msg)
@@ -299,7 +300,7 @@ class ZarrFileArray(StorageBase):
         slc = select_by_mask(
             self.shape_mask,
             (slice(None),) * len(self.shape),
-            (None,) * len(self.internal_shape),
+            (None,) * len(self.internal_shape),  # Adds axes with size 1
         )
         tile_shape = select_by_mask(self.shape_mask, (1,) * len(self.shape), self.internal_shape)
         mask = np.tile(mask[slc], tile_shape)
@@ -318,7 +319,7 @@ class ZarrFileArray(StorageBase):
         return list(self._mask[:].flat)
 
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None:
-        """Dump ``value`` into the location associated with ``key``.
+        """Dump 'value' into the location associated with 'key'.
 
         Examples
         --------
@@ -329,7 +330,7 @@ class ZarrFileArray(StorageBase):
         if any(isinstance(k, slice) for k in key):
             for external_index in itertools.product(*self._slice_indices(key)):
                 if self.internal_shape:
-                    block = np.asarray(value, dtype=object)
+                    block = np.asarray(value, dtype=object)  # in case it's a list
                     if block.shape != self.internal_shape:
                         msg = "Value has incorrect internal_shape"
                         raise ValueError(msg)
@@ -347,7 +348,7 @@ class ZarrFileArray(StorageBase):
             return
 
         if self.internal_shape:
-            block = np.asarray(value, dtype=object)
+            block = np.asarray(value, dtype=object)  # in case it's a list
             if block.shape != self.internal_shape:
                 msg = "Value has incorrect internal_shape"
                 raise ValueError(msg)
@@ -376,7 +377,7 @@ class ZarrFileArray(StorageBase):
 
     @property
     def dump_in_subprocess(self) -> bool:
-        """Indicates if the storage can be dumped in a subprocess."""
+        """Indicates if the storage can be dumped in a subprocess and read by the main process."""
         return True
 
     def _store_scalar_encoded(self, indices: tuple[int, ...], encoded: bytes) -> None:
@@ -403,9 +404,21 @@ class ZarrFileArray(StorageBase):
 
 
 class _SharedDictStore(MemoryStore):
-    """MemoryStore backed by a multiprocessing.Manager dictionary."""
+    """MemoryStore backed by a multiprocessing.Manager dictionary.
+
+    Parameters
+    ----------
+    shared_dict
+        Shared dictionary to use as the underlying storage, by default ``None``.
+        If ``None``, a new shared dictionary will be created.
+
+    """
 
     def __init__(self, shared_dict: multiprocessing.managers.DictProxy | None = None) -> None:
+        """Initialize the shared-memory-backed store.
+
+        See class docstring for a description of the parameters.
+        """
         if shared_dict is None:
             shared_dict = multiprocessing.Manager().dict()
         super().__init__(store_dict=shared_dict)
@@ -430,6 +443,7 @@ class ZarrMemoryArray(ZarrFileArray):
         store: Store | None = None,
         object_codec: Any = None,
     ) -> None:
+        """Initialize the ZarrMemoryArray."""
         if store is None:
             store = MemoryStore()
         super().__init__(
@@ -491,6 +505,7 @@ class ZarrSharedMemoryArray(ZarrMemoryArray):
         store: Store | None = None,
         object_codec: Any = None,
     ) -> None:
+        """Initialize the ZarrSharedMemoryArray."""
         if store is None:
             store = _SharedDictStore()
         super().__init__(
@@ -504,6 +519,7 @@ class ZarrSharedMemoryArray(ZarrMemoryArray):
 
     @property
     def dump_in_subprocess(self) -> bool:
+        """Indicates if the storage can be dumped in a subprocess and read by the main process."""
         return True
 
 
