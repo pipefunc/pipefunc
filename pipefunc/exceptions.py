@@ -122,6 +122,7 @@ class PropagatedErrorSnapshot:
     reason: str  # "input_is_error", "array_contains_errors", etc.
     attempted_kwargs: dict[str, Any]  # kwargs that were not errors
     timestamp: str = field(default_factory=_timestamp)
+    # No heavy payloads; root causes are only returned for "full" cases.
 
     def get_root_causes(self) -> list[ErrorSnapshot]:
         """Extract all original ErrorSnapshot objects."""
@@ -219,3 +220,19 @@ class PropagatedErrorSnapshot:
                     error_count=info_dict.get("error_count"),
                 )
         return error_info
+
+    def get_root_causes(self) -> list[ErrorSnapshot]:
+        """Extract all original ErrorSnapshot objects (for full-error inputs).
+
+        For array-containing errors (reductions), this currently returns an
+        empty list. Downstream code can still rely on `reason` and
+        `error_info` metadata to understand which parameters contained errors.
+        """
+        root_causes: list[ErrorSnapshot] = []
+        for info in self.error_info.values():
+            if info.type == "full" and info.error is not None:
+                if isinstance(info.error, PropagatedErrorSnapshot):
+                    root_causes.extend(info.error.get_root_causes())
+                elif isinstance(info.error, ErrorSnapshot):
+                    root_causes.append(info.error)
+        return root_causes

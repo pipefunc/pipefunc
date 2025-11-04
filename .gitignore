@@ -122,3 +122,5 @@ docs/source/*run_folder*
 uv.lock
 docs/source/concepts/cli-example.py
 .code/
+runs/
+test/

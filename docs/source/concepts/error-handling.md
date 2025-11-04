@@ -166,3 +166,12 @@ async_outputs = results["y"].output
   contained errors and lets you walk back to the root causes.
 - The semantics are identical for sequential, threaded, process-based, and
   async execution so downstream code can rely on consistent error metadata.
+
+```{note}
+Reduction limitation: For reductions where a function receives an array that
+contains one or more errors (reason: `array_contains_errors`),
+{meth}`~pipefunc.PropagatedErrorSnapshot.get_root_causes` currently returns
+an empty list. Root-cause enumeration is only available when the upstream input
+parameter itself is a single error ("full" case). You can still use the
+`reason` and `error_info` metadata to detect which inputs contained errors.
+```

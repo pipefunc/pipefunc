@@ -756,13 +756,20 @@ def _get_or_set_cache(
     kwargs: dict[str, Any],
     cache: _CacheBase | None,
     compute_fn: Callable[[], Any],
+    error_handling: Literal["raise", "continue"],
 ) -> Any:
     if cache is None:
         return compute_fn()
-    cache_key = (func._cache_id, to_hashable(kwargs))
+    cache_key = (func._cache_id, error_handling, to_hashable(kwargs))
 
     if cache_key in cache:
-        return cache.get(cache_key)
+        val = cache.get(cache_key)
+        if isinstance(val, ErrorSnapshot) and error_handling != "continue":
+            # Respect fail‑loud semantics when running in raise mode, even if a
+            # previous continue-mode run cached an ErrorSnapshot for the same inputs.
+            handle_pipefunc_error(val.exception, func, kwargs, error_handling="raise")
+            # handle_pipefunc_error raises; the return below is unreachable.
+        return val
     if isinstance(cache, HybridCache):
         t = time.monotonic()
     result = compute_fn()
@@ -809,7 +816,7 @@ def _run_iteration(
                 return snapshot
             raise  # pragma: no cover
 
-    return _get_or_set_cache(func, selected, cache, compute_fn)
+    return _get_or_set_cache(func, selected, cache, compute_fn, error_handling)
 
 
 def _try_shape(x: Any) -> tuple[int, ...]:
@@ -1388,7 +1395,7 @@ def _execute_single(
             assert snapshot is not None
             return snapshot
 
-    return _get_or_set_cache(func, kwargs, cache, compute_fn)
+    return _get_or_set_cache(func, kwargs, cache, compute_fn, error_handling)
 
 
 def _load_data(kwargs: dict[str, Any]) -> None:
