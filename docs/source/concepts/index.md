@@ -11,11 +11,11 @@ Error Handling <error-handling>
 Type Checking <type-checking>
 Variants <variants>
 Caching <caching>
-Linear Chaining Helper <linear-chaining>
 Automatic CLI <cli>
 MCP Server Integration <mcp>
 SLURM integration <slurm>
 Resource Management <resource-management>
+Linear Chaining Helper <linear-chaining>
 Simplifying Pipelines <simplifying-pipelines>
 Adaptive integration <adaptive-integration>
 Testing <testing>
