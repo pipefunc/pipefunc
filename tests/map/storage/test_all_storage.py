@@ -38,7 +38,7 @@ def array_type(request, tmp_path: Path):
 
             from pipefunc.map import ZarrFileArray
 
-            store = zarr.MemoryStore()
+            store = zarr.storage.MemoryStore()
             return ZarrFileArray(None, shape, internal_shape, shape_mask, store=store)
     elif request.param == "dict":
 
@@ -78,6 +78,15 @@ def test_file_based_object_array_to_array(array_type: Callable[..., StorageBase]
     assert result[1, 2] == {"b": 2}
     assert result[0, 1] is np.ma.masked
     assert result[1, 0] is np.ma.masked
+
+
+def test_storage_array_dump_negative_indices(array_type: Callable[..., StorageBase]):
+    arr = array_type((2, 3))
+
+    arr.dump((-1, -1), {"z": 42})
+
+    assert arr[-1, -1] == {"z": 42}
+    assert arr[1, 2] == {"z": 42}
 
 
 def test_file_array_getitem_with_slicing(array_type: Callable[..., StorageBase]):

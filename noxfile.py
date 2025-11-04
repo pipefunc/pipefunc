@@ -36,7 +36,7 @@ def pytest_all_deps(session: nox.Session) -> None:
             "widgets",
             "xarray",
             # Currently, all work except:
-            # "polars",  # because polars-runtime-32 compiling takes too long
+            # "polars",  # because polars-runtime-32 compiling takes long and fails
             # "mcp",  # because 'fastmcp' -> 'cryptography'
             # "zarr",  # because 'numcodecs' -> 'cryptography'
         ]
