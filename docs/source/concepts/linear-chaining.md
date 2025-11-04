@@ -9,10 +9,7 @@ jupytext:
 
 # Linear Chaining Helper
 
-`pipefunc.helpers.linear_chain` connects a list of functions linearly by applying minimal renames so “output of one becomes input of the next.”
-It only renames arguments where needed; it doesn’t change how your functions compute or how batching works.
-
-Use it to compose simple array→array transforms: keep a small toolbox of transforms and pick any subset (in any order) at runtime.
+`pipefunc.helpers.linear_chain` connects functions linearly so the output of one becomes the input of the next.
 
 ```{code-cell} ipython3
 import numpy as np
@@ -38,8 +35,6 @@ def gamma(img: np.ndarray, g: float = 2.2) -> np.ndarray:
 def threshold(img: np.ndarray, t: float = 0.5) -> np.ndarray:
     return (img > t).astype(np.float32)
 
-# Choose any subset and order at runtime
-
 chain = linear_chain(
     [
         to_float,
@@ -56,9 +51,15 @@ out = pipe.run("output", kwargs={"img": img, "t": 0.4})
 out.shape, out.dtype
 ```
 
+## How it works
+
+- If a parameter name matches an upstream output, uses that match
+- Otherwise, renames the first parameter to the upstream output
+- Plain callables auto-wrap as `PipeFunc` with `output_name=f.__name__`
+
 ## Multi-output functions
 
-To select a specific output, name your parameter to match it:
+By default, the first output is used. To select a different output, name your parameter to match it:
 
 ```{code-cell} ipython3
 @pipefunc(("a", "b"))
@@ -85,14 +86,3 @@ def f2(real_input: int, skip: int) -> int: return real_input + skip
 
 Pipeline(linear_chain([f1, f2])).run("m2", kwargs={"src": 10})  # -> 12
 ```
-
-## How it works
-
-- Parameter name matches upstream output → uses that match
-- Otherwise → renames first parameter to upstream output
-- Plain callables auto-wrap as `PipeFunc` with `output_name=f.__name__`
-- `copy=True` (default) returns copies; `copy=False` modifies originals
-
-## Batches of arrays
-
-For a batch of arrays, either make each transform vectorized over the batch dimension or use `mapspec` on your functions to define element-wise mapping (e.g., `"img[i] -> out[i]"`). `linear_chain` intentionally does not set or change `mapspec`; declare it on your `@pipefunc(...)` where needed.
