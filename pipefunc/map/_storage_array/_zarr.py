@@ -241,12 +241,8 @@ class ZarrFileArray(StorageBase):
         if self._mask[np_index]:
             return np.ma.masked
         data = self.array[full_index]
-        if isinstance(data, np.ndarray):
-            return np.asarray(
-                _decode_array(self.object_codec, data),
-                dtype=object,
-            )
-        return self._normalize_decoded(_decode_scalar(self.object_codec, data))
+        # Zarr v3 always returns ndarray (even 0-d arrays)
+        return np.asarray(_decode_array(self.object_codec, data), dtype=object)
 
     def has_index(self, index: int) -> bool:
         """Return whether the given linear index exists."""
