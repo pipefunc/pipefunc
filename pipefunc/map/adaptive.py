@@ -214,8 +214,8 @@ def create_learners(
     return_output
         Whether to return the output of the function in the learner.
     cleanup
-        .. deprecated:: 0.XX.0
-            Use `reuse` parameter instead. Will be removed in version 0.YY.0.
+        .. deprecated:: 0.89.0
+            Use `reuse` parameter instead. Will be removed in version 1.0.0.
 
         Whether to clean up the ``run_folder`` before running the pipeline.
         When set, takes priority over ``reuse`` parameter.
@@ -492,8 +492,8 @@ def create_learners_from_sweep(
     parallel
         Whether to run the map in parallel.
     cleanup
-        .. deprecated:: 0.XX.0
-            Use `reuse` parameter instead. Will be removed in version 0.YY.0.
+        .. deprecated:: 0.89.0
+            Use `reuse` parameter instead. Will be removed in version 1.0.0.
 
         Whether to clean up the ``run_folder`` before running the pipeline.
         When set, takes priority over ``reuse`` parameter.

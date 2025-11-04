@@ -847,8 +847,8 @@ class Pipeline:
             Whether to write results to disk when memory based storage is used.
             Does not have any effect when file based storage is used.
         cleanup
-            .. deprecated:: 0.XX.0
-                Use `reuse` parameter instead. Will be removed in version 0.YY.0.
+            .. deprecated:: 0.89.0
+                Use `reuse` parameter instead. Will be removed in version 1.0.0.
 
             Whether to clean up the ``run_folder`` before running the pipeline.
             When set, takes priority over ``reuse`` parameter.
@@ -1045,8 +1045,8 @@ class Pipeline:
             Whether to write results to disk when memory based storage is used.
             Does not have any effect when file based storage is used.
         cleanup
-            .. deprecated:: 0.XX.0
-                Use `reuse` parameter instead. Will be removed in version 0.YY.0.
+            .. deprecated:: 0.89.0
+                Use `reuse` parameter instead. Will be removed in version 1.0.0.
 
             Whether to clean up the ``run_folder`` before running the pipeline.
             When set, takes priority over ``reuse`` parameter.
