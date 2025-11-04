@@ -23,7 +23,7 @@ directly from the terminal. The CLI is auto-generated based on your Pipeline's d
 allowing you to supply parameters interactively (via the `cli` subcommand), load them from a JSON file
 (via the `json` subcommand), or simply view the pipeline documentation (via the `docs` subcommand).
 Mapping options (prefixed with `--map-`) allow you to configure parallel execution, storage method,
-and cleanup behavior. In `cli` or `json` mode it runs `pipeline.map` with the provided inputs and
+and reuse behavior. In `cli` or `json` mode it runs `pipeline.map` with the provided inputs and
 mapping options.
 
 Usage Examples:
@@ -50,15 +50,15 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
     - ``docs``: Display the pipeline documentation (using `pipeline.print_documentation`).
 
     Mapping options (prefixed with `--map-`) are available for the `cli` and `json` subcommands to control
-    parallel execution, storage method, and cleanup behavior.
+    parallel execution, storage method, and reuse behavior.
 
     Usage Examples:
 
     **CLI mode:**
-        ``python cli-example.py cli --x 2 --y 3 --map-parallel false --map-cleanup true``
+        ``python cli-example.py cli --x 2 --y 3 --map-parallel false --map-reuse true``
 
     **JSON mode:**
-        ``python cli-example.py json --json-file inputs.json --map-parallel false --map-cleanup true``
+        ``python cli-example.py json --json-file inputs.json --map-parallel false --map-reuse true``
 
     **Docs mode:**
         ``python cli-example.py docs``
@@ -209,9 +209,10 @@ def _add_map_arguments(parser: argparse.ArgumentParser) -> None:
         "run_folder": "run_folder",
         "parallel": True,
         "storage": "file_array",
-        "cleanup": True,
+        "cleanup": None,
+        "reuse": False,
     }
-    include_only = {"run_folder", "parallel", "storage", "cleanup"}
+    include_only = {"run_folder", "parallel", "storage", "cleanup", "reuse"}
     for arg, p in sig_map.parameters.items():
         if arg not in include_only:
             continue

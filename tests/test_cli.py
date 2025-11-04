@@ -61,6 +61,7 @@ def test_cli_add_map_arguments() -> None:
     assert any(action.dest == "map_parallel" for action in actions)
     assert any(action.dest == "map_storage" for action in actions)
     assert any(action.dest == "map_cleanup" for action in actions)
+    assert any(action.dest == "map_reuse" for action in actions)
 
 
 def test_cli_validate_inputs() -> None:

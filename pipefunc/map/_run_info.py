@@ -78,13 +78,27 @@ class RunInfo:
         *,
         executor: dict[OUTPUT_TYPE, Executor] | None = None,
         storage: str | dict[OUTPUT_TYPE, str] | None,
-        cleanup: bool = True,
+        cleanup: bool | None = None,
+        reuse: bool = False,
         reuse_validation: Literal["auto", "strict", "skip"] = "auto",
     ) -> RunInfo:
+        # Handle cleanup deprecation
+        if cleanup is not None:
+            import warnings
+
+            warnings.warn(
+                "The 'cleanup' parameter is deprecated and will be removed in a future version. "
+                "Use 'reuse' instead: cleanup=False is equivalent to reuse=True, "
+                "cleanup=True is equivalent to reuse=False",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            reuse = not cleanup  # cleanup has priority over reuse
+
         storage, run_folder = _resolve_storage_and_run_folder(run_folder, storage)
         internal_shapes = _construct_internal_shapes(internal_shapes, pipeline)
         if run_folder is not None:
-            if cleanup:
+            if not reuse:
                 _cleanup_run_folder(run_folder)
             else:
                 _compare_to_previous_run_info(
@@ -420,19 +434,19 @@ def _compare_to_previous_run_info(
     try:
         old = RunInfo.load(run_folder)
     except Exception as e:  # noqa: BLE001
-        msg = f"Could not load previous run info: {e}, cannot use `cleanup=False`."
+        msg = f"Could not load previous run info: {e}, cannot use `reuse=True`."
         raise ValueError(msg) from None
 
     # Always validate shapes and mapspecs regardless of reuse_validation mode
     if internal_shapes != old.internal_shapes:
-        msg = "Internal shapes do not match previous run, cannot use `cleanup=False`."
+        msg = "Internal shapes do not match previous run, cannot use `reuse=True`."
         raise ValueError(msg)
     if pipeline.mapspecs_as_strings != old.mapspecs_as_strings:
-        msg = "`MapSpec`s do not match previous run, cannot use `cleanup=False`."
+        msg = "`MapSpec`s do not match previous run, cannot use `reuse=True`."
         raise ValueError(msg)
     shapes, _masks = map_shapes(pipeline, inputs, internal_shapes)
     if shapes != old.shapes:
-        msg = "Shapes do not match previous run, cannot use `cleanup=False`."
+        msg = "Shapes do not match previous run, cannot use `reuse=True`."
         raise ValueError(msg)
 
     # Skip input/default validation if requested
@@ -445,18 +459,18 @@ def _compare_to_previous_run_info(
         if reuse_validation == "strict":
             msg = (
                 "Cannot compare inputs for equality (inputs may have broken `__eq__` implementations). "
-                "Cannot use `cleanup=False` with `reuse_validation='strict'`. "
+                "Cannot use `reuse=True` with `reuse_validation='strict'`. "
                 "Use `reuse_validation='skip'` if you are certain inputs are identical."
             )
             raise ValueError(msg)
         assert reuse_validation == "auto"
         print(
             "Could not compare new `inputs` to `inputs` from previous run."
-            " Proceeding *without* `cleanup`, hoping for the best.",
+            " Proceeding with `reuse=True`, hoping for the best.",
         )
         return
     if not equal_inputs:
-        msg = f"Inputs `{inputs=}` / `{old.inputs=}` do not match previous run, cannot use `cleanup=False`."
+        msg = f"Inputs `{inputs=}` / `{old.inputs=}` do not match previous run, cannot use `reuse=True`."
         raise ValueError(msg)
 
     # Validate defaults
@@ -465,18 +479,18 @@ def _compare_to_previous_run_info(
         if reuse_validation == "strict":
             msg = (
                 "Cannot compare defaults for equality (defaults may have broken `__eq__` implementations). "
-                "Cannot use `cleanup=False` with `reuse_validation='strict'`. "
+                "Cannot use `reuse=True` with `reuse_validation='strict'`. "
                 "Use `reuse_validation='skip'` if you are certain defaults are identical."
             )
             raise ValueError(msg)
         assert reuse_validation == "auto"
         print(
             "Could not compare new `defaults` to `defaults` from previous run."
-            " Proceeding *without* `cleanup`, hoping for the best.",
+            " Proceeding with `reuse=True`, hoping for the best.",
         )
         return
     if not equal_defaults:
-        msg = f"Defaults `{pipeline.defaults=}` / `{old.defaults=}` do not match previous run, cannot use `cleanup=False`."
+        msg = f"Defaults `{pipeline.defaults=}` / `{old.defaults=}` do not match previous run, cannot use `reuse=True`."
         raise ValueError(msg)
 
 

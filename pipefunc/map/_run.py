@@ -74,7 +74,8 @@ def run_map(
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
     storage: StorageType | None = None,
     persist_memory: bool = True,
-    cleanup: bool = True,
+    cleanup: bool | None = None,
+    reuse: bool = False,
     reuse_validation: Literal["auto", "strict", "skip"] = "auto",
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
@@ -152,10 +153,23 @@ def run_map(
         Whether to write results to disk when memory based storage is used.
         Does not have any effect when file based storage is used.
     cleanup
+        .. deprecated:: 0.XX.0
+            Use `reuse` parameter instead. Will be removed in version 0.YY.0.
+
         Whether to clean up the ``run_folder`` before running the pipeline.
+        When set, takes priority over ``reuse`` parameter.
+        ``cleanup=True`` is equivalent to ``reuse=False``.
+        ``cleanup=False`` is equivalent to ``reuse=True``.
+    reuse
+        Whether to reuse data from a previous run in the ``run_folder``.
+
+        - ``False`` (default): Clean up the ``run_folder`` before running (fresh start).
+        - ``True``: Attempt to load and reuse results from a previous run.
+
+        Note: If ``cleanup`` is specified, it takes priority over this parameter.
     reuse_validation
         Controls validation strictness when reusing data from a previous run
-        (only applies when ``cleanup=False``):
+        (only applies when ``reuse=True``):
 
         - ``"auto"`` (default): Validate that inputs/defaults match the previous run.
           If equality comparison fails (returns ``None``), warn but proceed anyway.
@@ -166,7 +180,7 @@ def run_map(
           You are responsible for ensuring inputs are actually identical.
 
         Note: Shapes and MapSpecs are always validated regardless of this setting.
-        Ignored when ``cleanup=True``.
+        Ignored when ``reuse=False``.
     fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
@@ -195,6 +209,19 @@ def run_map(
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
     """
+    # Handle cleanup deprecation
+    if cleanup is not None:
+        import warnings
+
+        warnings.warn(
+            "The 'cleanup' parameter is deprecated and will be removed in a future version. "
+            "Use 'reuse' instead: cleanup=False is equivalent to reuse=True, "
+            "cleanup=True is equivalent to reuse=False",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        reuse = not cleanup  # cleanup has priority over reuse
+
     prep = prepare_run(
         pipeline=pipeline,
         inputs=inputs,
@@ -206,6 +233,7 @@ def run_map(
         chunksizes=chunksizes,
         storage=storage,
         cleanup=cleanup,
+        reuse=reuse,
         reuse_validation=reuse_validation,
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
@@ -364,7 +392,8 @@ def run_map_async(
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
     storage: StorageType | None = None,
     persist_memory: bool = True,
-    cleanup: bool = True,
+    cleanup: bool | None = None,
+    reuse: bool = False,
     reuse_validation: Literal["auto", "strict", "skip"] = "auto",
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
@@ -442,10 +471,23 @@ def run_map_async(
         Whether to write results to disk when memory based storage is used.
         Does not have any effect when file based storage is used.
     cleanup
+        .. deprecated:: 0.XX.0
+            Use `reuse` parameter instead. Will be removed in version 0.YY.0.
+
         Whether to clean up the ``run_folder`` before running the pipeline.
+        When set, takes priority over ``reuse`` parameter.
+        ``cleanup=True`` is equivalent to ``reuse=False``.
+        ``cleanup=False`` is equivalent to ``reuse=True``.
+    reuse
+        Whether to reuse data from a previous run in the ``run_folder``.
+
+        - ``False`` (default): Clean up the ``run_folder`` before running (fresh start).
+        - ``True``: Attempt to load and reuse results from a previous run.
+
+        Note: If ``cleanup`` is specified, it takes priority over this parameter.
     reuse_validation
         Controls validation strictness when reusing data from a previous run
-        (only applies when ``cleanup=False``):
+        (only applies when ``reuse=True``):
 
         - ``"auto"`` (default): Validate that inputs/defaults match the previous run.
           If equality comparison fails (returns ``None``), warn but proceed anyway.
@@ -456,7 +498,7 @@ def run_map_async(
           You are responsible for ensuring inputs are actually identical.
 
         Note: Shapes and MapSpecs are always validated regardless of this setting.
-        Ignored when ``cleanup=True``.
+        Ignored when ``reuse=False``.
     fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
@@ -491,6 +533,19 @@ def run_map_async(
         `start()` method on the `AsyncMap` instance is called.
 
     """
+    # Handle cleanup deprecation
+    if cleanup is not None:
+        import warnings
+
+        warnings.warn(
+            "The 'cleanup' parameter is deprecated and will be removed in a future version. "
+            "Use 'reuse' instead: cleanup=False is equivalent to reuse=True, "
+            "cleanup=True is equivalent to reuse=False",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        reuse = not cleanup  # cleanup has priority over reuse
+
     prep = prepare_run(
         pipeline=pipeline,
         inputs=inputs,
@@ -502,6 +557,7 @@ def run_map_async(
         chunksizes=chunksizes,
         storage=storage,
         cleanup=cleanup,
+        reuse=reuse,
         reuse_validation=reuse_validation,
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
