@@ -27,11 +27,8 @@ __all__ = [
     "storage_registry",
 ]
 
-with _suppress(ImportError, AttributeError):
+with _suppress(ImportError):
     # ImportError: zarr not installed
-    # AttributeError: zarr v3 is not compatible with pipefunc
-    #   Blocked by: https://github.com/zarr-developers/zarr-python/issues/2617
-    #   TODO: Remove this block once zarr v3 is compatible with pipefunc
     from ._storage_array._zarr import ZarrFileArray, ZarrMemoryArray, ZarrSharedMemoryArray
 
     __all__ += ["ZarrFileArray", "ZarrMemoryArray", "ZarrSharedMemoryArray"]
