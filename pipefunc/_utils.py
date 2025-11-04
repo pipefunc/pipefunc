@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import functools
 import importlib.util
@@ -177,6 +178,16 @@ def is_equal(  # noqa: C901, PLR0911, PLR0912
         if on_error == "raise":
             raise
         return None
+
+
+def ensure_block_allowed() -> None:
+    """Ensure there is no running asyncio loop before blocking synchronously."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    msg = "Cannot call `result()` while an event loop is running; `await runner.task` instead."
+    raise RuntimeError(msg)
 
 
 def equal_dicts(
