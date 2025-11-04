@@ -947,7 +947,7 @@ class Pipeline:
             chunksizes=chunksizes,
             storage=storage,
             persist_memory=persist_memory,
-            cleanup=cleanup,
+            cleanup=None,  # Already handled deprecation above
             reuse=reuse,
             reuse_validation=reuse_validation,
             fixed_indices=fixed_indices,
@@ -1152,7 +1152,7 @@ class Pipeline:
             chunksizes=chunksizes,
             storage=storage,
             persist_memory=persist_memory,
-            cleanup=cleanup,
+            cleanup=None,  # Already handled deprecation above
             reuse=reuse,
             reuse_validation=reuse_validation,
             fixed_indices=fixed_indices,
