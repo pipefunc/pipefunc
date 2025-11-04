@@ -82,13 +82,15 @@ def _encode_array(codec: CloudPickleCodec, value: np.ndarray) -> np.ndarray:
 
 
 def _decode_scalar(codec: CloudPickleCodec, value: Any) -> Any:
-    if isinstance(value, memoryview):
-        value = value.tobytes()
+    """Decode a single stored element.
+
+    Zarr v3 returns Python ``bytes`` for ``VariableLengthBytes`` when slicing,
+    and a 0-d ``numpy.ndarray`` when indexing a single element. Handle those
+    two cases and avoid extra branching.
+    """
     if isinstance(value, np.ndarray) and value.shape == ():
         value = value.item()
-    if isinstance(value, np.bytes_):
-        value = value.tobytes()
-    if isinstance(value, (bytes, bytearray)):
+    if isinstance(value, (bytes, bytearray, np.bytes_)):
         buffer = np.frombuffer(value, dtype="uint8")
         return codec.decode(buffer)
     return value
@@ -112,8 +114,6 @@ def _decode_with_mask(
         else:
             decoded[index] = _decode_scalar(codec, data_array[index])
 
-    decoded = decoded.reshape(data_array.shape)
-    mask_array = mask_array.reshape(data_array.shape)
     return decoded, mask_array
 
 
