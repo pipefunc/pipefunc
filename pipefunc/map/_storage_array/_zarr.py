@@ -19,7 +19,7 @@ from zarr.api import synchronous as zs
 from zarr.core.buffer.core import default_buffer_prototype
 from zarr.core.sync import sync
 from zarr.dtype import VariableLengthBytes
-from zarr.errors import ArrayNotFoundError, UnstableSpecificationWarning
+from zarr.errors import UnstableSpecificationWarning
 from zarr.storage import LocalStore, MemoryStore
 
 from pipefunc._utils import prod
@@ -42,29 +42,27 @@ def _open_or_create_array(
     dtype: Any,
     fill_value: Any,
 ) -> zarr.Array:
-    """Open an array if it exists, otherwise create it."""
+    """Open an array (creating it if missing) via the public Zarr API.
+
+    Uses `zarr.api.synchronous.open_array(..., mode='a', ...)` to avoid
+    reimplementing open-or-create behavior.
+    """
     # Suppress Zarr's UnstableSpecificationWarning for VariableLengthBytes
-    # We rely on it intentionally despite it being marked as unstable
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UnstableSpecificationWarning)
-        try:
-            array = zs.open_array(store=store, path=name)
-        except ArrayNotFoundError:
-            array = zs.create_array(
-                store=store,
-                name=name,
-                shape=shape,
-                dtype=dtype,
-                chunks=chunks,
-                fill_value=fill_value,
-                overwrite=False,
-            )
-        else:
-            if array.shape != shape:
-                msg = (
-                    f"Existing array '{name}' has unexpected shape {array.shape}, expected {shape}."
-                )
-                raise ValueError(msg)
+        array = zs.open_array(
+            store=store,
+            path=name,
+            mode="a",
+            shape=shape,
+            dtype=dtype,
+            chunks=chunks,
+            fill_value=fill_value,
+        )
+        # Maintain previous safety check: validate existing shape if already created
+        if array.shape != shape:
+            msg = f"Existing array '{name}' has unexpected shape {array.shape}, expected {shape}."
+            raise ValueError(msg)
         return array
 
 
@@ -130,10 +128,8 @@ def _copy_store(source: Store, destination: Store) -> None:
     """
 
     async def _copy() -> None:
-        await source._ensure_open()
-        await destination._ensure_open()
+        # Use public Store API (lazy-open in get/set) without relying on privates
         prototype = default_buffer_prototype()
-
         async for key in source.list():
             buffer = await source.get(key, prototype=prototype)
             if buffer is not None:
@@ -202,7 +198,8 @@ class ZarrFileArray(StorageBase):
             self.store,
             name="mask",
             shape=self.resolved_shape,
-            chunks=(1,) * len(self.shape) or (1,),
+            # Zarr v3 requires an empty tuple for 0-D arrays
+            chunks=() if len(self.resolved_shape) == 0 else (1,) * len(self.resolved_shape),
             dtype=bool,
             fill_value=True,
         )
@@ -239,8 +236,9 @@ class ZarrFileArray(StorageBase):
         if self._mask[np_index]:
             return np.ma.masked
         data = self.array[full_index]
-        # Zarr v3 always returns ndarray (even 0-d arrays)
-        return np.asarray(_decode_array(self.object_codec, data), dtype=object)
+        # Zarr v3 always returns ndarray (even 0-D); unwrap to scalar for parity
+        decoded = np.asarray(_decode_array(self.object_codec, data), dtype=object)
+        return decoded.item() if decoded.shape == () else decoded
 
     def has_index(self, index: int) -> bool:
         """Return whether the given linear index exists."""
@@ -360,7 +358,7 @@ class ZarrFileArray(StorageBase):
         else:
             encoded_value = _encode_scalar(self.object_codec, value)
             assert all(isinstance(k, int) for k in key)
-            indices = cast("tuple[int, ...]", key)
+            indices = cast(tuple[int, ...], key)
             self._store_scalar_encoded(indices, encoded_value)
         self._mask[key] = False
 
@@ -381,7 +379,7 @@ class ZarrFileArray(StorageBase):
     def _store_scalar_encoded(self, indices: tuple[int, ...], encoded: bytes) -> None:
         """Store a single serialized value at the provided indices."""
         normalized_indices = cast(
-            "tuple[int, ...]",
+            tuple[int, ...],
             normalize_key(
                 indices,
                 self.resolved_shape,
