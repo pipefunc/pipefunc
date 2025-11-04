@@ -293,7 +293,7 @@ def test_eager_scheduler_with_caching(tmp_path: Path):
         scheduling_strategy="eager",
         inputs={},
         run_folder=run_folder,
-        cleanup=False,  # Don't clean up to test caching
+        reuse=True,  # Don't clean up to test caching
         show_progress=False,
         parallel=False,
         storage="dict",
@@ -377,7 +377,7 @@ def test_eager_scheduler_with_fixed_indices(tmp_path: Path):
         inputs=inputs,
         run_folder=run_folder,
         fixed_indices={"i": 3},
-        cleanup=False,  # Don't clean up to keep previous results
+        reuse=True,  # Don't clean up to keep previous results
         show_progress=False,
         parallel=False,
         storage="dict",

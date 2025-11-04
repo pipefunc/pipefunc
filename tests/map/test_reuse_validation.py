@@ -50,19 +50,19 @@ def test_reuse_validation_auto_with_broken_eq(tmp_path: Path, capsys) -> None:
     results1 = pipeline.map(
         inputs1,
         run_folder=tmp_path,
-        cleanup=True,
+        reuse=False,
         parallel=False,
         storage="dict",
     )
     np.testing.assert_array_equal(results1["y"].output, [2, 4])
 
-    # Second run with same inputs but cleanup=False, reuse_validation="auto"
+    # Second run with same inputs but reuse=True, reuse_validation="auto"
     # Should warn but proceed
     inputs2 = {"x": [NoEqualityInput(1), NoEqualityInput(2)]}
     results2 = pipeline.map(
         inputs2,
         run_folder=tmp_path,
-        cleanup=False,
+        reuse=True,
         reuse_validation="auto",
         parallel=False,
         storage="dict",
@@ -89,13 +89,13 @@ def test_reuse_validation_strict_with_broken_eq(tmp_path: Path) -> None:
     results1 = pipeline.map(
         inputs1,
         run_folder=tmp_path,
-        cleanup=True,
+        reuse=False,
         parallel=False,
         storage="dict",
     )
     np.testing.assert_array_equal(results1["y"].output, [2, 4])
 
-    # Second run with same inputs but cleanup=False, reuse_validation="strict"
+    # Second run with same inputs but reuse=True, reuse_validation="strict"
     # Should raise error
     inputs2 = {"x": [NoEqualityInput(1), NoEqualityInput(2)]}
     with pytest.raises(
@@ -105,7 +105,7 @@ def test_reuse_validation_strict_with_broken_eq(tmp_path: Path) -> None:
         pipeline.map(
             inputs2,
             run_folder=tmp_path,
-            cleanup=False,
+            reuse=True,
             reuse_validation="strict",
             parallel=False,
             storage="dict",
@@ -127,19 +127,19 @@ def test_reuse_validation_skip(tmp_path: Path) -> None:
     results1 = pipeline.map(
         inputs1,
         run_folder=tmp_path,
-        cleanup=True,
+        reuse=False,
         parallel=False,
         storage="dict",
     )
     np.testing.assert_array_equal(results1["y"].output, [2, 4])
 
-    # Second run with DIFFERENT inputs but cleanup=False, reuse_validation="skip"
+    # Second run with DIFFERENT inputs but reuse=True, reuse_validation="skip"
     # Should succeed because validation is skipped
     inputs2 = {"x": [BrokenEqualityInput(10), BrokenEqualityInput(20)]}
     results2 = pipeline.map(
         inputs2,
         run_folder=tmp_path,
-        cleanup=False,
+        reuse=True,
         reuse_validation="skip",
         parallel=False,
         storage="dict",
@@ -163,7 +163,7 @@ def test_reuse_validation_auto_with_mismatched_inputs(tmp_path: Path) -> None:
     results1 = pipeline.map(
         inputs1,
         run_folder=tmp_path,
-        cleanup=True,
+        reuse=False,
         parallel=False,
         storage="dict",
     )
@@ -175,7 +175,7 @@ def test_reuse_validation_auto_with_mismatched_inputs(tmp_path: Path) -> None:
         pipeline.map(
             inputs2,
             run_folder=tmp_path,
-            cleanup=False,
+            reuse=True,
             reuse_validation="auto",
             parallel=False,
             storage="dict",
@@ -197,7 +197,7 @@ def test_reuse_validation_skip_still_validates_shapes(tmp_path: Path) -> None:
     pipeline.map(
         inputs1,
         run_folder=tmp_path,
-        cleanup=True,
+        reuse=False,
         parallel=False,
         storage="dict",
     )
@@ -208,7 +208,7 @@ def test_reuse_validation_skip_still_validates_shapes(tmp_path: Path) -> None:
         pipeline.map(
             inputs2,
             run_folder=tmp_path,
-            cleanup=False,
+            reuse=True,
             reuse_validation="skip",
             parallel=False,
             storage="dict",
@@ -230,18 +230,18 @@ def test_reuse_validation_with_defaults(tmp_path: Path, capsys: pytest.CaptureFi
     results1 = pipeline.map(
         inputs1,
         run_folder=tmp_path,
-        cleanup=True,
+        reuse=False,
         parallel=False,
         storage="dict",
     )
     assert results1["y"].output == 15
 
-    # Second run with cleanup=False, reuse_validation="auto"
+    # Second run with reuse=True, reuse_validation="auto"
     # Should warn about defaults comparison
     results2 = pipeline.map(
         inputs1,
         run_folder=tmp_path,
-        cleanup=False,
+        reuse=True,
         reuse_validation="auto",
         parallel=False,
         storage="dict",
@@ -268,7 +268,7 @@ def test_reuse_validation_strict_with_defaults(tmp_path: Path) -> None:
     pipeline.map(
         inputs1,
         run_folder=tmp_path,
-        cleanup=True,
+        reuse=False,
         parallel=False,
         storage="dict",
     )
@@ -281,15 +281,15 @@ def test_reuse_validation_strict_with_defaults(tmp_path: Path) -> None:
         pipeline.map(
             inputs1,
             run_folder=tmp_path,
-            cleanup=False,
+            reuse=True,
             reuse_validation="strict",
             parallel=False,
             storage="dict",
         )
 
 
-def test_reuse_validation_ignored_when_cleanup_true(tmp_path: Path) -> None:
-    """Test that reuse_validation is ignored when cleanup=True."""
+def test_reuse_validation_ignored_when_reuse_true(tmp_path: Path) -> None:
+    """Test that reuse_validation is ignored when reuse=False."""
 
     @pipefunc(output_name="y")
     def double_it(x: NoEqualityInput) -> int:
@@ -303,19 +303,19 @@ def test_reuse_validation_ignored_when_cleanup_true(tmp_path: Path) -> None:
     results1 = pipeline.map(
         inputs1,
         run_folder=tmp_path,
-        cleanup=True,
+        reuse=False,
         parallel=False,
         storage="dict",
     )
     np.testing.assert_array_equal(results1["y"].output, [2, 4])
 
-    # Second run with cleanup=True - reuse_validation should be ignored
+    # Second run with reuse=False - reuse_validation should be ignored
     # This should work fine regardless of reuse_validation value
     inputs2 = {"x": [NoEqualityInput(3), NoEqualityInput(4)]}
     results2 = pipeline.map(
         inputs2,
         run_folder=tmp_path,
-        cleanup=True,
+        reuse=False,
         reuse_validation="strict",  # This is ignored
         parallel=False,
         storage="dict",
