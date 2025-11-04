@@ -7,7 +7,6 @@ import importlib.util
 import inspect
 import os
 import warnings
-from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -416,15 +415,22 @@ def _validate_unique_run_folders(async_maps: Sequence[AsyncMap], caller_name: st
 def _validate_slurm_executor_names(async_maps: Sequence[AsyncMap], caller_name: str) -> None:
     from pipefunc.map._adaptive_scheduler_slurm_executor import is_slurm_executor
 
-    cnt: Counter[str] = Counter()
-    for am in async_maps:
-        executors = am._prepared.executor
+    name_usage: dict[str, dict[int, set[int]]] = {}
+    for map_index, async_map in enumerate(async_maps):
+        executors = async_map._prepared.executor
         if executors is None:
             continue
-        for v in executors.values():
-            if is_slurm_executor(v):
-                cnt[v.name] += 1
-    violations = [name for name, count in cnt.items() if count > 1]
+        for executor in executors.values():
+            if not is_slurm_executor(executor):
+                continue
+            by_map = name_usage.setdefault(executor.name, {})
+            by_map.setdefault(map_index, set()).add(id(executor))
+
+    violations = sorted(
+        name
+        for name, usage in name_usage.items()
+        if any(len(instance_ids) > 1 for instance_ids in usage.values()) or len(usage) > 1
+    )
     if violations:
         msg = (
             f"All `map_async`s provided to `{caller_name}` that use a `SlurmExecutor`"
