@@ -35,7 +35,7 @@ def gamma(img: np.ndarray, g: float = 2.2) -> np.ndarray:
 def threshold(img: np.ndarray, t: float = 0.5) -> np.ndarray:
     return (img > t).astype(np.float32)
 
-chain = chain(
+functions = chain(
     [
         to_float,
         gamma,
@@ -44,7 +44,7 @@ chain = chain(
         normalize.copy(output_name="output"),  # apply normalize again, with different output name
     ],
 )
-pipe = Pipeline(chain)
+pipe = Pipeline(functions)
 
 img = np.random.randint(0, 255, size=(64, 64), dtype=np.uint8)
 out = pipe.run("output", kwargs={"img": img, "t": 0.4})
