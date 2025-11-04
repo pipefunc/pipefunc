@@ -82,9 +82,9 @@ def _encode_array(codec: CloudPickleCodec, value: np.ndarray) -> np.ndarray:
 def _decode_scalar(codec: CloudPickleCodec, value: Any) -> Any:
     """Decode a single stored element.
 
-    Zarr v3 returns Python ``bytes`` for ``VariableLengthBytes`` when slicing,
-    and a 0-d ``numpy.ndarray`` when indexing a single element. Handle those
-    two cases and avoid extra branching.
+    For ``VariableLengthBytes``: slicing returns an ``ndarray`` (``dtype=object``)
+    whose elements are Python ``bytes``; scalar indexing returns a 0-D
+    ``numpy.ndarray``. Handle both forms and avoid extra branching.
     """
     if isinstance(value, np.ndarray) and value.shape == ():
         value = value.item()
@@ -198,7 +198,8 @@ class ZarrFileArray(StorageBase):
             self.store,
             name="mask",
             shape=self.resolved_shape,
-            # Zarr v3 requires an empty tuple for 0-D arrays
+            # Zarr v3 requires an empty tuple for 0-D arrays; using chunks=(1,)
+            # raises ValueError. Use chunks=() for scalars.
             chunks=() if len(self.resolved_shape) == 0 else (1,) * len(self.resolved_shape),
             dtype=bool,
             fill_value=True,
@@ -236,7 +237,8 @@ class ZarrFileArray(StorageBase):
         if self._mask[np_index]:
             return np.ma.masked
         data = self.array[full_index]
-        # Zarr v3 always returns ndarray (even 0-D); unwrap to scalar for parity
+        # In Zarr v3 array indexing returns a NumPy ndarray (scalar
+        # indices yield a 0-D ndarray); unwrap to a Python scalar for parity
         decoded = np.asarray(_decode_array(self.object_codec, data), dtype=object)
         return decoded.item() if decoded.shape == () else decoded
 
