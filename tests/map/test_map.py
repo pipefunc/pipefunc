@@ -649,7 +649,7 @@ def test_pipeline_loading_existing_results(tmp_path: Path) -> None:
     results = pipeline.map(
         inputs,
         run_folder=tmp_path,
-        reuse=False,
+        resume=False,
         parallel=False,
         storage="dict",
     )
@@ -662,7 +662,7 @@ def test_pipeline_loading_existing_results(tmp_path: Path) -> None:
     results2 = pipeline.map(
         inputs,
         run_folder=tmp_path,
-        reuse=True,
+        resume=True,
         parallel=False,
         storage="dict",
     )
@@ -674,7 +674,7 @@ def test_pipeline_loading_existing_results(tmp_path: Path) -> None:
     results3 = pipeline.map(
         inputs,
         run_folder=tmp_path,
-        reuse=False,
+        resume=False,
         parallel=False,
         storage="dict",
     )
@@ -696,7 +696,7 @@ def test_run_info_compare(tmp_path: Path) -> None:
     results = pipeline.map(
         inputs,
         run_folder=tmp_path,
-        reuse=False,
+        resume=False,
         parallel=False,
         storage="dict",
     )
@@ -706,7 +706,7 @@ def test_run_info_compare(tmp_path: Path) -> None:
 
     inputs = {"x": [1, 2, 3, 4]}
     with pytest.raises(ValueError, match="Shapes do not match previous run"):
-        pipeline.map(inputs, run_folder=tmp_path, reuse=True, parallel=False, storage="dict")
+        pipeline.map(inputs, run_folder=tmp_path, resume=True, parallel=False, storage="dict")
 
 
 def test_nd_input_list(tmp_path: Path) -> None:
@@ -1834,15 +1834,15 @@ def test_pipeline_loading_existing_results_with_internal_shape(
     pipeline = Pipeline([f, g])
     inputs = {"x": 1}
 
-    pipeline.map(inputs, run_folder=tmp_path, reuse=False, parallel=False, storage="dict")
+    pipeline.map(inputs, run_folder=tmp_path, resume=False, parallel=False, storage="dict")
     assert counters["f"] == 1
     assert counters["g"] == 10
 
-    pipeline.map(inputs, run_folder=tmp_path, reuse=True, parallel=False, storage="dict")
+    pipeline.map(inputs, run_folder=tmp_path, resume=True, parallel=False, storage="dict")
     assert counters["f"] == 1
     assert counters["g"] == 10
 
-    pipeline.map(inputs, run_folder=tmp_path, reuse=False, parallel=False, storage="dict")
+    pipeline.map(inputs, run_folder=tmp_path, resume=False, parallel=False, storage="dict")
     assert counters["f"] == 2
     assert counters["g"] == 20
 

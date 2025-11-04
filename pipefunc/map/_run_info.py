@@ -79,18 +79,18 @@ class RunInfo:
         executor: dict[OUTPUT_TYPE, Executor] | None = None,
         storage: str | dict[OUTPUT_TYPE, str] | None,
         cleanup: bool | None = None,
-        reuse: bool = False,
-        reuse_validation: Literal["auto", "strict", "skip"] = "auto",
+        resume: bool = False,
+        resume_validation: Literal["auto", "strict", "skip"] = "auto",
     ) -> RunInfo:
         # Note: cleanup deprecation is handled in user-facing functions
         # (Pipeline.map, run_map, etc.) to ensure warning points to user's code
         if cleanup is not None:
-            reuse = not cleanup  # cleanup has priority over reuse
+            resume = not cleanup  # cleanup has priority over resume
 
         storage, run_folder = _resolve_storage_and_run_folder(run_folder, storage)
         internal_shapes = _construct_internal_shapes(internal_shapes, pipeline)
         if run_folder is not None:
-            if not reuse:
+            if not resume:
                 _cleanup_run_folder(run_folder)
             else:
                 _compare_to_previous_run_info(
@@ -98,7 +98,7 @@ class RunInfo:
                     run_folder,
                     inputs,
                     internal_shapes,
-                    reuse_validation,
+                    resume_validation,
                 )
         _check_inputs(pipeline, inputs)
         _maybe_inputs_to_disk_for_slurm(pipeline, inputs, run_folder, executor)
@@ -276,7 +276,7 @@ class RunInfo:
 
 def _handle_cleanup_deprecation(
     cleanup: bool | None,
-    reuse: bool,
+    resume: bool,
     stacklevel: int = 2,
 ) -> bool:
     """Handle deprecation of `cleanup` parameter."""
@@ -284,13 +284,13 @@ def _handle_cleanup_deprecation(
     if cleanup is not None:
         warnings.warn(
             "The 'cleanup' parameter is deprecated and will be removed in a future version. "
-            "Use 'reuse' instead: cleanup=False is equivalent to reuse=True, "
-            "cleanup=True is equivalent to reuse=False",
+            "Use 'resume' instead: cleanup=False is equivalent to resume=True, "
+            "cleanup=True is equivalent to resume=False",
             DeprecationWarning,
             stacklevel=stacklevel,
         )
-        reuse = not cleanup  # cleanup has priority over reuse
-    return reuse
+        resume = not cleanup  # cleanup has priority over resume
+    return resume
 
 
 def _legacy_fix(data: dict, run_folder: Path) -> None:
@@ -438,70 +438,70 @@ def _compare_to_previous_run_info(
     run_folder: Path,
     inputs: dict[str, Any],
     internal_shapes: UserShapeDict | None = None,
-    reuse_validation: Literal["auto", "strict", "skip"] = "auto",
+    resume_validation: Literal["auto", "strict", "skip"] = "auto",
 ) -> None:  # pragma: no cover
     if not RunInfo.path(run_folder).is_file():
         return
     try:
         old = RunInfo.load(run_folder)
     except Exception as e:  # noqa: BLE001
-        msg = f"Could not load previous run info: {e}, cannot use `reuse=True`."
+        msg = f"Could not load previous run info: {e}, cannot use `resume=True`."
         raise ValueError(msg) from None
 
-    # Always validate shapes and mapspecs regardless of reuse_validation mode
+    # Always validate shapes and mapspecs regardless of resume_validation mode
     if internal_shapes != old.internal_shapes:
-        msg = "Internal shapes do not match previous run, cannot use `reuse=True`."
+        msg = "Internal shapes do not match previous run, cannot use `resume=True`."
         raise ValueError(msg)
     if pipeline.mapspecs_as_strings != old.mapspecs_as_strings:
-        msg = "`MapSpec`s do not match previous run, cannot use `reuse=True`."
+        msg = "`MapSpec`s do not match previous run, cannot use `resume=True`."
         raise ValueError(msg)
     shapes, _masks = map_shapes(pipeline, inputs, internal_shapes)
     if shapes != old.shapes:
-        msg = "Shapes do not match previous run, cannot use `reuse=True`."
+        msg = "Shapes do not match previous run, cannot use `resume=True`."
         raise ValueError(msg)
 
     # Skip input/default validation if requested
-    if reuse_validation == "skip":
+    if resume_validation == "skip":
         return
 
     # Validate inputs
     equal_inputs = equal_dicts(inputs, old.inputs, verbose=True)
     if equal_inputs is None:
-        if reuse_validation == "strict":
+        if resume_validation == "strict":
             msg = (
                 "Cannot compare inputs for equality (inputs may have broken `__eq__` implementations). "
-                "Cannot use `reuse=True` with `reuse_validation='strict'`. "
-                "Use `reuse_validation='skip'` if you are certain inputs are identical."
+                "Cannot use `resume=True` with `resume_validation='strict'`. "
+                "Use `resume_validation='skip'` if you are certain inputs are identical."
             )
             raise ValueError(msg)
-        assert reuse_validation == "auto"
+        assert resume_validation == "auto"
         print(
             "Could not compare new `inputs` to `inputs` from previous run."
-            " Proceeding with `reuse=True`, hoping for the best.",
+            " Proceeding with `resume=True`, hoping for the best.",
         )
         return
     if not equal_inputs:
-        msg = f"Inputs `{inputs=}` / `{old.inputs=}` do not match previous run, cannot use `reuse=True`."
+        msg = f"Inputs `{inputs=}` / `{old.inputs=}` do not match previous run, cannot use `resume=True`."
         raise ValueError(msg)
 
     # Validate defaults
     equal_defaults = equal_dicts(pipeline.defaults, old.defaults)
     if equal_defaults is None:
-        if reuse_validation == "strict":
+        if resume_validation == "strict":
             msg = (
                 "Cannot compare defaults for equality (defaults may have broken `__eq__` implementations). "
-                "Cannot use `reuse=True` with `reuse_validation='strict'`. "
-                "Use `reuse_validation='skip'` if you are certain defaults are identical."
+                "Cannot use `resume=True` with `resume_validation='strict'`. "
+                "Use `resume_validation='skip'` if you are certain defaults are identical."
             )
             raise ValueError(msg)
-        assert reuse_validation == "auto"
+        assert resume_validation == "auto"
         print(
             "Could not compare new `defaults` to `defaults` from previous run."
-            " Proceeding with `reuse=True`, hoping for the best.",
+            " Proceeding with `resume=True`, hoping for the best.",
         )
         return
     if not equal_defaults:
-        msg = f"Defaults `{pipeline.defaults=}` / `{old.defaults=}` do not match previous run, cannot use `reuse=True`."
+        msg = f"Defaults `{pipeline.defaults=}` / `{old.defaults=}` do not match previous run, cannot use `resume=True`."
         raise ValueError(msg)
 
 

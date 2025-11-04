@@ -161,7 +161,7 @@ def create_learners(
     storage: str | dict[OUTPUT_TYPE, str] = "file_array",
     return_output: bool = False,
     cleanup: bool | None = None,
-    reuse: bool = False,
+    resume: bool = False,
     fixed_indices: dict[str, int | slice] | None = None,
     split_independent_axes: bool = False,
 ) -> LearnersDict:
@@ -215,17 +215,17 @@ def create_learners(
         Whether to return the output of the function in the learner.
     cleanup
         .. deprecated:: 0.89.0
-            Use `reuse` parameter instead. Will be removed in version 1.0.0.
+            Use `resume` parameter instead. Will be removed in version 1.0.0.
 
         Whether to clean up the ``run_folder`` before running the pipeline.
-        When set, takes priority over ``reuse`` parameter.
-        ``cleanup=True`` is equivalent to ``reuse=False``.
-        ``cleanup=False`` is equivalent to ``reuse=True``.
-    reuse
-        Whether to reuse data from a previous run in the ``run_folder``.
+        When set, takes priority over ``resume`` parameter.
+        ``cleanup=True`` is equivalent to ``resume=False``.
+        ``cleanup=False`` is equivalent to ``resume=True``.
+    resume
+        Whether to resume data from a previous run in the ``run_folder``.
 
         - ``False`` (default): Clean up the ``run_folder`` before running (fresh start).
-        - ``True``: Attempt to load and reuse results from a previous run.
+        - ``True``: Attempt to load and resume results from a previous run.
 
         Note: If ``cleanup`` is specified, it takes priority over this parameter.
     fixed_indices
@@ -256,7 +256,7 @@ def create_learners(
         internal_shapes,
         storage=storage,
         cleanup=cleanup,
-        reuse=reuse,
+        resume=resume,
     )
     store = run_info.init_store()
     learners: LearnersDict = LearnersDict(run_info=run_info)
@@ -440,7 +440,7 @@ class _MapWrapper:
     internal_shapes: UserShapeDict | None
     parallel: bool
     cleanup: bool | None
-    reuse: bool
+    resume: bool
 
     def __call__(self, _: Any) -> None:
         """Run the pipeline."""
@@ -451,7 +451,7 @@ class _MapWrapper:
             self.internal_shapes,
             parallel=self.parallel,
             cleanup=self.cleanup,
-            reuse=self.reuse,
+            resume=self.resume,
         )
 
 
@@ -463,7 +463,7 @@ def create_learners_from_sweep(
     *,
     parallel: bool = True,
     cleanup: bool | None = None,
-    reuse: bool = False,
+    resume: bool = False,
 ) -> tuple[list[SequenceLearner], list[Path]]:
     """Create adaptive learners for a sweep.
 
@@ -493,17 +493,17 @@ def create_learners_from_sweep(
         Whether to run the map in parallel.
     cleanup
         .. deprecated:: 0.89.0
-            Use `reuse` parameter instead. Will be removed in version 1.0.0.
+            Use `resume` parameter instead. Will be removed in version 1.0.0.
 
         Whether to clean up the ``run_folder`` before running the pipeline.
-        When set, takes priority over ``reuse`` parameter.
-        ``cleanup=True`` is equivalent to ``reuse=False``.
-        ``cleanup=False`` is equivalent to ``reuse=True``.
-    reuse
-        Whether to reuse data from a previous run in the ``run_folder``.
+        When set, takes priority over ``resume`` parameter.
+        ``cleanup=True`` is equivalent to ``resume=False``.
+        ``cleanup=False`` is equivalent to ``resume=True``.
+    resume
+        Whether to resume data from a previous run in the ``run_folder``.
 
         - ``False`` (default): Clean up the ``run_folder`` before running (fresh start).
-        - ``True``: Attempt to load and reuse results from a previous run.
+        - ``True``: Attempt to load and resume results from a previous run.
 
         Note: If ``cleanup`` is specified, it takes priority over this parameter.
 
@@ -521,7 +521,7 @@ def create_learners_from_sweep(
     max_digits = len(str(len(sweep) - 1))
     for i, inputs in enumerate(sweep):
         sweep_run = run_folder / f"sweep_{str(i).zfill(max_digits)}"
-        f = _MapWrapper(pipeline, inputs, sweep_run, internal_shapes, parallel, cleanup, reuse)
+        f = _MapWrapper(pipeline, inputs, sweep_run, internal_shapes, parallel, cleanup, resume)
         learner = SequenceLearner(f, sequence=[None])
         learners.append(learner)
         folders.append(sweep_run)

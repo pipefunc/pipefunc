@@ -75,8 +75,8 @@ def run_map(
     storage: StorageType | None = None,
     persist_memory: bool = True,
     cleanup: bool | None = None,
-    reuse: bool = False,
-    reuse_validation: Literal["auto", "strict", "skip"] = "auto",
+    resume: bool = False,
+    resume_validation: Literal["auto", "strict", "skip"] = "auto",
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
@@ -154,22 +154,22 @@ def run_map(
         Does not have any effect when file based storage is used.
     cleanup
         .. deprecated:: 0.89.0
-            Use `reuse` parameter instead. Will be removed in version 1.0.0.
+            Use `resume` parameter instead. Will be removed in version 1.0.0.
 
         Whether to clean up the ``run_folder`` before running the pipeline.
-        When set, takes priority over ``reuse`` parameter.
-        ``cleanup=True`` is equivalent to ``reuse=False``.
-        ``cleanup=False`` is equivalent to ``reuse=True``.
-    reuse
-        Whether to reuse data from a previous run in the ``run_folder``.
+        When set, takes priority over ``resume`` parameter.
+        ``cleanup=True`` is equivalent to ``resume=False``.
+        ``cleanup=False`` is equivalent to ``resume=True``.
+    resume
+        Whether to resume data from a previous run in the ``run_folder``.
 
         - ``False`` (default): Clean up the ``run_folder`` before running (fresh start).
-        - ``True``: Attempt to load and reuse results from a previous run.
+        - ``True``: Attempt to load and resume results from a previous run.
 
         Note: If ``cleanup`` is specified, it takes priority over this parameter.
-    reuse_validation
+    resume_validation
         Controls validation strictness when reusing data from a previous run
-        (only applies when ``reuse=True``):
+        (only applies when ``resume=True``):
 
         - ``"auto"`` (default): Validate that inputs/defaults match the previous run.
           If equality comparison fails (returns ``None``), warn but proceed anyway.
@@ -180,7 +180,7 @@ def run_map(
           You are responsible for ensuring inputs are actually identical.
 
         Note: Shapes and MapSpecs are always validated regardless of this setting.
-        Ignored when ``reuse=False``.
+        Ignored when ``resume=False``.
     fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
@@ -212,7 +212,7 @@ def run_map(
     from ._run_info import _handle_cleanup_deprecation
 
     # Handle cleanup deprecation
-    reuse = _handle_cleanup_deprecation(cleanup, reuse, stacklevel=2)
+    resume = _handle_cleanup_deprecation(cleanup, resume, stacklevel=2)
 
     prep = prepare_run(
         pipeline=pipeline,
@@ -225,8 +225,8 @@ def run_map(
         chunksizes=chunksizes,
         storage=storage,
         cleanup=cleanup,
-        reuse=reuse,
-        reuse_validation=reuse_validation,
+        resume=resume,
+        resume_validation=resume_validation,
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,
@@ -385,8 +385,8 @@ def run_map_async(
     storage: StorageType | None = None,
     persist_memory: bool = True,
     cleanup: bool | None = None,
-    reuse: bool = False,
-    reuse_validation: Literal["auto", "strict", "skip"] = "auto",
+    resume: bool = False,
+    resume_validation: Literal["auto", "strict", "skip"] = "auto",
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
@@ -464,22 +464,22 @@ def run_map_async(
         Does not have any effect when file based storage is used.
     cleanup
         .. deprecated:: 0.89.0
-            Use `reuse` parameter instead. Will be removed in version 1.0.0.
+            Use `resume` parameter instead. Will be removed in version 1.0.0.
 
         Whether to clean up the ``run_folder`` before running the pipeline.
-        When set, takes priority over ``reuse`` parameter.
-        ``cleanup=True`` is equivalent to ``reuse=False``.
-        ``cleanup=False`` is equivalent to ``reuse=True``.
-    reuse
-        Whether to reuse data from a previous run in the ``run_folder``.
+        When set, takes priority over ``resume`` parameter.
+        ``cleanup=True`` is equivalent to ``resume=False``.
+        ``cleanup=False`` is equivalent to ``resume=True``.
+    resume
+        Whether to resume data from a previous run in the ``run_folder``.
 
         - ``False`` (default): Clean up the ``run_folder`` before running (fresh start).
-        - ``True``: Attempt to load and reuse results from a previous run.
+        - ``True``: Attempt to load and resume results from a previous run.
 
         Note: If ``cleanup`` is specified, it takes priority over this parameter.
-    reuse_validation
+    resume_validation
         Controls validation strictness when reusing data from a previous run
-        (only applies when ``reuse=True``):
+        (only applies when ``resume=True``):
 
         - ``"auto"`` (default): Validate that inputs/defaults match the previous run.
           If equality comparison fails (returns ``None``), warn but proceed anyway.
@@ -490,7 +490,7 @@ def run_map_async(
           You are responsible for ensuring inputs are actually identical.
 
         Note: Shapes and MapSpecs are always validated regardless of this setting.
-        Ignored when ``reuse=False``.
+        Ignored when ``resume=False``.
     fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
@@ -528,7 +528,7 @@ def run_map_async(
     from ._run_info import _handle_cleanup_deprecation
 
     # Handle cleanup deprecation
-    reuse = _handle_cleanup_deprecation(cleanup, reuse, stacklevel=2)
+    resume = _handle_cleanup_deprecation(cleanup, resume, stacklevel=2)
 
     prep = prepare_run(
         pipeline=pipeline,
@@ -541,8 +541,8 @@ def run_map_async(
         chunksizes=chunksizes,
         storage=storage,
         cleanup=cleanup,
-        reuse=reuse,
-        reuse_validation=reuse_validation,
+        resume=resume,
+        resume_validation=resume_validation,
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,
