@@ -49,6 +49,7 @@ def run_map_eager(
     storage: StorageType | None = None,
     persist_memory: bool = True,
     cleanup: bool = True,
+    reuse_validation: Literal["auto", "strict", "skip"] = "auto",
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
@@ -130,6 +131,20 @@ def run_map_eager(
         Does not have any effect when file based storage is used.
     cleanup
         Whether to clean up the ``run_folder`` before running the pipeline.
+    reuse_validation
+        Controls validation strictness when reusing data from a previous run
+        (only applies when ``cleanup=False``):
+
+        - ``"auto"`` (default): Validate that inputs/defaults match the previous run.
+          If equality comparison fails (returns ``None``), warn but proceed anyway.
+        - ``"strict"``: Validate that inputs/defaults match. Raise an error if
+          equality comparison fails.
+        - ``"skip"``: Skip input/default validation entirely. **Use when your input
+          objects have broken ``__eq__`` implementations that return incorrect results.**
+          You are responsible for ensuring inputs are actually identical.
+
+        Note: Shapes and MapSpecs are always validated regardless of this setting.
+        Ignored when ``cleanup=True``.
     fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
@@ -170,6 +185,7 @@ def run_map_eager(
         chunksizes=chunksizes,
         storage=storage,
         cleanup=cleanup,
+        reuse_validation=reuse_validation,
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,

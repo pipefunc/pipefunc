@@ -7,7 +7,7 @@ import tempfile
 import warnings
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import cloudpickle
 import numpy as np
@@ -79,6 +79,7 @@ class RunInfo:
         executor: dict[OUTPUT_TYPE, Executor] | None = None,
         storage: str | dict[OUTPUT_TYPE, str] | None,
         cleanup: bool = True,
+        reuse_validation: Literal["auto", "strict", "skip"] = "auto",
     ) -> RunInfo:
         storage, run_folder = _resolve_storage_and_run_folder(run_folder, storage)
         internal_shapes = _construct_internal_shapes(internal_shapes, pipeline)
@@ -86,7 +87,13 @@ class RunInfo:
             if cleanup:
                 _cleanup_run_folder(run_folder)
             else:
-                _compare_to_previous_run_info(pipeline, run_folder, inputs, internal_shapes)
+                _compare_to_previous_run_info(
+                    pipeline,
+                    run_folder,
+                    inputs,
+                    internal_shapes,
+                    reuse_validation,
+                )
         _check_inputs(pipeline, inputs)
         _maybe_inputs_to_disk_for_slurm(pipeline, inputs, run_folder, executor)
         shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
@@ -406,6 +413,7 @@ def _compare_to_previous_run_info(
     run_folder: Path,
     inputs: dict[str, Any],
     internal_shapes: UserShapeDict | None = None,
+    reuse_validation: Literal["auto", "strict", "skip"] = "auto",
 ) -> None:  # pragma: no cover
     if not RunInfo.path(run_folder).is_file():
         return
@@ -414,6 +422,8 @@ def _compare_to_previous_run_info(
     except Exception as e:  # noqa: BLE001
         msg = f"Could not load previous run info: {e}, cannot use `cleanup=False`."
         raise ValueError(msg) from None
+
+    # Always validate shapes and mapspecs regardless of reuse_validation mode
     if internal_shapes != old.internal_shapes:
         msg = "Internal shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
@@ -424,8 +434,22 @@ def _compare_to_previous_run_info(
     if shapes != old.shapes:
         msg = "Shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
+
+    # Skip input/default validation if requested
+    if reuse_validation == "skip":
+        return
+
+    # Validate inputs
     equal_inputs = equal_dicts(inputs, old.inputs, verbose=True)
     if equal_inputs is None:
+        if reuse_validation == "strict":
+            msg = (
+                "Cannot compare inputs for equality (inputs may have broken `__eq__` implementations). "
+                "Cannot use `cleanup=False` with `reuse_validation='strict'`. "
+                "Use `reuse_validation='skip'` if you are certain inputs are identical."
+            )
+            raise ValueError(msg)
+        assert reuse_validation == "auto"
         print(
             "Could not compare new `inputs` to `inputs` from previous run."
             " Proceeding *without* `cleanup`, hoping for the best.",
@@ -434,8 +458,18 @@ def _compare_to_previous_run_info(
     if not equal_inputs:
         msg = f"Inputs `{inputs=}` / `{old.inputs=}` do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
+
+    # Validate defaults
     equal_defaults = equal_dicts(pipeline.defaults, old.defaults)
     if equal_defaults is None:
+        if reuse_validation == "strict":
+            msg = (
+                "Cannot compare defaults for equality (defaults may have broken `__eq__` implementations). "
+                "Cannot use `cleanup=False` with `reuse_validation='strict'`. "
+                "Use `reuse_validation='skip'` if you are certain defaults are identical."
+            )
+            raise ValueError(msg)
+        assert reuse_validation == "auto"
         print(
             "Could not compare new `defaults` to `defaults` from previous run."
             " Proceeding *without* `cleanup`, hoping for the best.",
