@@ -195,18 +195,10 @@ def run_map_eager_async(
         `start()` method on the `AsyncMap` instance is called.
 
     """
-    # Handle cleanup deprecation
-    if cleanup is not None:
-        import warnings
+    from ._run_info import _handle_cleanup_deprecation
 
-        warnings.warn(
-            "The 'cleanup' parameter is deprecated and will be removed in a future version. "
-            "Use 'reuse' instead: cleanup=False is equivalent to reuse=True, "
-            "cleanup=True is equivalent to reuse=False",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        reuse = not cleanup  # cleanup has priority over reuse
+    # Handle cleanup deprecation
+    reuse = _handle_cleanup_deprecation(cleanup, reuse, stacklevel=2)
 
     prep = prepare_run(
         pipeline=pipeline,

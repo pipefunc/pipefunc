@@ -82,17 +82,9 @@ class RunInfo:
         reuse: bool = False,
         reuse_validation: Literal["auto", "strict", "skip"] = "auto",
     ) -> RunInfo:
-        # Handle cleanup deprecation
+        # Note: cleanup deprecation is handled in user-facing functions
+        # (Pipeline.map, run_map, etc.) to ensure warning points to user's code
         if cleanup is not None:
-            import warnings
-
-            warnings.warn(
-                "The 'cleanup' parameter is deprecated and will be removed in a future version. "
-                "Use 'reuse' instead: cleanup=False is equivalent to reuse=True, "
-                "cleanup=True is equivalent to reuse=False",
-                DeprecationWarning,
-                stacklevel=2,
-            )
             reuse = not cleanup  # cleanup has priority over reuse
 
         storage, run_folder = _resolve_storage_and_run_folder(run_folder, storage)
@@ -280,6 +272,25 @@ class RunInfo:
                     internal[name] = internal_shape_from_mask(new_shape, self.shape_masks[name])
         if has_updated:
             self.dump()
+
+
+def _handle_cleanup_deprecation(
+    cleanup: bool | None,
+    reuse: bool,
+    stacklevel: int = 2,
+) -> bool:
+    """Handle deprecation of `cleanup` parameter."""
+    # Handle cleanup deprecation
+    if cleanup is not None:
+        warnings.warn(
+            "The 'cleanup' parameter is deprecated and will be removed in a future version. "
+            "Use 'reuse' instead: cleanup=False is equivalent to reuse=True, "
+            "cleanup=True is equivalent to reuse=False",
+            DeprecationWarning,
+            stacklevel=stacklevel,
+        )
+        reuse = not cleanup  # cleanup has priority over reuse
+    return reuse
 
 
 def _legacy_fix(data: dict, run_folder: Path) -> None:
