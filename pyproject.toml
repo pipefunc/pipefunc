@@ -39,7 +39,7 @@ pydantic = ["pydantic"]
 rich = ["rich"]
 widgets = ["graphviz-anywidget>=0.7.0", "ipywidgets"]
 xarray = ["xarray"]
-zarr = ["zarr>=3,<4", "numcodecs"]
+zarr = ["zarr>=3", "numcodecs"]
 test = [
     "coverage",
     "pytest-asyncio",
@@ -98,7 +98,7 @@ extras = [
     "rich",
     "rich-argparse",
     "xarray",
-    "zarr>=3,<4",
+    "zarr>=3",
 ]
 
 [project.urls]
