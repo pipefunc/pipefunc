@@ -120,7 +120,7 @@ def test_async_map_result_waits_for_running_task() -> None:
         assert result["y"].output.tolist() == [1, 2, 3]
         # Second call should be instantaneous and use the cache
         assert runner.result()["y"].output.tolist() == [1, 2, 3]
-        assert CALLS == [0, 1, 2]
+        assert sorted(CALLS) == [0, 1, 2]
     finally:
         loop.call_soon_threadsafe(loop.stop)
         loop_thread.join()

@@ -918,18 +918,6 @@ def _compute_with_cache(
     return _get_or_set_cache(func, kwargs, cache, _compute, error_handling)
 
 
-def _run_iteration(
-    func: PipeFunc,
-    selected: dict[str, Any],
-    error_info: dict[str, ErrorInfo] | None,
-    cache: _CacheBase | None,
-    error_handling: Literal["raise", "continue"],
-) -> Any:
-    # Early error detection and compute routed via unified helper
-    ctx = ErrorContext(mode=error_handling, error_info=error_info)
-    return _compute_with_cache(func, selected, cache, ctx, error_handling)
-
-
 def _try_shape(x: Any) -> tuple[int, ...]:
     try:
         return np.shape(x)
@@ -1009,7 +997,9 @@ def _run_iteration_and_process(
         error_handling,
         map_error_info,
     )
-    output = _run_iteration(func, selected_kwargs, error_infos.element, cache, error_handling)
+    # Early error detection centralized through the guard helper
+    ctx = ErrorContext(mode=error_handling, error_info=error_infos.element)
+    output = _compute_with_cache(func, selected_kwargs, cache, ctx, error_handling)
     outputs = _pick_output(func, output)
     has_dumped = _update_array(
         func,
