@@ -321,3 +321,58 @@ def test_resume_validation_ignored_when_resume_true(tmp_path: Path) -> None:
         storage="dict",
     )
     np.testing.assert_array_equal(results2["y"].output, [6, 8])
+
+
+def test_cleanup_parameter_deprecation_warning(tmp_path: Path) -> None:
+    """Test that using the deprecated cleanup parameter triggers a deprecation warning."""
+
+    @pipefunc(output_name="y")
+    def double_it(x: int) -> int:
+        return 2 * x
+
+    pipeline = Pipeline([(double_it, "x[i] -> y[i]")])
+    inputs = {"x": [1, 2, 3]}
+
+    # Test cleanup=True triggers warning and behaves like resume=False
+    with pytest.warns(
+        DeprecationWarning,
+        match="The 'cleanup' parameter is deprecated.*Use 'resume' instead",
+    ):
+        results1 = pipeline.map(
+            inputs,
+            run_folder=tmp_path,
+            cleanup=True,
+            parallel=False,
+            storage="dict",
+        )
+    np.testing.assert_array_equal(results1["y"].output, [2, 4, 6])
+
+    # Test cleanup=False triggers warning and behaves like resume=True
+    with pytest.warns(
+        DeprecationWarning,
+        match="The 'cleanup' parameter is deprecated.*Use 'resume' instead",
+    ):
+        results2 = pipeline.map(
+            inputs,
+            run_folder=tmp_path,
+            cleanup=False,
+            parallel=False,
+            storage="dict",
+        )
+    np.testing.assert_array_equal(results2["y"].output, [2, 4, 6])
+
+    # Test that cleanup takes priority over resume
+    with pytest.warns(
+        DeprecationWarning,
+        match="The 'cleanup' parameter is deprecated.*Use 'resume' instead",
+    ):
+        results3 = pipeline.map(
+            inputs,
+            run_folder=tmp_path,
+            cleanup=True,  # This should override resume=True
+            resume=True,
+            parallel=False,
+            storage="dict",
+        )
+    # Since cleanup=True (resume=False), the run folder should be cleaned
+    np.testing.assert_array_equal(results3["y"].output, [2, 4, 6])

@@ -191,7 +191,7 @@ def test_cli_pipeline_integration_json(tmp_path: Path, monkeypatch: pytest.Monke
         "map_run_folder": str(tmp_path),
         "map_parallel": "False",
         "map_storage": "dict",
-        "map_cleanup": "True",
+        "map_resume": "True",
     }
     cli_args_dict: dict[str, str] = {
         "mode": "json",
