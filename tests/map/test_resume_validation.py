@@ -1,4 +1,4 @@
-"""Tests for the reuse_validation parameter in pipeline.map()."""
+"""Tests for the resume_validation parameter in pipeline.map()."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ class NoEqualityInput:  # noqa: PLW1641
         raise NotImplementedError(msg)
 
 
-def test_reuse_validation_auto_with_broken_eq(tmp_path: Path, capsys) -> None:
+def test_resume_validation_auto_with_broken_eq(tmp_path: Path, capsys) -> None:
     """Test that 'auto' mode warns but proceeds when equality comparison fails."""
 
     @pipefunc(output_name="y")
@@ -50,20 +50,20 @@ def test_reuse_validation_auto_with_broken_eq(tmp_path: Path, capsys) -> None:
     results1 = pipeline.map(
         inputs1,
         run_folder=tmp_path,
-        cleanup=True,
+        resume=False,
         parallel=False,
         storage="dict",
     )
     np.testing.assert_array_equal(results1["y"].output, [2, 4])
 
-    # Second run with same inputs but cleanup=False, reuse_validation="auto"
+    # Second run with same inputs but resume=True, resume_validation="auto"
     # Should warn but proceed
     inputs2 = {"x": [NoEqualityInput(1), NoEqualityInput(2)]}
     results2 = pipeline.map(
         inputs2,
         run_folder=tmp_path,
-        cleanup=False,
-        reuse_validation="auto",
+        resume=True,
+        resume_validation="auto",
         parallel=False,
         storage="dict",
     )
@@ -74,7 +74,7 @@ def test_reuse_validation_auto_with_broken_eq(tmp_path: Path, capsys) -> None:
     assert "Could not compare new `inputs` to `inputs` from previous run" in captured.out
 
 
-def test_reuse_validation_strict_with_broken_eq(tmp_path: Path) -> None:
+def test_resume_validation_strict_with_broken_eq(tmp_path: Path) -> None:
     """Test that 'strict' mode raises error when equality comparison fails."""
 
     @pipefunc(output_name="y")
@@ -89,13 +89,13 @@ def test_reuse_validation_strict_with_broken_eq(tmp_path: Path) -> None:
     results1 = pipeline.map(
         inputs1,
         run_folder=tmp_path,
-        cleanup=True,
+        resume=False,
         parallel=False,
         storage="dict",
     )
     np.testing.assert_array_equal(results1["y"].output, [2, 4])
 
-    # Second run with same inputs but cleanup=False, reuse_validation="strict"
+    # Second run with same inputs but resume=True, resume_validation="strict"
     # Should raise error
     inputs2 = {"x": [NoEqualityInput(1), NoEqualityInput(2)]}
     with pytest.raises(
@@ -105,14 +105,14 @@ def test_reuse_validation_strict_with_broken_eq(tmp_path: Path) -> None:
         pipeline.map(
             inputs2,
             run_folder=tmp_path,
-            cleanup=False,
-            reuse_validation="strict",
+            resume=True,
+            resume_validation="strict",
             parallel=False,
             storage="dict",
         )
 
 
-def test_reuse_validation_skip(tmp_path: Path) -> None:
+def test_resume_validation_skip(tmp_path: Path) -> None:
     """Test that 'skip' mode bypasses input validation entirely."""
 
     @pipefunc(output_name="y")
@@ -127,20 +127,20 @@ def test_reuse_validation_skip(tmp_path: Path) -> None:
     results1 = pipeline.map(
         inputs1,
         run_folder=tmp_path,
-        cleanup=True,
+        resume=False,
         parallel=False,
         storage="dict",
     )
     np.testing.assert_array_equal(results1["y"].output, [2, 4])
 
-    # Second run with DIFFERENT inputs but cleanup=False, reuse_validation="skip"
+    # Second run with DIFFERENT inputs but resume=True, resume_validation="skip"
     # Should succeed because validation is skipped
     inputs2 = {"x": [BrokenEqualityInput(10), BrokenEqualityInput(20)]}
     results2 = pipeline.map(
         inputs2,
         run_folder=tmp_path,
-        cleanup=False,
-        reuse_validation="skip",
+        resume=True,
+        resume_validation="skip",
         parallel=False,
         storage="dict",
     )
@@ -148,7 +148,7 @@ def test_reuse_validation_skip(tmp_path: Path) -> None:
     np.testing.assert_array_equal(results2["y"].output, [2, 4])
 
 
-def test_reuse_validation_auto_with_mismatched_inputs(tmp_path: Path) -> None:
+def test_resume_validation_auto_with_mismatched_inputs(tmp_path: Path) -> None:
     """Test that 'auto' mode raises error when inputs are genuinely different."""
 
     @pipefunc(output_name="y")
@@ -163,7 +163,7 @@ def test_reuse_validation_auto_with_mismatched_inputs(tmp_path: Path) -> None:
     results1 = pipeline.map(
         inputs1,
         run_folder=tmp_path,
-        cleanup=True,
+        resume=False,
         parallel=False,
         storage="dict",
     )
@@ -175,14 +175,14 @@ def test_reuse_validation_auto_with_mismatched_inputs(tmp_path: Path) -> None:
         pipeline.map(
             inputs2,
             run_folder=tmp_path,
-            cleanup=False,
-            reuse_validation="auto",
+            resume=True,
+            resume_validation="auto",
             parallel=False,
             storage="dict",
         )
 
 
-def test_reuse_validation_skip_still_validates_shapes(tmp_path: Path) -> None:
+def test_resume_validation_skip_still_validates_shapes(tmp_path: Path) -> None:
     """Test that 'skip' mode still validates shapes and MapSpecs."""
 
     @pipefunc(output_name="y")
@@ -197,7 +197,7 @@ def test_reuse_validation_skip_still_validates_shapes(tmp_path: Path) -> None:
     pipeline.map(
         inputs1,
         run_folder=tmp_path,
-        cleanup=True,
+        resume=False,
         parallel=False,
         storage="dict",
     )
@@ -208,15 +208,15 @@ def test_reuse_validation_skip_still_validates_shapes(tmp_path: Path) -> None:
         pipeline.map(
             inputs2,
             run_folder=tmp_path,
-            cleanup=False,
-            reuse_validation="skip",
+            resume=True,
+            resume_validation="skip",
             parallel=False,
             storage="dict",
         )
 
 
-def test_reuse_validation_with_defaults(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
-    """Test that defaults are also validated based on reuse_validation mode."""
+def test_resume_validation_with_defaults(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+    """Test that defaults are also validated based on resume_validation mode."""
 
     @pipefunc(output_name="y")
     def add_default(x: int, offset: NoEqualityInput = NoEqualityInput(10)) -> int:  # noqa: B008
@@ -230,19 +230,19 @@ def test_reuse_validation_with_defaults(tmp_path: Path, capsys: pytest.CaptureFi
     results1 = pipeline.map(
         inputs1,
         run_folder=tmp_path,
-        cleanup=True,
+        resume=False,
         parallel=False,
         storage="dict",
     )
     assert results1["y"].output == 15
 
-    # Second run with cleanup=False, reuse_validation="auto"
+    # Second run with resume=True, resume_validation="auto"
     # Should warn about defaults comparison
     results2 = pipeline.map(
         inputs1,
         run_folder=tmp_path,
-        cleanup=False,
-        reuse_validation="auto",
+        resume=True,
+        resume_validation="auto",
         parallel=False,
         storage="dict",
     )
@@ -253,7 +253,7 @@ def test_reuse_validation_with_defaults(tmp_path: Path, capsys: pytest.CaptureFi
     assert "Could not compare new `defaults` to `defaults` from previous run" in captured.out
 
 
-def test_reuse_validation_strict_with_defaults(tmp_path: Path) -> None:
+def test_resume_validation_strict_with_defaults(tmp_path: Path) -> None:
     """Test that strict mode raises error for incomparable defaults."""
 
     @pipefunc(output_name="y")
@@ -268,7 +268,7 @@ def test_reuse_validation_strict_with_defaults(tmp_path: Path) -> None:
     pipeline.map(
         inputs1,
         run_folder=tmp_path,
-        cleanup=True,
+        resume=False,
         parallel=False,
         storage="dict",
     )
@@ -281,15 +281,15 @@ def test_reuse_validation_strict_with_defaults(tmp_path: Path) -> None:
         pipeline.map(
             inputs1,
             run_folder=tmp_path,
-            cleanup=False,
-            reuse_validation="strict",
+            resume=True,
+            resume_validation="strict",
             parallel=False,
             storage="dict",
         )
 
 
-def test_reuse_validation_ignored_when_cleanup_true(tmp_path: Path) -> None:
-    """Test that reuse_validation is ignored when cleanup=True."""
+def test_resume_validation_ignored_when_resume_true(tmp_path: Path) -> None:
+    """Test that resume_validation is ignored when resume=False."""
 
     @pipefunc(output_name="y")
     def double_it(x: NoEqualityInput) -> int:
@@ -303,21 +303,76 @@ def test_reuse_validation_ignored_when_cleanup_true(tmp_path: Path) -> None:
     results1 = pipeline.map(
         inputs1,
         run_folder=tmp_path,
-        cleanup=True,
+        resume=False,
         parallel=False,
         storage="dict",
     )
     np.testing.assert_array_equal(results1["y"].output, [2, 4])
 
-    # Second run with cleanup=True - reuse_validation should be ignored
-    # This should work fine regardless of reuse_validation value
+    # Second run with resume=False - resume_validation should be ignored
+    # This should work fine regardless of resume_validation value
     inputs2 = {"x": [NoEqualityInput(3), NoEqualityInput(4)]}
     results2 = pipeline.map(
         inputs2,
         run_folder=tmp_path,
-        cleanup=True,
-        reuse_validation="strict",  # This is ignored
+        resume=False,
+        resume_validation="strict",  # This is ignored
         parallel=False,
         storage="dict",
     )
     np.testing.assert_array_equal(results2["y"].output, [6, 8])
+
+
+def test_cleanup_parameter_deprecation_warning(tmp_path: Path) -> None:
+    """Test that using the deprecated cleanup parameter triggers a deprecation warning."""
+
+    @pipefunc(output_name="y")
+    def double_it(x: int) -> int:
+        return 2 * x
+
+    pipeline = Pipeline([(double_it, "x[i] -> y[i]")])
+    inputs = {"x": [1, 2, 3]}
+
+    # Test cleanup=True triggers warning and behaves like resume=False
+    with pytest.warns(
+        DeprecationWarning,
+        match="The 'cleanup' parameter is deprecated.*Use 'resume' instead",
+    ):
+        results1 = pipeline.map(
+            inputs,
+            run_folder=tmp_path,
+            cleanup=True,
+            parallel=False,
+            storage="dict",
+        )
+    np.testing.assert_array_equal(results1["y"].output, [2, 4, 6])
+
+    # Test cleanup=False triggers warning and behaves like resume=True
+    with pytest.warns(
+        DeprecationWarning,
+        match="The 'cleanup' parameter is deprecated.*Use 'resume' instead",
+    ):
+        results2 = pipeline.map(
+            inputs,
+            run_folder=tmp_path,
+            cleanup=False,
+            parallel=False,
+            storage="dict",
+        )
+    np.testing.assert_array_equal(results2["y"].output, [2, 4, 6])
+
+    # Test that cleanup takes priority over resume
+    with pytest.warns(
+        DeprecationWarning,
+        match="The 'cleanup' parameter is deprecated.*Use 'resume' instead",
+    ):
+        results3 = pipeline.map(
+            inputs,
+            run_folder=tmp_path,
+            cleanup=True,  # This should override resume=True
+            resume=True,
+            parallel=False,
+            storage="dict",
+        )
+    # Since cleanup=True (resume=False), the run folder should be cleaned
+    np.testing.assert_array_equal(results3["y"].output, [2, 4, 6])

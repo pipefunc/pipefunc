@@ -160,7 +160,8 @@ def create_learners(
     *,
     storage: str | dict[OUTPUT_TYPE, str] = "file_array",
     return_output: bool = False,
-    cleanup: bool = True,
+    cleanup: bool | None = None,
+    resume: bool = False,
     fixed_indices: dict[str, int | slice] | None = None,
     split_independent_axes: bool = False,
 ) -> LearnersDict:
@@ -213,7 +214,20 @@ def create_learners(
     return_output
         Whether to return the output of the function in the learner.
     cleanup
-        Whether to clean up the ``run_folder``.
+        .. deprecated:: 0.89.0
+            Use `resume` parameter instead. Will be removed in version 1.0.0.
+
+        Whether to clean up the ``run_folder`` before running the pipeline.
+        When set, takes priority over ``resume`` parameter.
+        ``cleanup=True`` is equivalent to ``resume=False``.
+        ``cleanup=False`` is equivalent to ``resume=True``.
+    resume
+        Whether to resume data from a previous run in the ``run_folder``.
+
+        - ``False`` (default): Clean up the ``run_folder`` before running (fresh start).
+        - ``True``: Attempt to load and resume results from a previous run.
+
+        Note: If ``cleanup`` is specified, it takes priority over this parameter.
     fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
@@ -242,6 +256,7 @@ def create_learners(
         internal_shapes,
         storage=storage,
         cleanup=cleanup,
+        resume=resume,
     )
     store = run_info.init_store()
     learners: LearnersDict = LearnersDict(run_info=run_info)
@@ -424,7 +439,8 @@ class _MapWrapper:
     run_folder: Path
     internal_shapes: UserShapeDict | None
     parallel: bool
-    cleanup: bool
+    cleanup: bool | None
+    resume: bool
 
     def __call__(self, _: Any) -> None:
         """Run the pipeline."""
@@ -435,6 +451,7 @@ class _MapWrapper:
             self.internal_shapes,
             parallel=self.parallel,
             cleanup=self.cleanup,
+            resume=self.resume,
         )
 
 
@@ -445,7 +462,8 @@ def create_learners_from_sweep(
     internal_shapes: UserShapeDict | None = None,
     *,
     parallel: bool = True,
-    cleanup: bool = True,
+    cleanup: bool | None = None,
+    resume: bool = False,
 ) -> tuple[list[SequenceLearner], list[Path]]:
     """Create adaptive learners for a sweep.
 
@@ -474,7 +492,20 @@ def create_learners_from_sweep(
     parallel
         Whether to run the map in parallel.
     cleanup
-        Whether to clean up the ``run_folder``.
+        .. deprecated:: 0.89.0
+            Use `resume` parameter instead. Will be removed in version 1.0.0.
+
+        Whether to clean up the ``run_folder`` before running the pipeline.
+        When set, takes priority over ``resume`` parameter.
+        ``cleanup=True`` is equivalent to ``resume=False``.
+        ``cleanup=False`` is equivalent to ``resume=True``.
+    resume
+        Whether to resume data from a previous run in the ``run_folder``.
+
+        - ``False`` (default): Clean up the ``run_folder`` before running (fresh start).
+        - ``True``: Attempt to load and resume results from a previous run.
+
+        Note: If ``cleanup`` is specified, it takes priority over this parameter.
 
     Returns
     -------
@@ -490,7 +521,7 @@ def create_learners_from_sweep(
     max_digits = len(str(len(sweep) - 1))
     for i, inputs in enumerate(sweep):
         sweep_run = run_folder / f"sweep_{str(i).zfill(max_digits)}"
-        f = _MapWrapper(pipeline, inputs, sweep_run, internal_shapes, parallel, cleanup)
+        f = _MapWrapper(pipeline, inputs, sweep_run, internal_shapes, parallel, cleanup, resume)
         learner = SequenceLearner(f, sequence=[None])
         learners.append(learner)
         folders.append(sweep_run)

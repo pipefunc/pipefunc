@@ -22,7 +22,7 @@ In other words, you can:
 - **Automatically generate a CLI** from your pipeline’s input parameters.
 - **Validate and coerce user inputs** using a dynamically created Pydantic model.
 - **Extract parameter descriptions** from your function docstrings (if packages like Griffe are installed) so that the CLI help text includes detailed information.
-- **Configure mapping options** (e.g., parallel execution, storage method, and cleanup) via dedicated command‐line flags.
+- **Configure mapping options** (e.g., parallel execution, storage method, and resume behavior) via dedicated command‐line flags.
 - **Print pipeline documentation** directly via the `docs` subcommand.
 
 ```{note}
@@ -60,7 +60,7 @@ The CLI supports three modes:
    python cli-example.py docs
    ```
 
-In CLI and JSON modes, additional mapping options (prefixed with `--map-`) allow you to control how the pipeline executes, including settings like the run folder, parallel execution, storage backend, and cleanup behavior.
+In CLI and JSON modes, additional mapping options (prefixed with `--map-`) allow you to control how the pipeline executes, including settings like the run folder, parallel execution, storage backend, and resume behavior.
 
 ---
 
@@ -81,7 +81,7 @@ When you invoke `pipeline.cli()`, the following steps occur:
    - **`docs`**: Prints the pipeline documentation.
 
 3. **Mapping Options:**
-   Mapping-related options (e.g., `--map-run_folder`, `--map-parallel`, `--map-storage`, and `--map-cleanup`) are added to the `cli` and `json` subcommands, letting you configure pipeline execution without modifying code.
+   Mapping-related options (e.g., `--map-run_folder`, `--map-parallel`, `--map-storage`, and `--map-resume`) are added to the `cli` and `json` subcommands, letting you configure pipeline execution without modifying code.
 
 4. **Input Validation and Execution:**
    For the `cli` and `json` subcommands, the CLI parses and validates the inputs using the generated Pydantic model.
