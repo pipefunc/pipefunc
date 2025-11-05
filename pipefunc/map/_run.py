@@ -749,7 +749,7 @@ def _run_iteration(
 ) -> Any:
     def compute_fn() -> Any:
         try:
-            return func(**selected)
+            return func.run(**selected)
         except Exception as e:
             if not in_executor:
                 # If we are in the executor, we need to handle the error in `_result`
@@ -1197,7 +1197,7 @@ def _execute_single(
 
     def compute_fn() -> Any:
         try:
-            return func(**kwargs)
+            return func.run(**kwargs)
         except Exception as e:
             handle_pipefunc_error(e, func, kwargs)
             # handle_pipefunc_error raises but mypy doesn't know that

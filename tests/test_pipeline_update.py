@@ -31,7 +31,7 @@ def test_renaming_output_name() -> None:
 
 def test_update_pipeline_defaults() -> None:
     @pipefunc(output_name="c", defaults={"b": 1}, renames={"a": "a1"})
-    def f(a=42, b=69):
+    def f(a=42, b=69):  # nice
         return a + b
 
     pipeline = Pipeline([f])
@@ -54,9 +54,9 @@ def test_update_pipeline_defaults() -> None:
     assert fp.parameters == ("a1", "b")
 
     # Call function with new defaults
-    assert fp(a1=2) == 5
-    assert fp() == 4
-    assert fp(a1=2, b=3) == 5
+    assert fp.run(a1=2) == 5
+    assert fp.run() == 4
+    assert fp.run(a1=2, b=3) == 5
 
     with pytest.raises(ValueError, match="Unused keyword arguments"):
         pipeline.update_defaults({"does_not_exist": 1})

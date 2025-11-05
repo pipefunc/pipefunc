@@ -54,13 +54,13 @@ def test_resources_variable():
     def f_c(a, b, resources):
         return resources.gpus
 
-    assert f_c(a=1, b=2) == 8
+    assert f_c.run(a=1, b=2) == 8
 
     pipeline = Pipeline([f_c])
     assert pipeline(a=1, b=2) == 8
 
     with pytest.raises(ValueError, match="Unexpected keyword arguments: `{'resources'}`"):
-        f_c(a=1, b=2, resources={"gpus": 4})
+        f_c.run(a=1, b=2, resources={"gpus": 4})
 
     with pytest.raises(ValueError, match="Unused keyword arguments: `resources`"):
         pipeline(a=1, b=2, resources={"gpus": 4})
@@ -160,7 +160,7 @@ def test_resources_func_with_variable() -> None:
         assert resources.cpus == a + b
         return a * b
 
-    result = j(a=2, b=3)
+    result = j.run(a=2, b=3)
     assert result == 6
 
     pipeline = Pipeline([j])

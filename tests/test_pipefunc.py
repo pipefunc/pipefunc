@@ -106,7 +106,7 @@ def test_update_defaults_and_renames_and_bound() -> None:
     assert f.defaults == {"a1": 42, "b": 2}
 
     # Call function with updated defaults
-    assert f(a1=3) == 5
+    assert f.run(a1=3) == 5
 
     # Overwrite defaults
     f.update_defaults({"a1": 1, "b": 3}, overwrite=True)
@@ -114,9 +114,9 @@ def test_update_defaults_and_renames_and_bound() -> None:
     assert f.parameters == ("a1", "b")
 
     # Call function with new defaults
-    assert f(a1=2) == 5
-    assert f() == 4
-    assert f(a1=2, b=3) == 5
+    assert f.run(a1=2) == 5
+    assert f.run() == 4
+    assert f.run(a1=2, b=3) == 5
 
     # Update renames
     assert f.renames == {"a": "a1"}
@@ -125,28 +125,28 @@ def test_update_defaults_and_renames_and_bound() -> None:
     assert f.parameters == ("a2", "b")
 
     # Call function with updated renames
-    assert f(a2=4) == 7
-    assert f(b=0) == 1
+    assert f.run(a2=4) == 7
+    assert f.run(b=0) == 1
 
     # Overwrite renames
     f.update_renames({"a": "a3"}, overwrite=True, update_from="original")
     assert f.parameters == ("a3", "b")
 
     # Call function with new renames
-    assert f(a3=1) == 4
+    assert f.run(a3=1) == 4
 
     assert f.defaults == {"a3": 1, "b": 3}  # need to reset defaults before updating bound
     f.update_defaults({}, overwrite=True)
     f.update_bound({"a3": "yolo", "b": "swag"})
-    assert f(a3=88, b=1) == "yoloswag"
+    assert f.run(a3=88, b=1) == "yoloswag"
     assert f.bound == {"a3": "yolo", "b": "swag"}
     f.update_renames({"a": "a4"}, update_from="original")
     assert f.bound == {"a4": "yolo", "b": "swag"}
     f.update_bound({}, overwrite=True)
-    assert f(a4=88, b=1) == 89
+    assert f.run(a4=88, b=1) == 89
 
     f.update_renames({"a4": "a5"}, update_from="current")
-    assert f(a5=88, b=1) == 89
+    assert f.run(a5=88, b=1) == 89
     f.update_renames({"b": "b1"}, update_from="current")
     assert f.renames == {"a": "a5", "b": "b1"}
 
@@ -408,16 +408,16 @@ def test_nested_func_renames_defaults_and_bound() -> None:
     nf.update_renames({"a": "a1", "b": "b1"}, update_from="original")
     assert nf.defaults == {"b1": 99}
     assert nf.renames == {"a": "a1", "b": "b1"}
-    assert nf(a1=1, b1=2) == 3
-    assert nf(a1=1) == 100
+    assert nf.run(a1=1, b1=2) == 3
+    assert nf.run(a1=1) == 100
     nf.update_defaults({"b1": 2, "a1": 2})
-    assert nf() == 4
+    assert nf.run() == 4
     assert nf.renames == {"a": "a1", "b": "b1"}
     assert nf.defaults == {"b1": 2, "a1": 2}
     # Reset defaults to update bound
     nf.update_defaults({}, overwrite=True)
     nf.update_bound({"a1": "a", "b1": "b"})
-    assert nf(a1=3, b1=4) == "ab"  # will ignore the input values now
+    assert nf.run(a1=3, b1=4) == "ab"  # will ignore the input values now
 
 
 def test_nested_pipefunc_with_resources() -> None:
@@ -485,9 +485,9 @@ def test_pipefunc_scope() -> None:
 
     scope = "x"
     f.update_scope(scope, "*")
-    assert f(x={"a": 1, "b": 1}) == 2
-    assert f(**{"x.a": 1, "x.b": 1}) == 2
-    assert f(**{"x.b": 1, "x": {"a": 1}}) == 2
+    assert f.run(x={"a": 1, "b": 1}) == 2
+    assert f.run(**{"x.a": 1, "x.b": 1}) == 2
+    assert f.run(**{"x.b": 1, "x": {"a": 1}}) == 2
 
 
 def test_set_pipefunc_scope_on_init() -> None:
@@ -499,11 +499,11 @@ def test_set_pipefunc_scope_on_init() -> None:
     assert f.parameter_scopes == {"x"}
     assert f.renames == {"a": "x.a", "b": "x.b", "c": "x.c"}
     assert str(f.mapspec) == "x.a[i] -> x.c[i]"
-    assert f(x={"a": 1, "b": 1}) == 2
+    assert f.run(x={"a": 1, "b": 1}) == 2
     f.update_scope(None, "*", "*")
     assert f.unscoped_parameters == ("a", "b")
     assert f.parameters == ("a", "b")
-    assert f(a=1, b=1) == 2
+    assert f.run(a=1, b=1) == 2
 
 
 def test_incorrect_resources_variable():
@@ -589,7 +589,7 @@ def test_error_snapshot(tmp_path: Path) -> None:
         raise ValueError(msg)
 
     with pytest.raises(ValueError, match="This is a test error"):
-        f(a=1, b=2)
+        f.run(a=1, b=2)
     snap = f.error_snapshot
     assert snap is not None
     assert isinstance(snap, ErrorSnapshot)
@@ -632,11 +632,11 @@ def test_defaults_dataclass_factory() -> None:
 
     pf = PipeFunc(TestClass, "container")
     assert pf.defaults["x0"] == [1, 2, 3]
-    assert pf() == TestClass(x0=[1, 2, 3], y0=100)
+    assert pf.run() == TestClass(x0=[1, 2, 3], y0=100)
 
     pf2 = PipeFunc(TestClass, "container", defaults={"x0": [4, 5, 6]})
     assert pf2.defaults["x0"] == [4, 5, 6]
-    assert pf2() == TestClass(x0=[4, 5, 6], y0=100)
+    assert pf2.run() == TestClass(x0=[4, 5, 6], y0=100)
 
 
 def test_default_and_bound() -> None:
@@ -674,13 +674,13 @@ def test_default_with_positional_args() -> None:
     def f(a, b=1):
         return a, b
 
-    assert f(1, 2) == (1, 2)
+    assert f.run(1, 2) == (1, 2)
     with pytest.raises(ValueError, match="Multiple values provided for parameter `a`"):
-        f(1, 2, a=2)
+        f.run(1, 2, a=2)
 
     f.update_renames({"a": "x.a", "b": "x.b"}, update_from="original")
-    assert f(1) == (1, 1)
-    assert f(**{"x.a": 1, "x.b": 2}) == (1, 2)
+    assert f.run(1) == (1, 1)
+    assert f.run(**{"x.a": 1, "x.b": 2}) == (1, 2)
 
 
 def test_nested_pipefunc_function_name() -> None:
@@ -706,20 +706,20 @@ def test_nested_pipefunc_renames() -> None:
     nf = NestedPipeFunc([PipeFunc(f, "f"), PipeFunc(g, "g")], renames={"f": "f1"})
     assert nf.renames == {"f": "f1"}
     nf.copy()
-    assert nf(a=1, b=2) == (3, 3)
+    assert nf.run(a=1, b=2) == (3, 3)
 
     # Rename input
     nf = NestedPipeFunc([PipeFunc(f, "f"), PipeFunc(g, "g")], renames={"a": "a1"})
     assert nf.renames == {"a": "a1"}
     nf.copy()
-    assert nf(a1=1, b=2) == (3, 3)
+    assert nf.run(a1=1, b=2) == (3, 3)
 
     # Rename both input and output (with scope)
     nf = NestedPipeFunc(
         [PipeFunc(f, "f"), PipeFunc(g, "g")],
         renames={"f": "x.f", "g": "x.g", "a": "x.a", "b": "x.b"},
     )
-    assert nf(**{"x.a": 1, "x.b": 2}) == (3, 3)
+    assert nf.run(**{"x.a": 1, "x.b": 2}) == (3, 3)
 
 
 def test_pipefunc_with_class_with___call__() -> None:
@@ -761,14 +761,14 @@ def test_wrapping_pipefunc_in_pipefunc() -> None:
     def test(input: Any) -> Any:  # noqa: A002
         return input
 
-    assert test(input2=1) == 1
+    assert test.run(input2=1) == 1
     test2 = PipeFunc(
         func=test,
         output_name="test2",
         renames={"input2": "input3"},
         mapspec="input3[i] -> test2[i]",
     )
-    assert test2(input3=1) == 1
+    assert test2.run(input3=1) == 1
 
 
 def test_wrapping_pipefunc_with_scope_in_pipefunc() -> None:
@@ -787,13 +787,13 @@ def test_wrapping_pipefunc_with_scope_in_pipefunc() -> None:
     assert parameter.name == "input"
     assert parameter.annotation == "int"
 
-    assert test(x={"input2": 1}) == 1
+    assert test.run(x={"input2": 1}) == 1
     test2 = PipeFunc(
         func=test,
         output_name="test2",
         renames={"x.input2": "x.input3"},
     )
-    assert test2(x={"input3": 1}) == 1
+    assert test2.run(x={"input3": 1}) == 1
 
     parameter = test2.original_parameters["x.input2"]
     assert isinstance(parameter, inspect.Parameter)
@@ -811,6 +811,6 @@ def test_renamed_inputs_error_snapshot():
         return a * 2
 
     with pytest.raises(ValueError, match="a cannot be negative"):
-        f(b=-1)  # This will raise an error
+        f.run(b=-1)  # This will raise an error
     with pytest.raises(ValueError, match="a cannot be negative"):
         f.error_snapshot.reproduce()
