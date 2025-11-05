@@ -565,6 +565,102 @@ async def test_element_scope_filters_error_indices_with_mock_slurm() -> None:
 
 
 @pytest.mark.asyncio
+async def test_eager_element_scope_filters_error_indices_with_mock_slurm() -> None:
+    """Eager scheduler should apply the same SLURM element-scope routing policy."""
+
+    from pipefunc.map import _run as map_run
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]", resources={"cpus": 1})
+    def double_it(x: int) -> int:  # pragma: no cover
+        if x == 5:
+            msg = "boom"
+            raise ValueError(msg)
+        return 2 * x
+
+    @pipefunc(
+        output_name="z",
+        mapspec="y[i] -> z[i]",
+        resources=lambda kwargs: {"cpus": int(kwargs["y"] % 3) + 1},
+        resources_scope="element",
+    )
+    def add_one(y: int) -> int:  # pragma: no cover
+        return y + 1
+
+    pipeline = Pipeline([double_it, add_one])
+    executor = MockSlurmExecutor(cores_per_node=1)
+    inputs = {"x": list(range(10))}
+
+    original_submit = map_run._submit
+    submission: list[tuple[str, list[int]]] = []
+
+    def wrapped_submit(func, *args, **kwargs):
+        process_index_callable = getattr(func, "keywords", {}).get("process_index")
+        if process_index_callable is not None:
+            captured_func = process_index_callable.keywords.get("func")
+            if captured_func is not None:
+                chunk = args[4] if len(args) > 4 else []
+                submission.append((captured_func.__name__, list(chunk)))
+        return original_submit(func, *args, **kwargs)
+
+    with mock.patch("pipefunc.map._run._submit", side_effect=wrapped_submit):
+        runner = pipeline.map_async(
+            inputs,
+            executor=executor,
+            error_handling="continue",
+            show_progress="headless",
+            scheduling_strategy="eager",
+        )
+        result = await runner.task
+
+    # Downstream should exclude the error index 5
+    add_chunks = [idx for name, idxs in submission if name == "add_one" for idx in idxs]
+    assert sorted(add_chunks) == [i for i in range(10) if i != 5]
+    # Upstream still submitted all
+    y_chunks = [idx for name, idxs in submission if name == "double_it" for idx in idxs]
+    assert sorted(y_chunks) == list(range(10))
+    # Outputs consistent with error propagation
+    assert isinstance(result["y"].output[5], ErrorSnapshot)
+
+
+@pytest.mark.asyncio
+async def test_slurm_chunksize_is_one_for_executor_submissions() -> None:
+    """SLURM executor should submit chunks of size 1 regardless of inputs."""
+
+    from pipefunc.map import _run as map_run
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def id_fn(x: int) -> int:  # pragma: no cover
+        return x
+
+    pipeline = Pipeline([id_fn])
+    executor = MockSlurmExecutor(cores_per_node=1)
+    inputs = {"x": list(range(10))}
+
+    original_submit = map_run._submit
+    chunk_lengths: list[int] = []
+
+    def wrapped_submit(func, _ex, _status, _progress, chunksize, *args):
+        # record the declared chunksize and that it equals the real chunk length
+        chunk = args[0] if args else []
+        chunk_lengths.append(len(chunk))
+        assert chunksize == len(chunk)
+        return original_submit(func, _ex, _status, _progress, chunksize, *args)
+
+    with mock.patch("pipefunc.map._run._submit", side_effect=wrapped_submit):
+        runner = pipeline.map_async(
+            inputs,
+            executor=executor,
+            show_progress="headless",
+        )
+        result = await runner.task
+
+    assert len(result["y"].output) == 10
+    # Every submitted chunk must be of size 1 for SLURM
+    assert chunk_lengths
+    assert all(n == 1 for n in chunk_lengths)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("resources_scope", ["element", "map"])
 @pytest.mark.parametrize("use_mock", [True, False])
 async def test_with_nested_pipefunc(
