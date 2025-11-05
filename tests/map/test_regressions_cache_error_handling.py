@@ -22,7 +22,8 @@ def test_cache_does_not_mask_raise_mode_after_continue_cache():
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]", cache=True)
     def may_fail(x: int) -> int:
         if x == 3:
-            raise ValueError("boom at 3")
+            msg = "boom at 3"
+            raise ValueError(msg)
         return x * 2
 
     pipeline = Pipeline([may_fail])
@@ -39,4 +40,3 @@ def test_cache_does_not_mask_raise_mode_after_continue_cache():
     # 2) Now, with error_handling="raise", identical inputs should raise
     with pytest.raises(ValueError, match="boom at 3"):
         pipeline.map({"x": [1, 3]}, error_handling="raise", parallel=False)
-

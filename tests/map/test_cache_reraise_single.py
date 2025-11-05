@@ -18,7 +18,8 @@ def test_cache_reraises_on_cached_error_snapshot_single() -> None:
     def may_fail(x: int) -> int:
         call_count["n"] += 1
         if x == 3:
-            raise ValueError("boom at 3 (single)")
+            msg = "boom at 3 (single)"
+            raise ValueError(msg)
         return x * 2
 
     pipeline = Pipeline([may_fail])
@@ -32,6 +33,5 @@ def test_cache_reraises_on_cached_error_snapshot_single() -> None:
     assert call_count["n"] == 1
 
     # 2) Now with raise mode, identical input should re-raise, not return cached snapshot
-    with pytest.raises(ValueError, match="boom at 3 \(single\)"):
+    with pytest.raises(ValueError, match=r"boom at 3 \(single\)"):
         pipeline.map({"x": 3}, error_handling="raise", parallel=False)
-

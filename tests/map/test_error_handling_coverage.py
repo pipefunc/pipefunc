@@ -64,7 +64,11 @@ def test_create_propagated_error_reason_selection():
     err_info_partial = {
         "y": ErrorInfo.from_partial_error((3,), (np.array([1]),), 1),
     }
-    propagated_partial = create_propagated_error(err_info_partial, func, {"y": np.array([1, 2, 3]), "q": 7})
+    propagated_partial = create_propagated_error(
+        err_info_partial,
+        func,
+        {"y": np.array([1, 2, 3]), "q": 7},
+    )
     assert propagated_partial.reason == "array_contains_errors"
     assert propagated_partial.skipped_function == func
     # attempted_kwargs keeps non-error kwargs

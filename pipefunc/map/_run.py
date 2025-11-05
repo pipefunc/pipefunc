@@ -665,7 +665,7 @@ class ResourcesEval:
     snapshot: ErrorSnapshot | None = None
 
 
-def eval_resources(
+def eval_resources(  # noqa: PLR0911
     *,
     func: PipeFunc,
     map_kwargs: dict[str, Any],
@@ -700,7 +700,7 @@ def eval_resources(
     try:
         res = func.resources(kw)  # type: ignore[has-type]
         return ResourcesEval("evaluated", resources=res)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         if mode != "continue":
             raise
         snap = ErrorSnapshot(func.resources, exc, (kw,), {})
@@ -785,8 +785,7 @@ def _get_or_set_cache(
     cache_key = (func._cache_id, error_handling, to_hashable(kwargs))
 
     if cache_key in cache:
-        val = cache.get(cache_key)
-        return val
+        return cache.get(cache_key)
     if isinstance(cache, HybridCache):
         t = time.monotonic()
     result = compute_fn()
@@ -799,7 +798,8 @@ def _get_or_set_cache(
 
 _EVALUATED_RESOURCES = "__pipefunc_internal_evaluated_resources__"
 _RESOURCE_EVALUATION_ERROR = "__pipefunc_internal_resource_error__"
- 
+
+
 @dataclass(frozen=True)
 class ErrorContext:
     mode: Literal["raise", "continue"]
@@ -818,7 +818,7 @@ def _maybe_propagate_before_call(
 
 def _maybe_wrap_exception(
     ctx: ErrorContext,
-    func: Callable[..., Any],
+    func: PipeFunc,
     kwargs: dict[str, Any],
     exc: Exception,
 ) -> ErrorSnapshot:
@@ -863,7 +863,6 @@ class ErrorStub:
     is_propagated: bool  # True for PropagatedErrorSnapshot, False for ErrorSnapshot
 
 
-
 @dataclass
 class _InternalShape:
     shape: tuple[int, ...]
@@ -879,7 +878,7 @@ class _InternalShape:
 
 
 def _call_user(
-    func: Callable[..., Any],
+    func: PipeFunc,
     kwargs: dict[str, Any],
     ctx: ErrorContext,
 ) -> Any:

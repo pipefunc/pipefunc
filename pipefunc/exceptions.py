@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, Literal
 import cloudpickle
 
 from pipefunc._utils import get_local_ip
+
 Reason = Literal["input_is_error", "array_contains_errors"]
 
 if TYPE_CHECKING:
@@ -123,8 +124,6 @@ class PropagatedErrorSnapshot:
     reason: Reason  # normalized reason label
     attempted_kwargs: dict[str, Any]  # kwargs that were not errors
     timestamp: str = field(default_factory=_timestamp)
-
-    
 
     def __str__(self) -> str:
         """Return a string representation of the propagated error snapshot."""

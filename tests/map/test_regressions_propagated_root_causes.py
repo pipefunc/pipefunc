@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-import numpy as np
+from typing import TYPE_CHECKING
 
 import pytest
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
+
+if TYPE_CHECKING:
+    import numpy as np
 
 
 @pytest.mark.xfail(reason="Reduction get_root_causes only returns roots for full-error inputs")
@@ -22,7 +25,8 @@ def test_get_root_causes_in_reduction_returns_upstream_errors():
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def may_fail(x: int) -> int:
         if x == 3:
-            raise ValueError("cannot process 3")
+            msg = "cannot process 3"
+            raise ValueError(msg)
         return x * 2
 
     @pipefunc(output_name="total")  # reduction over full array

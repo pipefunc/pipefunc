@@ -123,7 +123,7 @@ def create_propagated_error(
     return PropagatedErrorSnapshot(
         error_info=error_info,
         skipped_function=skipped_function,
-        reason=reason,
+        reason=reason,  # type: ignore[arg-type]
         attempted_kwargs={k: v for k, v in kwargs.items() if k not in error_info},
     )
 
