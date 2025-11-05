@@ -844,18 +844,26 @@ def _get_or_set_cache(
     func: PipeFunc,
     kwargs: dict[str, Any],
     cache: _CacheBase | None,
-    compute_fn: Callable[[], Any],
+    ctx: ErrorContext,
     error_handling: Literal["raise", "continue"],
 ) -> Any:
+    """Compute with unified error guards and cache the result."""
+
+    def _compute() -> Any:
+        propagated = _maybe_propagate_before_call(ctx, func, kwargs)
+        if propagated is not None:
+            return propagated
+        return _call_user(func, kwargs, ctx)
+
     if cache is None:
-        return compute_fn()
+        return _compute()
     cache_key = (func._cache_id, error_handling, to_hashable(kwargs))
 
     if cache_key in cache:
         return cache.get(cache_key)
     if isinstance(cache, HybridCache):
         t = time.monotonic()
-    result = compute_fn()
+    result = _compute()
     if isinstance(cache, HybridCache):
         cache.put(cache_key, result, time.monotonic() - t)
     else:
@@ -894,28 +902,6 @@ def _maybe_wrap_exception(
         assert snapshot is not None
         return snapshot
     raise exc  # pragma: no cover
-
-
-def _compute_with_cache(
-    func: PipeFunc,
-    kwargs: dict[str, Any],
-    cache: _CacheBase | None,
-    ctx: ErrorContext,
-    error_handling: Literal["raise", "continue"],
-) -> Any:
-    """Unified compute+cache path used by map and non-map execution.
-
-    Always routes through the error guards and caches both computed results
-    and propagated error snapshots using the existing cache key.
-    """
-
-    def _compute() -> Any:
-        propagated = _maybe_propagate_before_call(ctx, func, kwargs)
-        if propagated is not None:
-            return propagated
-        return _call_user(func, kwargs, ctx)
-
-    return _get_or_set_cache(func, kwargs, cache, _compute, error_handling)
 
 
 def _try_shape(x: Any) -> tuple[int, ...]:
@@ -999,7 +985,7 @@ def _run_iteration_and_process(
     )
     # Early error detection centralized through the guard helper
     ctx = ErrorContext(mode=error_handling, error_info=error_infos.element)
-    output = _compute_with_cache(func, selected_kwargs, cache, ctx, error_handling)
+    output = _get_or_set_cache(func, selected_kwargs, cache, ctx, error_handling)
     outputs = _pick_output(func, output)
     has_dumped = _update_array(
         func,
@@ -1478,7 +1464,7 @@ def _execute_single(
     )
 
     ctx = ErrorContext(mode=error_handling, error_info=error_infos.element)
-    return _compute_with_cache(func, kwargs, cache, ctx, error_handling)
+    return _get_or_set_cache(func, kwargs, cache, ctx, error_handling)
 
 
 def _load_data(kwargs: dict[str, Any]) -> None:
