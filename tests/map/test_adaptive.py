@@ -156,7 +156,7 @@ def test_create_learners_loading_data(tmp_path: Path, return_output: bool) -> No
         inputs,
         run_folder=tmp_path,
         return_output=return_output,
-        cleanup=True,
+        resume=False,
     )
     flat_learners = learners.flatten()
     for learner_list in flat_learners.values():
@@ -171,7 +171,7 @@ def test_create_learners_loading_data(tmp_path: Path, return_output: bool) -> No
         inputs,
         run_folder=tmp_path,
         return_output=return_output,
-        cleanup=False,
+        resume=True,
     )
     flat_learners = learners.flatten()
     for learner_list in flat_learners.values():
@@ -206,7 +206,7 @@ def test_create_learners_from_sweep(tmp_path: Path) -> None:
         pipeline,
         sweep,
         run_folder=tmp_path,
-        cleanup=True,
+        resume=False,
         parallel=False,  # otherwise the counters won't be set
     )
     for learner in learners:
@@ -221,7 +221,7 @@ def test_create_learners_from_sweep(tmp_path: Path) -> None:
         pipeline,
         sweep,
         run_folder=tmp_path,
-        cleanup=False,
+        resume=True,
         parallel=False,  # otherwise the counters won't be set
     )
     for learner in learners:
@@ -234,7 +234,7 @@ def test_create_learners_from_sweep(tmp_path: Path) -> None:
         pipeline,
         sweep,
         run_folder=tmp_path,
-        cleanup=True,
+        resume=False,
         parallel=False,  # otherwise the counters won't be set
     )
     for learner in learners:
