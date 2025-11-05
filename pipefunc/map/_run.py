@@ -829,6 +829,28 @@ def _maybe_wrap_exception(
     raise exc  # pragma: no cover
 
 
+def _compute_with_cache(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    cache: _CacheBase | None,
+    ctx: ErrorContext,
+    error_handling: Literal["raise", "continue"],
+) -> Any:
+    """Unified compute+cache path used by map and non-map execution.
+
+    Always routes through the error guards and caches both computed results
+    and propagated error snapshots using the existing cache key.
+    """
+
+    def _compute() -> Any:
+        propagated = _maybe_propagate_before_call(ctx, func, kwargs)
+        if propagated is not None:
+            return propagated
+        return _call_user(func, kwargs, ctx)
+
+    return _get_or_set_cache(func, kwargs, cache, _compute, error_handling)
+
+
 def _run_iteration(
     func: PipeFunc,
     selected: dict[str, Any],
@@ -836,16 +858,9 @@ def _run_iteration(
     cache: _CacheBase | None,
     error_handling: Literal["raise", "continue"],
 ) -> Any:
-    # Early error detection centralized through the guard helper
+    # Early error detection and compute routed via unified helper
     ctx = ErrorContext(mode=error_handling, error_info=error_info)
-    propagated_error = _maybe_propagate_before_call(ctx, func, selected)
-    if propagated_error is not None:
-        return propagated_error
-
-    def compute_fn() -> Any:
-        return _call_user(func, selected, ctx)
-
-    return _get_or_set_cache(func, selected, cache, compute_fn, error_handling)
+    return _compute_with_cache(func, selected, cache, ctx, error_handling)
 
 
 def _try_shape(x: Any) -> tuple[int, ...]:
@@ -1406,15 +1421,7 @@ def _execute_single(
     )
 
     ctx = ErrorContext(mode=error_handling, error_info=error_infos.element)
-
-    # Early error detection for non-mapspec operations
-    if (pe := _maybe_propagate_before_call(ctx, func, kwargs)) is not None:
-        return _get_or_set_cache(func, kwargs, cache, lambda: pe, error_handling)
-
-    def compute_fn() -> Any:
-        return _call_user(func, kwargs, ctx)
-
-    return _get_or_set_cache(func, kwargs, cache, compute_fn, error_handling)
+    return _compute_with_cache(func, kwargs, cache, ctx, error_handling)
 
 
 def _load_data(kwargs: dict[str, Any]) -> None:
