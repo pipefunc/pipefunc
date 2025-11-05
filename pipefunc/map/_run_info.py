@@ -82,11 +82,7 @@ class RunInfo:
         resume: bool = False,
         resume_validation: Literal["auto", "strict", "skip"] = "auto",
     ) -> RunInfo:
-        # Note: cleanup deprecation is handled in user-facing functions
-        # (Pipeline.map, run_map, etc.) to ensure warning points to user's code
-        if cleanup is not None:
-            resume = not cleanup  # cleanup has priority over resume
-
+        resume = _handle_cleanup_deprecation(cleanup, resume, warning=True)
         storage, run_folder = _resolve_storage_and_run_folder(run_folder, storage)
         internal_shapes = _construct_internal_shapes(internal_shapes, pipeline)
         if run_folder is not None:
@@ -278,17 +274,19 @@ def _handle_cleanup_deprecation(
     cleanup: bool | None,
     resume: bool,
     stacklevel: int = 2,
+    *,
+    warning: bool = True,
 ) -> bool:
     """Handle deprecation of `cleanup` parameter."""
-    # Handle cleanup deprecation
     if cleanup is not None:
-        warnings.warn(
-            "The 'cleanup' parameter is deprecated and will be removed in a future version. "
-            "Use 'resume' instead: cleanup=False is equivalent to resume=True, "
-            "cleanup=True is equivalent to resume=False",
-            DeprecationWarning,
-            stacklevel=stacklevel,
-        )
+        if warning:
+            warnings.warn(
+                "The 'cleanup' parameter is deprecated and will be removed in a future version. "
+                "Use 'resume' instead: cleanup=False is equivalent to resume=True, "
+                "cleanup=True is equivalent to resume=False",
+                DeprecationWarning,
+                stacklevel=stacklevel,
+            )
         resume = not cleanup  # cleanup has priority over resume
     return resume
 

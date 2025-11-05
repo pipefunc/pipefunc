@@ -45,6 +45,7 @@ from pipefunc.map._mapspec import (
 from pipefunc.map._run import AsyncMap, run_map, run_map_async
 from pipefunc.map._run_eager import run_map_eager
 from pipefunc.map._run_eager_async import run_map_eager_async
+from pipefunc.map._run_info import _handle_cleanup_deprecation
 from pipefunc.resources import Resources
 
 from ._autodoc import PipelineDocumentation, format_pipeline_docs
@@ -924,9 +925,6 @@ class Pipeline:
             use `Result.output` to get the actual result.
 
         """
-        from pipefunc.map._run_info import _handle_cleanup_deprecation
-
-        # Handle cleanup deprecation
         resume = _handle_cleanup_deprecation(cleanup, resume, stacklevel=2)
 
         if scheduling_strategy == "generation":
@@ -1129,9 +1127,6 @@ class Pipeline:
 
 
         """
-        from pipefunc.map._run_info import _handle_cleanup_deprecation
-
-        # Handle cleanup deprecation
         resume = _handle_cleanup_deprecation(cleanup, resume, stacklevel=2)
 
         if scheduling_strategy == "generation":

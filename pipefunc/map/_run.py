@@ -38,6 +38,7 @@ from ._load import _load_from_store, maybe_load_data
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
 from ._result import DirectValue, Result, ResultDict
+from ._run_info import _handle_cleanup_deprecation
 from ._shapes import external_shape_from_mask, internal_shape_from_mask, shape_is_resolved
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
@@ -209,9 +210,6 @@ def run_map(
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
     """
-    from ._run_info import _handle_cleanup_deprecation
-
-    # Handle cleanup deprecation
     resume = _handle_cleanup_deprecation(cleanup, resume, stacklevel=2)
 
     prep = prepare_run(
@@ -525,9 +523,6 @@ def run_map_async(
         `start()` method on the `AsyncMap` instance is called.
 
     """
-    from ._run_info import _handle_cleanup_deprecation
-
-    # Handle cleanup deprecation
     resume = _handle_cleanup_deprecation(cleanup, resume, stacklevel=2)
 
     prep = prepare_run(

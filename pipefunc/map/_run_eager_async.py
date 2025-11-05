@@ -18,6 +18,8 @@ from pipefunc.map._run_eager import (
     _update_dependencies_and_submit,
 )
 
+from ._run_info import _handle_cleanup_deprecation
+
 if TYPE_CHECKING:
     from collections.abc import Callable
     from concurrent.futures import Executor
@@ -195,9 +197,6 @@ def run_map_eager_async(
         `start()` method on the `AsyncMap` instance is called.
 
     """
-    from ._run_info import _handle_cleanup_deprecation
-
-    # Handle cleanup deprecation
     resume = _handle_cleanup_deprecation(cleanup, resume, stacklevel=2)
 
     prep = prepare_run(

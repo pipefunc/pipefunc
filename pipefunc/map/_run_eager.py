@@ -16,6 +16,7 @@ from pipefunc.map._run import (
 )
 
 from ._adaptive_scheduler_slurm_executor import maybe_finalize_slurm_executors
+from ._run_info import _handle_cleanup_deprecation
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -187,9 +188,6 @@ def run_map_eager(
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
     """
-    from ._run_info import _handle_cleanup_deprecation
-
-    # Handle cleanup deprecation
     resume = _handle_cleanup_deprecation(cleanup, resume, stacklevel=2)
 
     # Prepare the run (this call sets up the run folder, storage, progress, etc.)
