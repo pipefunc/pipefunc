@@ -855,9 +855,8 @@ def _get_or_set_cache(
     """Compute with unified error guards and cache the result."""
 
     def _compute() -> Any:
-        propagated = _maybe_propagate_before_call(ctx, func, kwargs)
-        if propagated is not None:
-            return propagated
+        if ctx.mode == "continue" and ctx.error_info:
+            return create_propagated_error(ctx.error_info, func, kwargs)
         return _call_user(func, kwargs, ctx)
 
     if cache is None:
@@ -884,16 +883,6 @@ _RESOURCE_EVALUATION_ERROR = "__pipefunc_internal_resource_error__"
 class ErrorContext:
     mode: Literal["raise", "continue"]
     error_info: dict[str, ErrorInfo] | None
-
-
-def _maybe_propagate_before_call(
-    ctx: ErrorContext,
-    func: Callable[..., Any],
-    kwargs: dict[str, Any],
-) -> PropagatedErrorSnapshot | None:
-    if ctx.mode != "continue" or not ctx.error_info:
-        return None
-    return create_propagated_error(ctx.error_info, func, kwargs)
 
 
 def _maybe_wrap_exception(
