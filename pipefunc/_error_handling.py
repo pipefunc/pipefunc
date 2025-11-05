@@ -128,39 +128,6 @@ def create_propagated_error(
     )
 
 
-def propagate_input_errors(
-    kwargs: dict[str, Any],
-    func: Callable[..., Any],
-    error_handling: str,
-    error_info: dict[str, ErrorInfo] | None,
-) -> PropagatedErrorSnapshot | None:
-    """Check for error inputs and create PropagatedErrorSnapshot if needed.
-
-    Parameters
-    ----------
-    kwargs
-        The keyword arguments to check.
-    func
-        The function that would be called.
-    error_handling
-        The error handling mode ("raise" or "continue").
-    error_info
-        Precomputed error information for ``kwargs``.
-
-    Returns
-    -------
-        PropagatedErrorSnapshot if errors found and error_handling is "continue",
-        None otherwise.
-
-    """
-    if error_handling != "continue":
-        return None
-
-    if not error_info:
-        return None
-    return create_propagated_error(error_info, func, kwargs)
-
-
 def cloudpickle_function_state(state: dict[str, Any], function_key: str) -> dict[str, Any]:
     """Prepare state dict for pickling by serializing function references.
 

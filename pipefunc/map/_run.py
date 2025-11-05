@@ -16,7 +16,11 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 import numpy as np
 import numpy.typing as npt
 
-from pipefunc._error_handling import ErrorInfo, propagate_input_errors, scan_inputs_for_errors
+from pipefunc._error_handling import (
+    ErrorInfo,
+    create_propagated_error,
+    scan_inputs_for_errors,
+)
 from pipefunc._pipefunc_utils import handle_pipefunc_error
 from pipefunc._utils import (
     at_least_tuple,
@@ -889,7 +893,7 @@ def _maybe_propagate_before_call(
 ) -> PropagatedErrorSnapshot | None:
     if ctx.mode != "continue" or not ctx.error_info:
         return None
-    return propagate_input_errors(kwargs, func, ctx.mode, ctx.error_info)
+    return create_propagated_error(ctx.error_info, func, kwargs)
 
 
 def _maybe_wrap_exception(

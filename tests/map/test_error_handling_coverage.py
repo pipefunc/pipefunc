@@ -14,8 +14,6 @@ from pipefunc._error_handling import (
     cloudpickle_function_state,
     cloudunpickle_function_state,
     create_propagated_error,
-    propagate_input_errors,
-    scan_inputs_for_errors,
 )
 from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
 
@@ -73,16 +71,6 @@ def test_create_propagated_error_reason_selection():
     assert propagated_partial.skipped_function == func
     # attempted_kwargs keeps non-error kwargs
     assert propagated_partial.attempted_kwargs == {"q": 7}
-
-
-def test_propagate_input_errors_with_raise_mode():
-    """Test propagate_input_errors returns None when error_handling is 'raise'."""
-    kwargs = {"x": 5}
-    func = lambda x: x * 2  # noqa: E731
-
-    error_info = scan_inputs_for_errors(kwargs)
-    result = propagate_input_errors(kwargs, func, "raise", error_info=error_info)
-    assert result is None
 
 
 def test_cloudpickle_functions_no_function_key():
