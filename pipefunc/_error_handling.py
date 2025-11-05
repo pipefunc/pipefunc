@@ -118,8 +118,6 @@ def create_propagated_error(
     if any(info.type == "full" for info in error_info.values()):
         reason = "input_is_error"
     else:
-        # At least one partial error must be present for propagation to occur
-        # (error_info is non-empty here). Normalize to the canonical name.
         reason = "array_contains_errors"
 
     return PropagatedErrorSnapshot(

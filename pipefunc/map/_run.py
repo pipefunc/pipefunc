@@ -673,11 +673,10 @@ def eval_resources(
     error_infos: _ErrorInfos,
     mode: Literal["raise", "continue"],
 ) -> ResourcesEval:
-    # Respect precomputed resources to avoid double evaluation (main + executor)
+    # Short-circuit if resources were evaluated in a prior phase
     if _EVALUATED_RESOURCES in element_kwargs:
         return ResourcesEval("evaluated", resources=element_kwargs[_EVALUATED_RESOURCES])
-    # Map-level pre-evaluated resources are not stored in map_kwargs in the
-    # current design; element_kwargs carries evaluated resources.
+    # Map-level pre-evaluated resources are not used; element scope holds them.
 
     # If a previous pass recorded a resource evaluation error, don't re-evaluate
     if _RESOURCE_EVALUATION_ERROR in element_kwargs:
@@ -716,13 +715,7 @@ def _eval_and_apply_resources(
     error_infos: _ErrorInfos,
     mode: Literal["raise", "continue"],
 ) -> tuple[ResourcesEval, _ErrorInfos]:
-    """Run eval_resources and apply side effects consistently.
-
-    - On "evaluated": stores resources in element_kwargs[_EVALUATED_RESOURCES].
-    - On "error" (continue mode): adds an ErrorInfo entry and stashes the snapshot in
-      element_kwargs[_RESOURCE_EVALUATION_ERROR] to prevent re-evaluation downstream.
-    - Returns the ResourcesEval and possibly updated _ErrorInfos.
-    """
+    """Evaluate resources and apply side effects to kwargs and error infos."""
     res = eval_resources(
         func=func,
         map_kwargs=map_kwargs,
@@ -806,10 +799,7 @@ def _get_or_set_cache(
 
 _EVALUATED_RESOURCES = "__pipefunc_internal_evaluated_resources__"
 _RESOURCE_EVALUATION_ERROR = "__pipefunc_internal_resource_error__"
-# No internal resource keys need to be stripped from call kwargs anymore.
-
-
-# Centralized error-flow context and guards
+ 
 @dataclass(frozen=True)
 class ErrorContext:
     mode: Literal["raise", "continue"]
@@ -821,10 +811,8 @@ def _maybe_propagate_before_call(
     func: Callable[..., Any],
     kwargs: dict[str, Any],
 ) -> PropagatedErrorSnapshot | None:
-    """Early-out if inputs already contain error objects (continue mode only)."""
     if ctx.mode != "continue" or not ctx.error_info:
         return None
-    # Reuse the existing helper to construct a PropagatedErrorSnapshot.
     return propagate_input_errors(kwargs, func, ctx.mode, ctx.error_info)
 
 
@@ -834,12 +822,10 @@ def _maybe_wrap_exception(
     kwargs: dict[str, Any],
     exc: Exception,
 ) -> ErrorSnapshot:
-    """Map a thrown user exception to ErrorSnapshot (continue) or re-raise (raise)."""
     snapshot = handle_pipefunc_error(exc, func, kwargs, ctx.mode)
     if ctx.mode == "continue":
         assert snapshot is not None
         return snapshot
-    # handle_pipefunc_error raises for "raise" mode; the return is unreachable.
     raise exc  # pragma: no cover
 
 
@@ -872,14 +858,7 @@ def _try_shape(x: Any) -> tuple[int, ...]:
 
 @dataclass
 class ErrorStub:
-    """Lightweight marker indicating an error occurred (for return_results=False).
-
-    When return_results=False, we don't need the full ErrorSnapshot with its
-    potentially large kwargs. This marker tracks just enough information to:
-    - Count errors correctly
-    - Propagate errors downstream
-    - Distinguish between original errors and propagated errors
-    """
+    """Lightweight marker for errors when return_results=False."""
 
     is_propagated: bool  # True for PropagatedErrorSnapshot, False for ErrorSnapshot
 
