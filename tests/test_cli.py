@@ -61,6 +61,7 @@ def test_cli_add_map_arguments() -> None:
     assert any(action.dest == "map_parallel" for action in actions)
     assert any(action.dest == "map_storage" for action in actions)
     assert any(action.dest == "map_cleanup" for action in actions)
+    assert any(action.dest == "map_resume" for action in actions)
 
 
 def test_cli_validate_inputs() -> None:
@@ -190,7 +191,7 @@ def test_cli_pipeline_integration_json(tmp_path: Path, monkeypatch: pytest.Monke
         "map_run_folder": str(tmp_path),
         "map_parallel": "False",
         "map_storage": "dict",
-        "map_cleanup": "True",
+        "map_resume": "True",
     }
     cli_args_dict: dict[str, str] = {
         "mode": "json",
