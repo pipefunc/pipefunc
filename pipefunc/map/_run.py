@@ -676,8 +676,13 @@ def eval_resources(
     # Respect precomputed resources to avoid double evaluation (main + executor)
     if _EVALUATED_RESOURCES in element_kwargs:
         return ResourcesEval("evaluated", resources=element_kwargs[_EVALUATED_RESOURCES])
-    if func.resources_scope == "map" and _EVALUATED_RESOURCES in map_kwargs:
-        return ResourcesEval("evaluated", resources=map_kwargs[_EVALUATED_RESOURCES])
+    # Map-level pre-evaluated resources are not stored in map_kwargs in the
+    # current design; element_kwargs carries evaluated resources.
+
+    # If a previous pass recorded a resource evaluation error, don't re-evaluate
+    if _RESOURCE_EVALUATION_ERROR in element_kwargs:
+        snap = element_kwargs[_RESOURCE_EVALUATION_ERROR]
+        return ResourcesEval("error", snapshot=snap)
 
     if not callable(func.resources):  # type: ignore[has-type]
         return ResourcesEval("skipped")
@@ -703,6 +708,40 @@ def eval_resources(
         return ResourcesEval("error", snapshot=snap)
 
 
+def _eval_and_apply_resources(
+    *,
+    func: PipeFunc,
+    map_kwargs: dict[str, Any],
+    element_kwargs: dict[str, Any],
+    error_infos: _ErrorInfos,
+    mode: Literal["raise", "continue"],
+) -> tuple[ResourcesEval, _ErrorInfos]:
+    """Run eval_resources and apply side effects consistently.
+
+    - On "evaluated": stores resources in element_kwargs[_EVALUATED_RESOURCES].
+    - On "error" (continue mode): adds an ErrorInfo entry and stashes the snapshot in
+      element_kwargs[_RESOURCE_EVALUATION_ERROR] to prevent re-evaluation downstream.
+    - Returns the ResourcesEval and possibly updated _ErrorInfos.
+    """
+    res = eval_resources(
+        func=func,
+        map_kwargs=map_kwargs,
+        element_kwargs=element_kwargs,
+        error_infos=error_infos,
+        mode=mode,
+    )
+    if res.state == "evaluated":
+        element_kwargs[_EVALUATED_RESOURCES] = res.resources
+        return res, error_infos
+    if res.state == "error" and mode == "continue" and res.snapshot is not None:
+        element_error_info = dict(error_infos.element or {})
+        element_error_info[_RESOURCE_EVALUATION_ERROR] = ErrorInfo.from_full_error(res.snapshot)
+        new_infos = _ErrorInfos(error_infos.map, element_error_info)
+        element_kwargs[_RESOURCE_EVALUATION_ERROR] = res.snapshot
+        return res, new_infos
+    return res, error_infos
+
+
 def _prepare_kwargs_for_execution(
     func: PipeFunc,
     map_kwargs: dict[str, Any],
@@ -714,19 +753,13 @@ def _prepare_kwargs_for_execution(
 ) -> tuple[dict[str, Any], _ErrorInfos]:
     selected_kwargs = _select_kwargs(func, map_kwargs, shape, shape_mask, index)
     error_infos = _create_error_infos(selected_kwargs, error_handling, map_error_info)
-    res = eval_resources(
+    res, error_infos = _eval_and_apply_resources(
         func=func,
         map_kwargs=map_kwargs,
         element_kwargs=selected_kwargs,
         error_infos=error_infos,
         mode=error_handling,
     )
-    if res.state == "evaluated":
-        selected_kwargs[_EVALUATED_RESOURCES] = res.resources
-    elif res.state == "error" and error_handling == "continue" and res.snapshot is not None:
-        element_error_info = dict(error_infos.element or {})
-        element_error_info[_RESOURCE_EVALUATION_ERROR] = ErrorInfo.from_full_error(res.snapshot)
-        error_infos = _ErrorInfos(error_infos.map, element_error_info)
     return selected_kwargs, error_infos
 
 
@@ -760,11 +793,6 @@ def _get_or_set_cache(
 
     if cache_key in cache:
         val = cache.get(cache_key)
-        if isinstance(val, ErrorSnapshot) and error_handling != "continue":
-            # Respect fail‑loud semantics when running in raise mode, even if a
-            # previous continue-mode run cached an ErrorSnapshot for the same inputs.
-            handle_pipefunc_error(val.exception, func, kwargs, error_handling="raise")
-            # handle_pipefunc_error raises; the return below is unreachable.
         return val
     if isinstance(cache, HybridCache):
         t = time.monotonic()
@@ -788,7 +816,7 @@ class ErrorContext:
     error_info: dict[str, ErrorInfo] | None
 
 
-def maybe_propagate_before_call(
+def _maybe_propagate_before_call(
     ctx: ErrorContext,
     func: Callable[..., Any],
     kwargs: dict[str, Any],
@@ -800,7 +828,7 @@ def maybe_propagate_before_call(
     return propagate_input_errors(kwargs, func, ctx.mode, ctx.error_info)
 
 
-def maybe_wrap_exception(
+def _maybe_wrap_exception(
     ctx: ErrorContext,
     func: Callable[..., Any],
     kwargs: dict[str, Any],
@@ -824,7 +852,7 @@ def _run_iteration(
 ) -> Any:
     # Early error detection centralized through the guard helper
     ctx = ErrorContext(mode=error_handling, error_info=error_info)
-    propagated_error = maybe_propagate_before_call(ctx, func, selected)
+    propagated_error = _maybe_propagate_before_call(ctx, func, selected)
     if propagated_error is not None:
         return propagated_error
 
@@ -880,7 +908,7 @@ def _call_user(
     try:
         return func(**call_kwargs)
     except Exception as e:  # noqa: BLE001
-        return maybe_wrap_exception(ctx, func, kwargs, e)
+        return _maybe_wrap_exception(ctx, func, kwargs, e)
 
 
 def _entry_contains_error(entry: Any) -> bool:
@@ -1355,19 +1383,13 @@ def _maybe_execute_single(
 ) -> Any:
     args = (func, kwargs, store, cache, error_handling)  # args for _execute_single
     error_infos = _create_error_infos(kwargs, error_handling, None)
-    res = eval_resources(
+    res, error_infos = _eval_and_apply_resources(
         func=func,
         map_kwargs=kwargs,
         element_kwargs=kwargs,
         error_infos=error_infos,
         mode=error_handling,
     )
-    if res.state == "evaluated":
-        kwargs[_EVALUATED_RESOURCES] = res.resources
-    elif res.state == "error" and error_handling == "continue" and res.snapshot is not None:
-        element_error_info = dict(error_infos.element or {})
-        element_error_info[_RESOURCE_EVALUATION_ERROR] = ErrorInfo.from_full_error(res.snapshot)
-        error_infos = _ErrorInfos(error_infos.map, element_error_info)
     ex = _executor_for_func(func, executor)
     if ex is not None and res.state != "error":
         resolved_resources = kwargs.get(_EVALUATED_RESOURCES)
@@ -1397,24 +1419,18 @@ def _execute_single(
     # Otherwise, run the function
     _load_data(kwargs)
     error_infos = _create_error_infos(kwargs, error_handling, None)
-    res = eval_resources(
+    res, error_infos = _eval_and_apply_resources(
         func=func,
         map_kwargs=kwargs,
         element_kwargs=kwargs,
         error_infos=error_infos,
         mode=error_handling,
     )
-    if res.state == "evaluated":
-        kwargs[_EVALUATED_RESOURCES] = res.resources
-    elif res.state == "error" and error_handling == "continue" and res.snapshot is not None:
-        element_error_info = dict(error_infos.element or {})
-        element_error_info[_RESOURCE_EVALUATION_ERROR] = ErrorInfo.from_full_error(res.snapshot)
-        error_infos = _ErrorInfos(error_infos.map, element_error_info)
 
     ctx = ErrorContext(mode=error_handling, error_info=error_infos.element)
 
     # Early error detection for non-mapspec operations
-    if (pe := maybe_propagate_before_call(ctx, func, kwargs)) is not None:
+    if (pe := _maybe_propagate_before_call(ctx, func, kwargs)) is not None:
         return _get_or_set_cache(func, kwargs, cache, lambda: pe, error_handling)
 
     def compute_fn() -> Any:
