@@ -98,6 +98,24 @@ def _is_slurm_executor_type(executor: Executor | None) -> TypeGuard[type[SlurmEx
     return isinstance(executor, type) and issubclass(executor, SlurmExecutor)
 
 
+def should_filter_error_indices(
+    func: PipeFunc,
+    executor: Executor,
+    error_handling: str,
+) -> bool:
+    """Policy: decide if error indices must be filtered locally.
+
+    Today this is required for SLURM with element-scope resources when
+    error_handling="continue" so we don't evaluate resources for errored
+    elements or submit pointless jobs.
+    """
+    return (
+        func.resources_scope == "element"
+        and is_slurm_executor(executor)
+        and error_handling == "continue"
+    )
+
+
 def _slurm_executor_for_map(
     executor: SlurmExecutor | type[SlurmExecutor],
     process_index: functools.partial[tuple[Any, ...]],
@@ -195,6 +213,7 @@ def _map_slurm_executor_kwargs(
         evaluated_resources = _resources_from_process_index(process_index, i)
         scheduler_resources = _adaptive_scheduler_resource_dict(evaluated_resources)
         resources_list.append(scheduler_resources)
+
     dict_of_tuples = _list_of_dicts_to_dict_of_tuples(resources_list)
     kwargs.update(dict_of_tuples)
     return kwargs

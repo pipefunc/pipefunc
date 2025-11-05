@@ -36,6 +36,7 @@ from ._adaptive_scheduler_slurm_executor import (
     maybe_multi_run_manager,
     maybe_update_slurm_executor_map,
     maybe_update_slurm_executor_single,
+    should_filter_error_indices,
 )
 from ._load import _load_from_store, maybe_load_data
 from ._mapspec import MapSpec, _shape_to_key
@@ -1336,6 +1337,20 @@ def _get_optimal_chunk_size(
     return max(1, chunk_size)
 
 
+def _scan_error_flags(
+    process_index: functools.partial[tuple[Any, ...]],
+    indices: list[int],
+) -> list[bool]:
+    """Return booleans indicating whether each index has input errors."""
+    kw = process_index.keywords
+    func = kw["func"]
+    flags: list[bool] = []
+    for idx in indices:
+        selected = _select_kwargs(func, kw["kwargs"], kw["shape"], kw["shape_mask"], idx)
+        flags.append(bool(scan_inputs_for_errors(selected)))
+    return flags
+
+
 def _all_indices_propagate_errors(
     process_index: functools.partial[tuple[Any, ...]],
     indices: list[int],
@@ -1343,12 +1358,68 @@ def _all_indices_propagate_errors(
     kw = process_index.keywords
     if kw["error_handling"] != "continue":
         return False
-    func = kw["func"]
-    for idx in indices:
-        selected = _select_kwargs(func, kw["kwargs"], kw["shape"], kw["shape_mask"], idx)
-        if not scan_inputs_for_errors(selected):
-            return False
-    return True
+    return all(_scan_error_flags(process_index, indices))
+
+
+def _split_error_and_valid_indices(
+    process_index: functools.partial[tuple[Any, ...]],
+    indices: list[int],
+) -> tuple[list[int], list[int]]:
+    """Split indices into those with propagated errors and those that are valid.
+
+    Returns
+    -------
+    (error_indices, valid_indices)
+
+    """
+    flags = _scan_error_flags(process_index, indices)
+    error_indices = [i for i, is_err in zip(indices, flags) if is_err]
+    valid_indices = [i for i, is_err in zip(indices, flags) if not is_err]
+    return error_indices, valid_indices
+
+
+def route_indices_for_executor(
+    func: PipeFunc,
+    executor_inst: Executor,
+    process_index: functools.partial[tuple[Any, ...]],
+    indices: list[int],
+    error_handling: str,
+) -> tuple[list[int], list[int]]:
+    """Decide which indices to run locally vs submit to the executor.
+
+    - SLURM element-scope + continue: split error vs valid indices
+    - Otherwise: if all indices propagate errors → process locally
+    - Otherwise: submit everything to executor
+    """
+    if should_filter_error_indices(func, executor_inst, error_handling):
+        return _split_error_and_valid_indices(process_index, indices)
+    if _all_indices_propagate_errors(process_index, indices):
+        return indices, []
+    return [], indices
+
+
+def _submit_executor_indices(
+    func: PipeFunc,
+    ex: Executor,
+    executor: dict[OUTPUT_TYPE, Executor],
+    process_index: functools.partial[tuple[Any, ...]],
+    executor_indices: list[int],
+    status: Status | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
+) -> list[_ChunkTask]:
+    """Encapsulate the 'update → chunk → submit' path for executor indices."""
+    ex = maybe_update_slurm_executor_map(func, ex, executor, process_index, executor_indices)
+    chunksize = _chunksize_for_func(func, chunksizes, len(executor_indices), ex)
+    chunks = list(_chunk_indices(executor_indices, chunksize))
+    process_chunk = functools.partial(_process_chunk, process_index=process_index)
+    return [
+        _ChunkTask(
+            _submit(process_chunk, ex, status, progress, len(chunk), chunk),
+            tuple(chunk),
+        )
+        for chunk in chunks
+    ]
 
 
 def _maybe_parallel_map(
@@ -1360,33 +1431,71 @@ def _maybe_parallel_map(
     status: Status | None,
     progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
 ) -> list[_ChunkTask]:
+    """Submit map work, balancing local error-processing and executor tasks.
+
+    Steps
+    -----
+    1. Route: decide local vs executor indices via route_indices_for_executor.
+    2. Local: process error indices immediately (optionally with progress wrapping).
+    3. Executor: update executor, chunk, and submit valid indices.
+    """
     if not indices:
         return []
     ex = _executor_for_func(func, executor)
     if ex is not None:
         assert executor is not None
-        if _all_indices_propagate_errors(process_index, indices):  # skip submitting to executor
-            if status is not None:
-                assert progress is not None
-                process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
-            return [_ChunkTask((process_index(i),), (i,)) for i in indices]
 
-        ex = maybe_update_slurm_executor_map(func, ex, executor, process_index, indices)
-        chunksize = _chunksize_for_func(func, chunksizes, len(indices), ex)
-        chunks = list(_chunk_indices(indices, chunksize))
-        process_chunk = functools.partial(_process_chunk, process_index=process_index)
-        return [
-            _ChunkTask(
-                _submit(process_chunk, ex, status, progress, len(chunk), chunk),
-                tuple(chunk),
+        # 1) Route indices to local vs executor according to policy
+        local_indices, executor_indices = route_indices_for_executor(
+            func,
+            ex,
+            process_index,
+            indices,
+            process_index.keywords["error_handling"],
+        )
+
+        tasks: list[_ChunkTask] = []
+
+        # 2) Process local (error) indices immediately without submitting to executor
+        if local_indices:
+            tasks.extend(_submit_local_indices(process_index, local_indices, status, progress))
+
+        # 3) Submit only valid indices to the executor
+        if executor_indices:
+            tasks.extend(
+                _submit_executor_indices(
+                    func,
+                    ex,
+                    executor,
+                    process_index,
+                    executor_indices,
+                    status,
+                    progress,
+                    chunksizes,
+                ),
             )
-            for chunk in chunks
-        ]
+
+        return tasks
     if status is not None:
         assert progress is not None
         process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
     # Put the process_index result in a tuple to have consistent shapes when func has mapspec
     return [_ChunkTask((process_index(i),), (i,)) for i in indices]
+
+
+def _submit_local_indices(
+    process_index: Callable[..., Any],
+    local_indices: list[int],
+    status: Status | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
+) -> list[_ChunkTask]:
+    """Create local tasks for error indices with consistent status handling."""
+    wrapped = (
+        _wrap_with_status_update(process_index, status, progress)  # type: ignore[arg-type]
+        if status is not None
+        else process_index
+    )
+    return [_ChunkTask((wrapped(i),), (i,)) for i in local_indices]
 
 
 def _wrap_with_status_update(
