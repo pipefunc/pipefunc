@@ -362,6 +362,15 @@ def _sequence(
     return np.flatnonzero(fixed_mask)
 
 
+def _ensure_adaptive_error_mode(run_info: RunInfo) -> None:
+    if run_info.error_handling != "raise":
+        msg = (
+            "Adaptive learners do not support error_handling='continue'. "
+            "Please rerun with error_handling='raise' or switch to non-adaptive map execution."
+        )
+        raise NotImplementedError(msg)
+
+
 def _execute_iteration_in_single(
     _: Any,
     func: PipeFunc,
@@ -374,6 +383,7 @@ def _execute_iteration_in_single(
 
     Meets the requirements of `adaptive.SequenceLearner`.
     """
+    _ensure_adaptive_error_mode(run_info)
     output, exists = _load_from_store(func.output_name, store, return_output=return_output)
     if exists:
         return output
@@ -399,6 +409,7 @@ def _execute_iteration_in_map_spec(
 
     Meets the requirements of `adaptive.SequenceLearner`.
     """
+    _ensure_adaptive_error_mode(run_info)
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     # Load the data if it exists
     if all(arr.has_index(index) for arr in arrays):
@@ -419,7 +430,7 @@ def _execute_iteration_in_map_spec(
         mask,
         arrays,
         cache,
-        in_executor=True,
+        error_handling="raise",
         force_dump=True,
     )
     if not return_output:

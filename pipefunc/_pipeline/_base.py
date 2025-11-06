@@ -777,6 +777,7 @@ class Pipeline:
         auto_subpipeline: bool = False,
         show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
         return_results: bool = True,
+        error_handling: Literal["raise", "continue"] = "raise",
         scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> ResultDict:
         """Run a pipeline with `MapSpec` functions for given ``inputs``.
@@ -902,6 +903,11 @@ class Pipeline:
             Whether to return the results of the pipeline. If ``False``, the pipeline is run
             without keeping the results in memory. Instead the results are only kept in the set
             ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+        error_handling
+            How to handle errors during function execution:
+
+            - ``"raise"`` (default): Stop execution on first error and raise exception
+            - ``"continue"``: Continue execution, collecting errors as ErrorSnapshot objects
         scheduling_strategy
             Strategy for scheduling pipeline function execution:
 
@@ -952,6 +958,7 @@ class Pipeline:
             auto_subpipeline=auto_subpipeline,
             show_progress=show_progress,
             return_results=return_results,
+            error_handling=error_handling,
         )
 
     def map_async(
@@ -974,6 +981,7 @@ class Pipeline:
         display_widgets: bool = True,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
+        error_handling: Literal["raise", "continue"] = "raise",
         start: bool = True,
     ) -> AsyncMap:
         """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
@@ -1111,6 +1119,11 @@ class Pipeline:
               without waiting for entire generations to complete. Can improve performance
               by maximizing parallel execution, especially for complex dependency graphs
               with varied execution times.
+        error_handling
+            How to handle errors during function execution:
+
+            - ``"raise"`` (default): Stop execution on first error and raise exception
+            - ``"continue"``: Continue execution, collecting errors as ErrorSnapshot objects
         start
             Whether to start the pipeline immediately. If ``False``, the pipeline is not started until the
             `start()` method on the `AsyncMap` instance is called.
@@ -1155,6 +1168,7 @@ class Pipeline:
             show_progress=show_progress,
             display_widgets=display_widgets,
             return_results=return_results,
+            error_handling=error_handling,
             start=start,
         )
 
@@ -2660,7 +2674,7 @@ def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:
     try:
         return func(**func_args)
     except Exception as e:
-        handle_pipefunc_error(e, func, func_args)
+        handle_pipefunc_error(e, func, func_args, "raise")
         # handle_pipefunc_error raises but mypy doesn't know that
         raise  # pragma: no cover
 
