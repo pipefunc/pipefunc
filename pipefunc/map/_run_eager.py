@@ -9,8 +9,10 @@ from pipefunc._pipefunc import PipeFunc
 from pipefunc.map._run import (
     _finalize_run_map,
     _KwargsTask,
+    _MapTask,
     _maybe_executor,
     _process_task,
+    _SingleTask,
     _submit_func,
     prepare_run,
 )
@@ -56,6 +58,7 @@ def run_map_eager(
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
+    error_handling: Literal["raise", "continue"] = "raise",
 ) -> ResultDict:
     """Eagerly schedule pipeline functions as soon as their dependencies are met.
 
@@ -186,6 +189,11 @@ def run_map_eager(
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+    error_handling
+        How to handle errors during function execution:
+
+        - ``"raise"`` (default): Stop execution on first error and raise exception
+        - ``"continue"``: Continue execution, collecting errors as ErrorSnapshot objects
 
     """
     resume = _handle_cleanup_deprecation(cleanup, resume, stacklevel=2)
@@ -208,6 +216,7 @@ def run_map_eager(
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,
         in_async=False,
+        error_handling=error_handling,
     )
 
     dependency_info = _build_dependency_graph(prep.pipeline)
@@ -320,15 +329,14 @@ class _FunctionTracker:
         self.func_futures[func] = set()
 
         # Track futures for this function
-        if func.requires_mapping:
-            r, _ = kwargs_task.task
-            for task in r:
-                fut = _ensure_future(task)
+        if isinstance(kwargs_task.task, _MapTask):
+            for chunk_task in kwargs_task.task.chunk_tasks:
+                fut = _ensure_future(chunk_task.value)
                 self.future_to_func[fut] = func
                 self.func_futures[func].add(fut)
         else:
-            task = kwargs_task.task
-            fut = _ensure_future(task)
+            assert isinstance(kwargs_task.task, _SingleTask)
+            fut = _ensure_future(kwargs_task.task.value)
             self.future_to_func[fut] = func
             self.func_futures[func].add(fut)
 
