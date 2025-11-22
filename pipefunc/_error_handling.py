@@ -66,8 +66,22 @@ def scan_inputs_for_errors(kwargs: dict[str, Any]) -> dict[str, ErrorInfo]:
         if isinstance(value, (ErrorSnapshot, PropagatedErrorSnapshot)):
             # Input parameter is itself an error
             error_info[param_name] = ErrorInfo.from_full_error(value)
-        elif isinstance(value, StorageBase):
+            continue
+
+        array: np.ndarray | np.ma.MaskedArray | None = None
+        if isinstance(value, StorageBase):
+            dtype = getattr(value, "dtype", None)
+            if dtype is not None and dtype is not object:
+                continue  # Numeric/bytes storages cannot hold ErrorSnapshot objects
             array = value.to_array()
+        elif isinstance(value, np.ndarray) and value.dtype == object:
+            array = value
+
+        if array is not None:
+            if array.dtype != object:
+                continue  # Skip cheap scan for non-object arrays
+            # Check if array contains any ErrorSnapshot objects
+            # Using np.fromiter is generally faster than list comprehension for flat iteration
             error_mask = np.fromiter(
                 (isinstance(v, (ErrorSnapshot, PropagatedErrorSnapshot)) for v in array.flat),
                 dtype=bool,
@@ -79,17 +93,7 @@ def scan_inputs_for_errors(kwargs: dict[str, Any]) -> dict[str, ErrorInfo]:
                     error_indices=np.where(error_mask.reshape(array.shape)),
                     error_count=int(error_mask.sum()),
                 )
-        elif isinstance(value, np.ndarray) and value.dtype == object:
-            # Check if array contains any ErrorSnapshot objects
-            error_mask = np.array(
-                [isinstance(v, (ErrorSnapshot, PropagatedErrorSnapshot)) for v in value.flat],
-            )
-            if error_mask.any():
-                error_info[param_name] = ErrorInfo.from_partial_error(
-                    shape=value.shape,
-                    error_indices=np.where(error_mask.reshape(value.shape)),
-                    error_count=error_mask.sum(),
-                )
+
     return error_info
 
 

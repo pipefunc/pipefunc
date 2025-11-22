@@ -582,6 +582,54 @@ def test_tuple_output_with_output_picker():
     assert out2[2] == 60
 
 
+def test_output_picker_skipped_for_error_snapshots():
+    """Error outputs bypass pickers that expect a successful result."""
+
+    @pipefunc(
+        output_name=("a", "b"),
+        mapspec="x[i] -> a[i], b[i]",
+        output_picker=dict.__getitem__,
+    )
+    def picker_func(x: int) -> dict[str, int]:
+        if x == 1:
+            msg = f"Error at {x}"
+            raise ValueError(msg)
+        return {"a": x, "b": x + 1}
+
+    pipeline = Pipeline([picker_func])
+
+    result = pipeline.map({"x": [0, 1, 2]}, error_handling="continue", parallel=False)
+
+    a = result["a"].output
+    b = result["b"].output
+
+    assert a[0] == 0
+    assert isinstance(a[1], ErrorSnapshot)
+    assert a[2] == 2
+
+    assert b[0] == 1
+    assert isinstance(b[1], ErrorSnapshot)
+    assert b[2] == 3
+
+
+def test_output_picker_skipped_for_error_snapshots_single_task():
+    """Non-mapped functions also bypass pickers when returning errors."""
+
+    @pipefunc(output_name=("left", "right"), output_picker=dict.__getitem__)
+    def picker_func(flag: bool) -> dict[str, int]:
+        if flag:
+            msg = "boom"
+            raise ValueError(msg)
+        return {"left": 1, "right": 2}
+
+    pipeline = Pipeline([picker_func])
+
+    result = pipeline.map({"flag": True}, error_handling="continue", parallel=False)
+
+    assert isinstance(result["left"].output, ErrorSnapshot)
+    assert isinstance(result["right"].output, ErrorSnapshot)
+
+
 @pytest.mark.parametrize("parallel", [False, True])
 def test_tuple_output_parallel_execution(parallel):
     """Test tuple outputs with error handling in parallel execution."""

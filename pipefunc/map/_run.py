@@ -637,6 +637,10 @@ def _dump_single_output(
     run_info: RunInfo,
 ) -> tuple[Any, ...]:
     if isinstance(func.output_name, tuple):
+        if _is_error_snapshot(output):
+            for output_name in func.output_name:
+                _single_dump_single_output(output, output_name, store, run_info)
+            return tuple(output for _ in func.output_name)
         new_output = []  # output in same order as func.output_name
         for output_name in func.output_name:
             assert func.output_picker is not None
@@ -807,6 +811,23 @@ def _eval_and_apply_resources(
     return res, error_infos
 
 
+def _prepare_execution_environment(
+    func: PipeFunc,
+    element_kwargs: dict[str, Any],
+    map_kwargs: dict[str, Any],
+    error_handling: Literal["raise", "continue"],
+    map_error_info: dict[str, ErrorInfo] | None,
+) -> tuple[ResourcesEval, _ErrorInfos]:
+    error_infos = _create_error_infos(element_kwargs, error_handling, map_error_info)
+    return _eval_and_apply_resources(
+        func=func,
+        map_kwargs=map_kwargs,
+        element_kwargs=element_kwargs,
+        error_infos=error_infos,
+        mode=error_handling,
+    )
+
+
 def _prepare_kwargs_for_execution(
     func: PipeFunc,
     map_kwargs: dict[str, Any],
@@ -817,13 +838,12 @@ def _prepare_kwargs_for_execution(
     map_error_info: dict[str, ErrorInfo] | None,
 ) -> tuple[dict[str, Any], _ErrorInfos]:
     selected_kwargs = _select_kwargs(func, map_kwargs, shape, shape_mask, index)
-    error_infos = _create_error_infos(selected_kwargs, error_handling, map_error_info)
-    res, error_infos = _eval_and_apply_resources(
-        func=func,
-        map_kwargs=map_kwargs,
-        element_kwargs=selected_kwargs,
-        error_infos=error_infos,
-        mode=error_handling,
+    _res, error_infos = _prepare_execution_environment(
+        func,
+        selected_kwargs,
+        map_kwargs,
+        error_handling,
+        map_error_info,
     )
     return selected_kwargs, error_infos
 
@@ -838,10 +858,17 @@ def _init_result_arrays(
     return [np.empty(prod(shape), dtype=object) for _ in at_least_tuple(output_name)]
 
 
+def _is_error_snapshot(output: Any) -> bool:
+    return isinstance(output, (ErrorSnapshot, PropagatedErrorSnapshot))
+
+
 def _pick_output(func: PipeFunc, output: Any) -> tuple[Any, ...]:
+    output_names = at_least_tuple(func.output_name)
+    if _is_error_snapshot(output):
+        return tuple(output for _ in output_names)
     return tuple(
         (func.output_picker(output, output_name) if func.output_picker is not None else output)
-        for output_name in at_least_tuple(func.output_name)
+        for output_name in output_names
     )
 
 
@@ -1520,14 +1547,7 @@ def _maybe_execute_single(
     error_handling: Literal["raise", "continue"],
 ) -> Any:
     args = (func, kwargs, store, cache, error_handling)  # args for _execute_single
-    error_infos = _create_error_infos(kwargs, error_handling, None)
-    res, error_infos = _eval_and_apply_resources(
-        func=func,
-        map_kwargs=kwargs,
-        element_kwargs=kwargs,
-        error_infos=error_infos,
-        mode=error_handling,
-    )
+    res, _error_infos = _prepare_execution_environment(func, kwargs, kwargs, error_handling, None)
     ex = _executor_for_func(func, executor)
     if ex is not None and res.state != "error":
         resolved_resources = kwargs.get(_EVALUATED_RESOURCES)
@@ -1556,14 +1576,7 @@ def _execute_single(
 
     # Otherwise, run the function
     _load_data(kwargs)
-    error_infos = _create_error_infos(kwargs, error_handling, None)
-    res, error_infos = _eval_and_apply_resources(
-        func=func,
-        map_kwargs=kwargs,
-        element_kwargs=kwargs,
-        error_infos=error_infos,
-        mode=error_handling,
-    )
+    _res, error_infos = _prepare_execution_environment(func, kwargs, kwargs, error_handling, None)
 
     ctx = ErrorContext(mode=error_handling, error_info=error_infos.element)
     return _get_or_set_cache(func, kwargs, cache, ctx, error_handling)
