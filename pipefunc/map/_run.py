@@ -60,7 +60,7 @@ if TYPE_CHECKING:
     from ._progress import Status
     from ._result import StoreType
     from ._run_info import RunInfo
-    from ._types import ShapeTuple, UserShapeDict
+    from ._types import Index, Indices, ShapeTuple, UserShapeDict
 
 
 def run_map(
@@ -666,7 +666,7 @@ def _select_kwargs(
     kwargs: dict[str, Any],
     shape: ShapeTuple,
     shape_mask: tuple[bool, ...],
-    index: int,
+    index: Index,
 ) -> dict[str, Any]:
     assert func.mapspec is not None
     external_shape = external_shape_from_mask(shape, shape_mask)
@@ -692,7 +692,7 @@ def _select_kwargs_and_eval_resources(
     kwargs: dict[str, Any],
     shape: ShapeTuple,
     shape_mask: tuple[bool, ...],
-    index: int,
+    index: Index,
 ) -> dict[str, Any]:
     selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
     _maybe_eval_resources_in_selected(kwargs, selected, func)
@@ -778,7 +778,7 @@ class _InternalShape:
 
 
 def _run_iteration_and_process(
-    index: int,
+    index: Index,
     func: PipeFunc,
     kwargs: dict[str, Any],
     shape: ShapeTuple,
@@ -813,7 +813,7 @@ def _update_array(
     arrays: Sequence[StorageBase],
     shape: ShapeTuple,
     shape_mask: tuple[bool, ...],
-    index: int,
+    index: Index | tuple[int, ...],
     outputs: Iterable[Any],
     *,
     in_post_process: bool,
@@ -833,7 +833,10 @@ def _update_array(
         if force_dump or (array.dump_in_subprocess ^ in_post_process):
             if output_key is None:  # Only calculate the output key if needed
                 external_shape = external_shape_from_mask(shape, shape_mask)
-                output_key = func.mapspec.output_key(external_shape, index)  # type: ignore[arg-type]
+                if isinstance(index, int):
+                    output_key = func.mapspec.output_key(external_shape, index)  # type: ignore[arg-type]
+                else:
+                    output_key = index
             array.dump(output_key, _output)
             has_dumped = True
     return has_dumped
@@ -895,13 +898,13 @@ def _validate_internal_shape(
 
 def _update_result_array(
     result_arrays: list[np.ndarray] | None,
-    index: int,
+    index: Index,
     output: list[Any],
     shape: tuple[int, ...],
     mask: tuple[bool, ...],
     func: PipeFunc,
 ) -> None:
-    if result_arrays is None:
+    if result_arrays is None or not isinstance(index, int):
         return
     for result_array, _output in zip(result_arrays, output):
         if not all(mask):
@@ -914,7 +917,7 @@ def _update_result_array(
 def _existing_and_missing_indices(
     arrays: list[StorageBase],
     fixed_mask: np.flatiter[npt.NDArray[np.bool_]] | None,
-) -> tuple[list[int], list[int]]:
+) -> tuple[Indices, Indices]:
     # TODO: when `fixed_indices` are used we could be more efficient by not
     # computing the full mask.
     masks = (arr.mask_linear() for arr in arrays)
@@ -948,8 +951,8 @@ def _maybe_executor(
 @dataclass
 class _MapSpecArgs:
     process_index: functools.partial[tuple[Any, ...]]
-    existing: list[int]
-    missing: list[int]
+    existing: Indices
+    missing: Indices
     result_arrays: list[np.ndarray] | None
     mask: tuple[bool, ...]
     arrays: list[StorageBase]
@@ -1046,7 +1049,7 @@ def _process_chunk(
     return list(map(process_index, chunk))
 
 
-def _chunk_indices(indices: list[int], chunksize: int) -> Iterable[tuple[int, ...]]:
+def _chunk_indices(indices: Indices, chunksize: int) -> Iterable[tuple[Index, ...]]:
     # The same implementation as outlined in the itertools.batched() documentation
     # https://docs.python.org/3/library/itertools.html#itertools.batched
     # but itertools.batched() was only added in python 3.12
@@ -1054,7 +1057,7 @@ def _chunk_indices(indices: list[int], chunksize: int) -> Iterable[tuple[int, ..
 
     iterator = iter(indices)
     while batch := tuple(itertools.islice(iterator, chunksize)):
-        yield batch
+        yield batch  # type: ignore[misc]
 
 
 def _chunksize_for_func(
@@ -1122,7 +1125,7 @@ def _get_optimal_chunk_size(
 def _maybe_parallel_map(
     func: PipeFunc,
     process_index: functools.partial[tuple[Any, ...]],
-    indices: list[int],
+    indices: Indices,
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     status: Status | None,
@@ -1350,8 +1353,8 @@ def _submit_func(
 
 def _update_status_if_needed(
     status: Status | None,
-    existing: list[int],
-    missing: list[int],
+    existing: Indices,
+    missing: Indices,
 ) -> None:
     if status is not None and status.n_total is None:
         status.n_total = len(missing) + len(existing)
@@ -1421,7 +1424,7 @@ def _output_from_mapspec_task(
         if first:
             shape = _maybe_resolve_shapes_from_map(func, store, args, outputs, return_results)
             first = False
-        _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
+        _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)  # type: ignore[arg-type]
         _update_array(func, arrays, shape, args.mask, index, outputs, in_post_process=True)
 
     first = True
