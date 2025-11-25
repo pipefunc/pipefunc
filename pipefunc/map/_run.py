@@ -708,6 +708,10 @@ class _ErrorInfos(NamedTuple):
     element: dict[str, ErrorInfo] | None
 
 
+# Cached singleton for raise mode - avoids creating new tuple each iteration
+_ERROR_INFOS_NONE: _ErrorInfos = _ErrorInfos(None, None)
+
+
 def _should_scan_map_error_info(
     func: PipeFunc,
     error_handling: Literal["raise", "continue"],
@@ -726,7 +730,7 @@ def _create_error_infos(
     precomputed_map_error_info: dict[str, ErrorInfo] | None,
 ) -> _ErrorInfos:
     if error_handling != "continue":
-        return _ErrorInfos(None, None)
+        return _ERROR_INFOS_NONE  # Cached singleton for raise mode
 
     element_error_info = scan_inputs_for_errors(element_kwargs)
     map_error_info = precomputed_map_error_info
@@ -741,6 +745,10 @@ class ResourcesEval:
     snapshot: ErrorSnapshot | None = None
 
 
+# Cached singleton for when resources are not callable - avoids creating new dataclass each iteration
+_RESOURCES_SKIPPED: ResourcesEval = ResourcesEval("skipped")
+
+
 def eval_resources(  # noqa: PLR0911
     *,
     func: PipeFunc,
@@ -749,6 +757,11 @@ def eval_resources(  # noqa: PLR0911
     error_infos: _ErrorInfos,
     mode: Literal["raise", "continue"],
 ) -> ResourcesEval:
+    # Most common case: resources is not callable (None or static value)
+    # Check this first to avoid dict lookups on every iteration
+    if not callable(func.resources):  # type: ignore[has-type]
+        return _RESOURCES_SKIPPED
+
     # Short-circuit if resources were evaluated in a prior phase
     if _EVALUATED_RESOURCES in element_kwargs:
         return ResourcesEval("evaluated", resources=element_kwargs[_EVALUATED_RESOURCES])
@@ -759,19 +772,16 @@ def eval_resources(  # noqa: PLR0911
         snap = element_kwargs[_RESOURCE_EVALUATION_ERROR]
         return ResourcesEval("error", snapshot=snap)
 
-    if not callable(func.resources):  # type: ignore[has-type]
-        return ResourcesEval("skipped")
-
     # choose scope
     if func.resources_scope == "map":
         if error_infos.map and func.resources_variable is None:
-            return ResourcesEval("skipped")
+            return _RESOURCES_SKIPPED
         kw: dict[str, Any] | None = map_kwargs
     else:
         kw = None if error_infos.element else element_kwargs
 
     if kw is None:
-        return ResourcesEval("skipped")
+        return _RESOURCES_SKIPPED
 
     try:
         res = func.resources(kw)  # type: ignore[has-type]
@@ -959,9 +969,8 @@ def _call_user(
     kwargs: dict[str, Any],
     ctx: ErrorContext,
 ) -> Any:
-    call_kwargs = dict(kwargs)
     try:
-        return func(**call_kwargs)
+        return func(**kwargs)
     except Exception as e:  # noqa: BLE001
         return _maybe_wrap_exception(ctx, func, kwargs, e)
 
