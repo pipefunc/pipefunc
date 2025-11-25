@@ -890,24 +890,30 @@ def _get_or_set_cache(
     error_handling: Literal["raise", "continue"],
 ) -> Any:
     """Compute with unified error guards and cache the result."""
-
-    def _compute() -> Any:
+    # Fast path: no cache - avoid inner function definition overhead
+    if cache is None:
         if ctx.mode == "continue" and ctx.error_info:
             return create_propagated_error(ctx.error_info, func, kwargs)
         return _call_user(func, kwargs, ctx)
 
-    if cache is None:
-        return _compute()
+    # Slow path: with caching
     cache_key = (func._cache_id, error_handling, to_hashable(kwargs))
-
     if cache_key in cache:
         return cache.get(cache_key)
+
+    # Compute the result with optional timing for HybridCache
     if isinstance(cache, HybridCache):
         t = time.monotonic()
-    result = _compute()
-    if isinstance(cache, HybridCache):
+        if ctx.mode == "continue" and ctx.error_info:
+            result = create_propagated_error(ctx.error_info, func, kwargs)
+        else:
+            result = _call_user(func, kwargs, ctx)
         cache.put(cache_key, result, time.monotonic() - t)
     else:
+        if ctx.mode == "continue" and ctx.error_info:
+            result = create_propagated_error(ctx.error_info, func, kwargs)
+        else:
+            result = _call_user(func, kwargs, ctx)
         cache.put(cache_key, result)
     return result
 
@@ -920,6 +926,10 @@ _RESOURCE_EVALUATION_ERROR = "__pipefunc_internal_resource_error__"
 class ErrorContext:
     mode: Literal["raise", "continue"]
     error_info: dict[str, ErrorInfo] | None
+
+
+# Cached singleton for raise mode with no error info - most common case
+_ERROR_CONTEXT_RAISE_NONE: ErrorContext = ErrorContext(mode="raise", error_info=None)
 
 
 def _maybe_wrap_exception(
@@ -1014,7 +1024,11 @@ def _run_iteration_and_process(
         map_error_info,
     )
     # Early error detection centralized through the guard helper
-    ctx = ErrorContext(mode=error_handling, error_info=error_infos.element)
+    # Use cached singleton for the most common case (raise mode, no errors)
+    if error_handling == "raise" and error_infos.element is None:
+        ctx = _ERROR_CONTEXT_RAISE_NONE
+    else:
+        ctx = ErrorContext(mode=error_handling, error_info=error_infos.element)
     output = _get_or_set_cache(func, selected_kwargs, cache, ctx, error_handling)
     outputs = _pick_output(func, output)
     has_dumped = _update_array(
