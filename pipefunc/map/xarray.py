@@ -206,7 +206,12 @@ def _xarray_dataset(
             # the data and requiring dimensions, resulting in an error
             ds[name] = ((), DimensionlessArray(array))
         else:
-            ds[name] = ((), array)
+            # Create a 0-D object array by assigning to an empty array.
+            # This prevents numpy from iterating over objects with __getitem__
+            # (which would produce unexpected array shapes).
+            scalar_array = np.empty((), dtype=object)
+            scalar_array[()] = array
+            ds[name] = ((), scalar_array)
     return ds
 
 
