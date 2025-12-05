@@ -335,6 +335,32 @@ All fixes were verified by:
 
 ---
 
+## Remaining TODOs / Open Risks
+
+1. **SLURM map-scope filtering is still unvalidated**
+   `should_filter_error_indices` only gates `resources_scope=="element"`, so map-scope resources plus propagated errors may still submit useless jobs. Needs a test using a real `SlurmExecutor` (or a faithful mock that forces `is_slurm_executor` to `True`) to decide whether map-scope should also skip/route error indices.
+
+2. **ErrorSnapshot double-dump and storage compatibility**
+   Error objects bypass the XOR guard in `_update_array`, so they are written in both executor and post-process phases. Currently an inefficiency, but could fail with storages that cannot handle object dtype or concurrent writes. Todo: deduplicate error writes or explicitly guarantee storages accept overwrite of identical error payloads.
+
+3. **Global `func.error_snapshot` mutation is not thread/process safe**
+   `handle_pipefunc_error` writes to `func.error_snapshot`, so concurrent executions of the same `PipeFunc` can race and attach the wrong snapshot. Need a per-call snapshot store or locking to avoid cross-contamination in multi-thread/process runs.
+
+4. **Deep propagation pickling may blow recursion**
+   `PropagatedErrorSnapshot._pickle_error_info` recursively pickles nested errors without a depth guard. Extremely deep propagation chains could hit recursion limits or fail to deserialize. Consider iterative encoding/decoding or a maximum-depth safeguard.
+
+5. **Array-containing errors lack root-cause surfaces**
+   `get_root_causes` ignores `type=="partial"` entries, so users cannot trace array-level failures. Decide whether to surface representative indices or nested snapshots for partial errors, and document the policy.
+
+6. **Untested/under-tested edge cases**
+   - Nested pipelines in continue mode
+   - Mixed storages (e.g., FileArray + SharedMemoryArray) when only some storages carry errors
+   - Async cancellation/timeout behavior under continue mode
+   - Memory footprint for very large arrays containing many errors
+   Add targeted tests or measurements to cover these scenarios.
+
+---
+
 ## Part 5: Files Changed
 
 ### Source Files Modified:
