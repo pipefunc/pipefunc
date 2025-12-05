@@ -1450,9 +1450,8 @@ def _split_error_and_valid_indices(
     return error_indices, valid_indices
 
 
-def route_indices_for_executor(
-    func: PipeFunc,
-    executor_inst: Executor,
+def _route_indices_for_executor(
+    executor: Executor,
     process_index: functools.partial[tuple[Any, ...]],
     indices: list[int],
     error_handling: str,
@@ -1463,7 +1462,7 @@ def route_indices_for_executor(
     - Otherwise: if all indices propagate errors → process locally
     - Otherwise: submit everything to executor
     """
-    if should_filter_error_indices(func, executor_inst, error_handling):
+    if should_filter_error_indices(executor, error_handling):
         return _split_error_and_valid_indices(process_index, indices)
     if _all_indices_propagate_errors(process_index, indices):
         return indices, []
@@ -1518,8 +1517,7 @@ def _maybe_parallel_map(
         assert executor is not None
 
         # 1) Route indices to local vs executor according to policy
-        local_indices, executor_indices = route_indices_for_executor(
-            func,
+        local_indices, executor_indices = _route_indices_for_executor(
             ex,
             process_index,
             indices,

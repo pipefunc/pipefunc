@@ -99,7 +99,6 @@ def _is_slurm_executor_type(executor: Executor | None) -> TypeGuard[type[SlurmEx
 
 
 def should_filter_error_indices(
-    _func: PipeFunc,
     executor: Executor,
     error_handling: str,
 ) -> bool:

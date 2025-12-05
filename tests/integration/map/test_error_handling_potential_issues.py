@@ -265,91 +265,28 @@ def test_resource_error_reproduce():
 # =============================================================================
 
 
-def test_slurm_filtering_with_resources_scopes():
-    """Test should_filter_error_indices for different resource scopes.
+def test_slurm_error_index_filtering():
+    """Test should_filter_error_indices with different executor/mode combinations.
 
-    Both element and map scopes should filter error indices when using
-    SLURM with continue mode (after the fix that removed the element-only
-    restriction).
+    The function filters error indices when:
+    - Using a SLURM executor AND
+    - error_handling="continue"
+
+    This prevents submitting pointless SLURM jobs for indices with upstream errors.
     """
     from pipefunc.map._adaptive_scheduler_slurm_executor import should_filter_error_indices
 
-    @pipefunc(
-        output_name="y",
-        mapspec="x[i] -> y[i]",
-        resources=Resources(cpus=1),
-        resources_scope="element",
-    )
-    def element_scope(x: int) -> int:
-        return x * 2
-
-    @pipefunc(
-        output_name="z",
-        mapspec="x[i] -> z[i]",
-        resources=Resources(cpus=1),
-        resources_scope="map",
-    )
-    def map_scope(x: int) -> int:
-        return x * 2
-
     mock_executor = MagicMock()
 
+    # SLURM + continue = should filter
     with patch(
         "pipefunc.map._adaptive_scheduler_slurm_executor.is_slurm_executor",
         return_value=True,
     ):
-        # Both scopes should filter with SLURM + continue mode
-        assert should_filter_error_indices(element_scope, mock_executor, "continue")
-        assert should_filter_error_indices(map_scope, mock_executor, "continue")
+        assert should_filter_error_indices(mock_executor, "continue")
+        assert not should_filter_error_indices(mock_executor, "raise")
 
-        # Neither should filter with raise mode
-        assert not should_filter_error_indices(element_scope, mock_executor, "raise")
-        assert not should_filter_error_indices(map_scope, mock_executor, "raise")
-
-
-def test_slurm_filtering_various_combinations():
-    """Test should_filter_error_indices with various executor/scope/mode combinations."""
-    from pipefunc.map._adaptive_scheduler_slurm_executor import should_filter_error_indices
-
-    @pipefunc(
-        output_name="y",
-        mapspec="x[i] -> y[i]",
-        resources=Resources(cpus=1),
-        resources_scope="element",
-    )
-    def element_func(x: int) -> int:
-        return x
-
-    @pipefunc(
-        output_name="z",
-        mapspec="x[i] -> z[i]",
-        resources=Resources(cpus=1),
-        resources_scope="map",
-    )
-    def map_func(x: int) -> int:
-        return x
-
-    @pipefunc(output_name="w", mapspec="x[i] -> w[i]")
-    def no_resources_func(x: int) -> int:
-        return x
-
-    mock_executor = MagicMock()
-
-    # With SLURM executor (mocked)
-    with patch(
-        "pipefunc.map._adaptive_scheduler_slurm_executor.is_slurm_executor",
-        return_value=True,
-    ):
-        # continue mode should filter for all resource scopes
-        assert should_filter_error_indices(element_func, mock_executor, "continue")
-        assert should_filter_error_indices(map_func, mock_executor, "continue")
-        assert should_filter_error_indices(no_resources_func, mock_executor, "continue")
-
-        # raise mode should never filter
-        assert not should_filter_error_indices(element_func, mock_executor, "raise")
-        assert not should_filter_error_indices(map_func, mock_executor, "raise")
-
-    # With non-SLURM executor
+    # Non-SLURM executor = should not filter (even with continue mode)
     with ThreadPoolExecutor(max_workers=1) as thread_executor:
-        assert not should_filter_error_indices(element_func, thread_executor, "continue")
-        assert not should_filter_error_indices(map_func, thread_executor, "continue")
+        assert not should_filter_error_indices(thread_executor, "continue")
+        assert not should_filter_error_indices(thread_executor, "raise")
