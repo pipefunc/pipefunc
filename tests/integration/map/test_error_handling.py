@@ -1237,3 +1237,168 @@ def test_output_picker_exception_raises_in_raise_mode():
     # With error_handling="raise", picker failure should raise
     with pytest.raises(RuntimeError, match="picker boom"):
         pipeline.map({"x": [1]}, error_handling="raise", parallel=False)
+
+
+def test_output_picker_exception_with_file_storage(tmp_path):
+    """Test output_picker exceptions with file storage for mapped functions."""
+
+    def bad_picker(result, key):
+        if key == "bad":
+            msg = "picker boom"
+            raise RuntimeError(msg)
+        return result[key]
+
+    @pipefunc(
+        output_name=("good", "bad"),
+        mapspec="x[i] -> good[i], bad[i]",
+        output_picker=bad_picker,
+    )
+    def my_func(x: int) -> dict:
+        return {"good": x * 2, "bad": x * 3}
+
+    pipeline = Pipeline([my_func])
+
+    # With file storage, this exercises _pick_single_output error handling
+    result = pipeline.map(
+        {"x": [1, 2]},
+        error_handling="continue",
+        run_folder=tmp_path,
+        parallel=False,
+    )
+
+    # "good" output should work fine
+    assert result["good"].output[0] == 2
+    assert result["good"].output[1] == 4
+
+    # "bad" output should have ErrorSnapshots
+    assert isinstance(result["bad"].output[0], ErrorSnapshot)
+    assert isinstance(result["bad"].output[1], ErrorSnapshot)
+
+
+def test_output_picker_exception_raises_with_file_storage(tmp_path):
+    """Test output_picker exceptions raise in raise mode with file storage."""
+
+    def bad_picker(result, key):
+        msg = "picker boom"
+        raise RuntimeError(msg)
+
+    @pipefunc(
+        output_name=("a", "b"),
+        mapspec="x[i] -> a[i], b[i]",
+        output_picker=bad_picker,
+    )
+    def my_func(x: int) -> dict:
+        return {"a": x, "b": x}
+
+    pipeline = Pipeline([my_func])
+
+    with pytest.raises(RuntimeError, match="picker boom"):
+        pipeline.map(
+            {"x": [1]},
+            error_handling="raise",
+            run_folder=tmp_path,
+            parallel=False,
+        )
+
+
+def test_output_picker_exception_non_mapped_with_file_storage(tmp_path):
+    """Test output_picker exceptions for non-mapped functions with file storage.
+
+    This covers _dump_single_output error handling path (lines 649-659).
+    """
+
+    def bad_picker(result, key):
+        if key == "bad":
+            msg = "picker boom in single"
+            raise RuntimeError(msg)
+        return result[key]
+
+    @pipefunc(
+        output_name=("good", "bad"),
+        output_picker=bad_picker,
+    )
+    def single_func(x: np.ndarray) -> dict:
+        return {"good": int(x.sum()) * 2, "bad": int(x.sum()) * 3}
+
+    # Need a mapped function to provide input
+    @pipefunc(output_name="x", mapspec="i[j] -> x[j]")
+    def make_x(i: int) -> int:
+        return i
+
+    pipeline = Pipeline([make_x, single_func])
+
+    result = pipeline.map(
+        {"i": [5]},
+        error_handling="continue",
+        run_folder=tmp_path,
+        parallel=False,
+    )
+
+    # "good" output should work (scalar, not array)
+    assert result["good"].output == 10
+
+    # "bad" output should be ErrorSnapshot
+    assert isinstance(result["bad"].output, ErrorSnapshot)
+    assert "picker boom in single" in str(result["bad"].output.exception)
+
+
+def test_output_picker_exception_non_mapped_raises(tmp_path):
+    """Test output_picker exceptions raise for non-mapped functions in raise mode."""
+
+    def bad_picker(result, key):
+        msg = "picker boom in single"
+        raise RuntimeError(msg)
+
+    @pipefunc(
+        output_name=("a", "b"),
+        output_picker=bad_picker,
+    )
+    def single_func(x: np.ndarray) -> dict:
+        return {"a": x.sum(), "b": x.sum()}
+
+    @pipefunc(output_name="x", mapspec="i[j] -> x[j]")
+    def make_x(i: int) -> int:
+        return i
+
+    pipeline = Pipeline([make_x, single_func])
+
+    with pytest.raises(RuntimeError, match="picker boom in single"):
+        pipeline.map(
+            {"i": [5]},
+            error_handling="raise",
+            run_folder=tmp_path,
+            parallel=False,
+        )
+
+
+def test_all_indices_propagate_errors_with_executor(tmp_path):
+    """Test that all-error indices are run locally instead of submitted to executor.
+
+    When all indices would propagate errors, they should be processed locally
+    rather than submitted to the executor (covers _all_indices_propagate_errors path).
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def always_fail(x: int) -> int:
+        msg = "always fails"
+        raise ValueError(msg)
+
+    @pipefunc(output_name="z", mapspec="y[i] -> z[i]")
+    def downstream(y: int) -> int:
+        return y + 1
+
+    pipeline = Pipeline([always_fail, downstream])
+
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        result = pipeline.map(
+            {"x": [1, 2, 3]},
+            error_handling="continue",
+            run_folder=tmp_path,
+            executor={"y": ex, "z": ex},
+        )
+
+    # All upstream failed, so all downstream should be PropagatedErrorSnapshot
+    for i in range(3):
+        assert isinstance(result["y"].output[i], ErrorSnapshot)
+        assert isinstance(result["z"].output[i], PropagatedErrorSnapshot)
