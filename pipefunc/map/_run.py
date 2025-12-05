@@ -644,7 +644,19 @@ def _dump_single_output(
         new_output = []  # output in same order as func.output_name
         for output_name in func.output_name:
             assert func.output_picker is not None
-            _output = func.output_picker(output, output_name)
+            try:
+                _output = func.output_picker(output, output_name)
+            except Exception as e:
+                if run_info.error_handling == "continue":
+                    # Create ErrorSnapshot for output_picker failure
+                    _output = ErrorSnapshot(
+                        func.output_picker,
+                        e,
+                        args=(output, output_name),
+                        kwargs={},
+                    )
+                else:
+                    raise
             new_output.append(_output)
             _single_dump_single_output(_output, output_name, store, run_info)
         return tuple(new_output)
@@ -872,12 +884,42 @@ def _is_error_snapshot(output: Any) -> bool:
     return isinstance(output, (ErrorSnapshot, PropagatedErrorSnapshot))
 
 
-def _pick_output(func: PipeFunc, output: Any) -> tuple[Any, ...]:
+def _pick_single_output(
+    func: PipeFunc,
+    output: Any,
+    output_name: str,
+    error_handling: Literal["raise", "continue"],
+) -> Any:
+    """Pick a single output, with error handling for output_picker failures."""
+    assert func.output_picker is not None
+    try:
+        return func.output_picker(output, output_name)
+    except Exception as e:
+        if error_handling == "continue":
+            # Create ErrorSnapshot for output_picker failure
+            return ErrorSnapshot(
+                func.output_picker,
+                e,
+                args=(output, output_name),
+                kwargs={},
+            )
+        raise
+
+
+def _pick_output(
+    func: PipeFunc,
+    output: Any,
+    error_handling: Literal["raise", "continue"] = "raise",
+) -> tuple[Any, ...]:
     output_names = at_least_tuple(func.output_name)
     if _is_error_snapshot(output):
         return tuple(output for _ in output_names)
+    if func.output_picker is None:
+        return tuple(output for _ in output_names)
+
+    # Apply output_picker with error handling
     return tuple(
-        (func.output_picker(output, output_name) if func.output_picker is not None else output)
+        _pick_single_output(func, output, output_name, error_handling)
         for output_name in output_names
     )
 
@@ -1016,7 +1058,7 @@ def _run_iteration_and_process(
     # Early error detection centralized through the guard helper
     ctx = ErrorContext(mode=error_handling, error_info=error_infos.element)
     output = _get_or_set_cache(func, selected_kwargs, cache, ctx, error_handling)
-    outputs = _pick_output(func, output)
+    outputs = _pick_output(func, output, error_handling)
     has_dumped = _update_array(
         func,
         arrays,

@@ -80,6 +80,14 @@ def scan_inputs_for_errors(kwargs: dict[str, Any]) -> dict[str, ErrorInfo]:
         if array is not None:
             if array.dtype != object:
                 continue  # Skip cheap scan for non-object arrays
+
+            # Handle 0-D arrays specially (np.where doesn't work on 0-D arrays)
+            if array.ndim == 0:
+                item = array.item()
+                if isinstance(item, (ErrorSnapshot, PropagatedErrorSnapshot)):
+                    error_info[param_name] = ErrorInfo.from_full_error(item)
+                continue
+
             # Check if array contains any ErrorSnapshot objects
             # Using np.fromiter is generally faster than list comprehension for flat iteration
             error_mask = np.fromiter(

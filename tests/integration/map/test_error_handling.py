@@ -1122,3 +1122,118 @@ def test_return_results_false_with_errors_uses_lightweight_markers(tmp_path) -> 
 
     # The key test: this should have worked without keeping full ErrorSnapshots in memory
     # during execution (they were replaced with lightweight _ErrorMarker objects)
+
+
+def test_empty_inputs_continue_mode():
+    """Test that empty input arrays work correctly with error_handling='continue'."""
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def double(x: int) -> int:
+        return x * 2
+
+    pipeline = Pipeline([double])
+    result = pipeline.map({"x": []}, error_handling="continue")
+
+    y_output = result["y"].output
+    assert len(y_output) == 0
+    assert isinstance(y_output, np.ndarray)
+
+
+def test_resume_rejects_different_error_handling_mode(tmp_path):
+    """Test that resume=True rejects runs with different error_handling modes."""
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def may_fail(x: int) -> int:
+        if x == 1:
+            msg = "boom"
+            raise ValueError(msg)
+        return x * 2
+
+    pipeline = Pipeline([may_fail])
+
+    # First run with error_handling="continue"
+    pipeline.map(
+        {"x": [0, 1, 2]},
+        error_handling="continue",
+        run_folder=tmp_path,
+    )
+
+    # Attempt to resume with error_handling="raise" should fail
+    with pytest.raises(ValueError, match="error_handling.*does not match"):
+        pipeline.map(
+            {"x": [0, 1, 2]},
+            error_handling="raise",
+            resume=True,
+            run_folder=tmp_path,
+        )
+
+    # Resuming with same error_handling should work
+    result = pipeline.map(
+        {"x": [0, 1, 2]},
+        error_handling="continue",
+        resume=True,
+        run_folder=tmp_path,
+    )
+    assert result["y"].output[0] == 0
+    assert isinstance(result["y"].output[1], ErrorSnapshot)
+    assert result["y"].output[2] == 4
+
+
+def test_output_picker_exception_in_continue_mode():
+    """Test that output_picker exceptions produce ErrorSnapshot in continue mode."""
+
+    def bad_picker(result, key):
+        if key == "bad":
+            msg = "picker boom"
+            raise RuntimeError(msg)
+        return result[key]
+
+    @pipefunc(
+        output_name=("good", "bad"),
+        mapspec="x[i] -> good[i], bad[i]",
+        output_picker=bad_picker,
+    )
+    def my_func(x: int) -> dict:
+        return {"good": x * 2, "bad": x * 3}
+
+    pipeline = Pipeline([my_func])
+
+    # With error_handling="continue", picker failure should produce ErrorSnapshot
+    result = pipeline.map(
+        {"x": [1, 2, 3]},
+        error_handling="continue",
+        parallel=False,
+    )
+
+    # "good" output should work fine
+    assert result["good"].output[0] == 2
+    assert result["good"].output[1] == 4
+    assert result["good"].output[2] == 6
+
+    # "bad" output should have ErrorSnapshots due to picker failure
+    assert isinstance(result["bad"].output[0], ErrorSnapshot)
+    assert isinstance(result["bad"].output[1], ErrorSnapshot)
+    assert isinstance(result["bad"].output[2], ErrorSnapshot)
+    assert "picker boom" in str(result["bad"].output[0].exception)
+
+
+def test_output_picker_exception_raises_in_raise_mode():
+    """Test that output_picker exceptions raise in error_handling='raise' mode."""
+
+    def bad_picker(result, key):
+        msg = "picker boom"
+        raise RuntimeError(msg)
+
+    @pipefunc(
+        output_name=("a", "b"),
+        mapspec="x[i] -> a[i], b[i]",
+        output_picker=bad_picker,
+    )
+    def my_func(x: int) -> dict:
+        return {"a": x, "b": x}
+
+    pipeline = Pipeline([my_func])
+
+    # With error_handling="raise", picker failure should raise
+    with pytest.raises(RuntimeError, match="picker boom"):
+        pipeline.map({"x": [1]}, error_handling="raise", parallel=False)

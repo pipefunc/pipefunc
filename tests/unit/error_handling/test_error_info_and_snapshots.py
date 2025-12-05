@@ -319,3 +319,53 @@ def test_propagated_error_snapshot_loads_legacy_pickle(tmp_path, monkeypatch):
     assert info.type == "full"
     assert isinstance(info.error, ErrorSnapshot)
     assert str(info.error.exception) == "bad 1"
+
+
+def test_scan_inputs_for_errors_0d_object_array():
+    """Test that scan_inputs_for_errors handles 0-D object arrays correctly."""
+    from pipefunc._error_handling import scan_inputs_for_errors
+
+    # Test 0-D array with non-error value - should return empty dict
+    arr = np.array(42, dtype=object)
+    result = scan_inputs_for_errors({"x": arr})
+    assert result == {}
+
+    # Test 0-D array containing ErrorSnapshot - should detect it as full error
+    error = ErrorSnapshot(
+        function=lambda x: x,
+        exception=ValueError("test error"),
+        args=(1,),
+        kwargs={},
+    )
+    arr_with_error = np.array(error, dtype=object)
+    result = scan_inputs_for_errors({"x": arr_with_error})
+    assert "x" in result
+    assert result["x"].type == "full"
+    assert result["x"].error == error
+
+    # Test 0-D array containing PropagatedErrorSnapshot
+    propagated = PropagatedErrorSnapshot(
+        error_info={"y": ErrorInfo.from_full_error(error)},
+        skipped_function=lambda x: x,
+        reason="input_is_error",
+        attempted_kwargs={},
+    )
+    arr_with_propagated = np.array(propagated, dtype=object)
+    result = scan_inputs_for_errors({"x": arr_with_propagated})
+    assert "x" in result
+    assert result["x"].type == "full"
+    assert result["x"].error == propagated
+
+
+def test_scan_inputs_for_errors_0d_numeric_array():
+    """Test that scan_inputs_for_errors skips 0-D numeric arrays."""
+    from pipefunc._error_handling import scan_inputs_for_errors
+
+    # Numeric 0-D arrays should be skipped (cannot contain errors)
+    arr = np.array(42, dtype=int)
+    result = scan_inputs_for_errors({"x": arr})
+    assert result == {}
+
+    arr_float = np.array(3.14, dtype=float)
+    result = scan_inputs_for_errors({"x": arr_float})
+    assert result == {}
