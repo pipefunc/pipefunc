@@ -56,6 +56,7 @@ class RunInfo:
     run_folder: Path | None
     mapspecs_as_strings: list[str]
     storage: str | dict[OUTPUT_TYPE, str]
+    error_handling: Literal["raise", "continue"] = "raise"
     pipefunc_version: str = __version__
 
     def __post_init__(self) -> None:
@@ -78,6 +79,7 @@ class RunInfo:
         *,
         executor: dict[OUTPUT_TYPE, Executor] | None = None,
         storage: str | dict[OUTPUT_TYPE, str] | None,
+        error_handling: Literal["raise", "continue"] = "raise",
         cleanup: bool | None = None,
         resume: bool = False,
         resume_validation: Literal["auto", "strict", "skip"] = "auto",
@@ -95,6 +97,7 @@ class RunInfo:
                     inputs,
                     internal_shapes,
                     resume_validation,
+                    error_handling,
                 )
         _check_inputs(pipeline, inputs)
         _maybe_inputs_to_disk_for_slurm(pipeline, inputs, run_folder, executor)
@@ -111,6 +114,7 @@ class RunInfo:
             mapspecs_as_strings=pipeline.mapspecs_as_strings,
             run_folder=run_folder,
             storage=storage,
+            error_handling=error_handling,
         )
 
     def storage_class(self, output_name: OUTPUT_TYPE) -> type[StorageBase]:
@@ -294,6 +298,8 @@ def _handle_cleanup_deprecation(
 def _legacy_fix(data: dict, run_folder: Path) -> None:
     """Fix legacy format where paths included run_folder prefix.
 
+    Paths (#898)
+    ------------
     Legacy format (<=v0.86.0):
     - run_folder: "foo/my_run_folder"
     - input_paths: {"x": "foo/my_run_folder/inputs/x.cloudpickle"}
@@ -304,20 +310,30 @@ def _legacy_fix(data: dict, run_folder: Path) -> None:
     - input_paths: {"x": "inputs/x.cloudpickle"}
     - defaults_path: "defaults/defaults.cloudpickle"
 
+    Error handling (#854)
+    ---------------------
+    The ``error_handling`` field was introduced in v0.89.0. Older
+    ``run_info.json`` files omit it, so we inject the default value to keep
+    ``RunInfo.load`` backward compatible.
+
     Parameters
     ----------
     data
-        RunInfo data dict (modified in place)
+        RunInfo data dict (modified in place).
     run_folder
-        Original run_folder path
+        Original run_folder path detected at load time.
 
     """
     stored_run_folder = data["run_folder"]
 
-    # Detect legacy: check if paths start with stored run_folder
-    is_legacy = data["defaults_path"].startswith(stored_run_folder)
+    # ``error_handling`` was introduced in v0.89.0; older run_info.json files lack it
+    # which would otherwise cause RunInfo(**data) to raise.
+    data.setdefault("error_handling", "raise")
 
-    if not is_legacy:
+    # Detect legacy: check if paths start with stored run_folder
+    legacy_path = data["defaults_path"].startswith(stored_run_folder)
+
+    if not legacy_path:
         return
 
     # Fix paths: strip the stored run_folder prefix
@@ -431,12 +447,46 @@ def _cleanup_run_folder(run_folder: Path) -> None:
     shutil.rmtree(run_folder, ignore_errors=True)
 
 
+def _validate_dict_equality(  # pragma: no cover
+    name: str,
+    new_dict: dict[str, Any],
+    old_dict: dict[str, Any],
+    resume_validation: Literal["auto", "strict", "skip"],
+    *,
+    verbose: bool = False,
+) -> bool:
+    """Validate that two dicts are equal, handling comparison failures.
+
+    Returns True to continue validation, False to stop validation early.
+    """
+    equal_result = equal_dicts(new_dict, old_dict, verbose=verbose)
+    if equal_result is None:
+        if resume_validation == "strict":
+            msg = (
+                f"Cannot compare {name} for equality ({name} may have broken `__eq__` implementations). "
+                f"Cannot use `resume=True` with `resume_validation='strict'`. "
+                "Use `resume_validation='skip'` if you are certain they are identical."
+            )
+            raise ValueError(msg)
+        assert resume_validation == "auto"
+        print(
+            f"Could not compare new `{name}` to `{name}` from previous run."
+            " Proceeding with `resume=True`, hoping for the best.",
+        )
+        return False
+    if not equal_result:
+        msg = f"`{name}` do not match previous run, cannot use `resume=True`."
+        raise ValueError(msg)
+    return True
+
+
 def _compare_to_previous_run_info(
     pipeline: Pipeline,
     run_folder: Path,
     inputs: dict[str, Any],
     internal_shapes: UserShapeDict | None = None,
     resume_validation: Literal["auto", "strict", "skip"] = "auto",
+    error_handling: Literal["raise", "continue"] = "raise",
 ) -> None:  # pragma: no cover
     if not RunInfo.path(run_folder).is_file():
         return
@@ -445,6 +495,15 @@ def _compare_to_previous_run_info(
     except Exception as e:  # noqa: BLE001
         msg = f"Could not load previous run info: {e}, cannot use `resume=True`."
         raise ValueError(msg) from None
+
+    # Validate error_handling mode matches - critical for correct behavior
+    if error_handling != old.error_handling:
+        msg = (
+            f"`error_handling='{error_handling}'` does not match previous run "
+            f"(`error_handling='{old.error_handling}'`), cannot use `resume=True`. "
+            "Resuming with a different error handling mode could lead to incorrect results."
+        )
+        raise ValueError(msg)
 
     # Always validate shapes and mapspecs regardless of resume_validation mode
     if internal_shapes != old.internal_shapes:
@@ -463,44 +522,11 @@ def _compare_to_previous_run_info(
         return
 
     # Validate inputs
-    equal_inputs = equal_dicts(inputs, old.inputs, verbose=True)
-    if equal_inputs is None:
-        if resume_validation == "strict":
-            msg = (
-                "Cannot compare inputs for equality (inputs may have broken `__eq__` implementations). "
-                "Cannot use `resume=True` with `resume_validation='strict'`. "
-                "Use `resume_validation='skip'` if you are certain inputs are identical."
-            )
-            raise ValueError(msg)
-        assert resume_validation == "auto"
-        print(
-            "Could not compare new `inputs` to `inputs` from previous run."
-            " Proceeding with `resume=True`, hoping for the best.",
-        )
+    if not _validate_dict_equality("inputs", inputs, old.inputs, resume_validation, verbose=True):
         return
-    if not equal_inputs:
-        msg = f"Inputs `{inputs=}` / `{old.inputs=}` do not match previous run, cannot use `resume=True`."
-        raise ValueError(msg)
 
     # Validate defaults
-    equal_defaults = equal_dicts(pipeline.defaults, old.defaults)
-    if equal_defaults is None:
-        if resume_validation == "strict":
-            msg = (
-                "Cannot compare defaults for equality (defaults may have broken `__eq__` implementations). "
-                "Cannot use `resume=True` with `resume_validation='strict'`. "
-                "Use `resume_validation='skip'` if you are certain defaults are identical."
-            )
-            raise ValueError(msg)
-        assert resume_validation == "auto"
-        print(
-            "Could not compare new `defaults` to `defaults` from previous run."
-            " Proceeding with `resume=True`, hoping for the best.",
-        )
-        return
-    if not equal_defaults:
-        msg = f"Defaults `{pipeline.defaults=}` / `{old.defaults=}` do not match previous run, cannot use `resume=True`."
-        raise ValueError(msg)
+    _validate_dict_equality("defaults", pipeline.defaults, old.defaults, resume_validation)
 
 
 def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:

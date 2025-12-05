@@ -45,10 +45,10 @@ def maybe_update_slurm_executor_single(
     func: PipeFunc,
     ex: Executor,
     executor: dict[OUTPUT_TYPE, Executor],
-    kwargs: dict[str, Any],
+    resources: Resources | None,
 ) -> Executor:
     if is_slurm_executor(ex) or _is_slurm_executor_type(ex):
-        ex = _slurm_executor_for_single(ex, func, kwargs)
+        ex = _slurm_executor_for_single(ex, func, resources)
         assert isinstance(executor, dict)
         executor[func.output_name] = ex  # type: ignore[assignment]
     return ex
@@ -98,6 +98,19 @@ def _is_slurm_executor_type(executor: Executor | None) -> TypeGuard[type[SlurmEx
     return isinstance(executor, type) and issubclass(executor, SlurmExecutor)
 
 
+def should_filter_error_indices(
+    executor: Executor,
+    error_handling: str,
+) -> bool:
+    """Policy: decide if error indices must be filtered locally.
+
+    Today this is required for SLURM with element-scope resources when
+    error_handling="continue" so we don't evaluate resources for errored
+    elements or submit pointless jobs.
+    """
+    return is_slurm_executor(executor) and error_handling == "continue"
+
+
 def _slurm_executor_for_map(
     executor: SlurmExecutor | type[SlurmExecutor],
     process_index: functools.partial[tuple[Any, ...]],
@@ -112,11 +125,8 @@ def _slurm_executor_for_map(
 def _slurm_executor_for_single(
     executor: SlurmExecutor | type[SlurmExecutor],
     func: PipeFunc,
-    kwargs: dict[str, Any],
+    resources: Resources | None,
 ) -> Executor:
-    resources: Resources | None = (
-        func.resources(kwargs) if callable(func.resources) else func.resources  # type: ignore[has-type]
-    )
     executor_kwargs = _adaptive_scheduler_resource_dict(resources, clear=True)
     executor_kwargs["name"] = _slurm_name(func.output_name, executor)
     return _new_slurm_executor(executor, **executor_kwargs)
@@ -198,6 +208,7 @@ def _map_slurm_executor_kwargs(
         evaluated_resources = _resources_from_process_index(process_index, i)
         scheduler_resources = _adaptive_scheduler_resource_dict(evaluated_resources)
         resources_list.append(scheduler_resources)
+
     dict_of_tuples = _list_of_dicts_to_dict_of_tuples(resources_list)
     kwargs.update(dict_of_tuples)
     return kwargs
@@ -246,7 +257,8 @@ def _resources_from_process_index(
     process_index: functools.partial[tuple[Any, ...]],
     index: int,
 ) -> Resources | None:
-    from ._run import _EVALUATED_RESOURCES, _select_kwargs_and_eval_resources
+    from ._run import _EVALUATED_RESOURCES, _prepare_kwargs_for_execution
+
     # Import here to avoid circular imports
 
     kw = process_index.keywords
@@ -254,14 +266,16 @@ def _resources_from_process_index(
     # NOTE: We are executing this line below 2 times for each index.
     # This is not ideal, if it becomes a performance issue we can cache
     # the result.
-    selected = _select_kwargs_and_eval_resources(
+    selected, _error_infos = _prepare_kwargs_for_execution(
         kw["func"],
         kw["kwargs"],
         kw["shape"],
         kw["shape_mask"],
         index,
+        kw["error_handling"],
+        kw["map_error_info"],
     )
-    return selected[_EVALUATED_RESOURCES]
+    return selected.get(_EVALUATED_RESOURCES)  # missing with PropagatedErrorSnapshot
 
 
 T = TypeVar("T")
