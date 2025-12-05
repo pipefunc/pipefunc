@@ -289,6 +289,19 @@ def should_filter_error_indices(func, executor, error_handling) -> bool:
 
 ---
 
+### Non-Issue 5: Masked Array Support
+
+**Claimed Problem**: `scan_inputs_for_errors` might not correctly handle `np.ma.MaskedArray` inputs, potentially missing errors or incorrectly flagging masked-out errors.
+
+**Investigation**: Verified that `np.ma.MaskedArray` is an instance of `np.ndarray`, so it is processed by the array scanning logic. `array.flat` on a MaskedArray yields `np.ma.masked` for masked elements.
+
+**Finding**: ✅ WORKING CORRECTLY
+- **Unmasked ErrorSnapshots**: Correctly detected as errors.
+- **Masked ErrorSnapshots**: Correctly ignored (treated as valid/skipped), because `isinstance(np.ma.masked, ErrorSnapshot)` is `False`.
+- **Result**: The system respects the mask, preventing false positives for masked-out errors.
+
+---
+
 ## Part 3: Additional Tests Added (Not Regression Tests)
 
 These tests were added for completeness but don't test bug fixes:
@@ -324,6 +337,7 @@ Tests that output_picker exceptions still raise in `error_handling="raise"` mode
 | Map-scope resources skipped | By design |
 | Resource error function reference | Correct behavior |
 | SLURM filtering for map-scope | Inconclusive (needs SLURM env) |
+| Masked Array Support | Correct behavior (respects mask) |
 
 ### Verification Method
 
@@ -365,12 +379,10 @@ All fixes were verified by:
    - **Verification**: Verified with a mock-based test (`test_map_scope_filters_error_indices_with_mock_slurm`) confirming that error indices are routed to local processing instead of the remote executor.
    - **Risk**: Resolved.
 
-6. **ErrorSnapshot double-dump inefficiency**
-   - Error objects bypass the XOR guard in `_update_array`
-   - Written in both executor and post-process phases
-   - Currently inefficient but not incorrect
-   - Test: `test_error_objects_dump_count_with_mock` (xfail) documents this
-   - Risk: Low - inefficiency only, not correctness issue
+6. **ErrorSnapshot double-dump inefficiency** ✅ FIXED
+   - **Problem**: Error objects bypassed the XOR guard in `_update_array`, causing them to be written in both executor and post-process phases
+   - **Fix**: Removed the `is_error_object` bypass - error objects now follow the same XOR logic as normal values, ensuring exactly one dump
+   - **Test**: `test_error_objects_dump_count_with_mock` validates single dump
 
 7. **Untested/under-tested edge cases**
    - Nested pipelines in continue mode

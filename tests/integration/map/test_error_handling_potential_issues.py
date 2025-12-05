@@ -1,10 +1,10 @@
 """Tests to verify potential issues identified in PR review.
 
 These tests investigate whether the following are actual bugs:
-1. Double dumping of error objects - CONFIRMED BUG
+1. Double dumping of error objects - FIXED (error objects now use same XOR logic)
 2. Map-scope resources skipped for valid elements - NOT A BUG (by design)
-3. Resource error uses wrong function reference - CONFIRMED (stores resources callable)
-4. SLURM filtering only for resources_scope="element" - NOT A BUG (is_slurm_executor returns False for mock)
+3. Resource error uses wrong function reference - NOT A BUG (stores resources callable correctly)
+4. SLURM filtering only for resources_scope="element" - FIXED (now filters all scopes)
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
 from pipefunc.resources import Resources
 
 # =============================================================================
-# Test 1: Double dumping of error objects - CONFIRMED BUG
+# Test 1: Double dumping of error objects - FIXED
 # =============================================================================
 
 
@@ -60,16 +60,12 @@ def test_error_objects_dumped_twice_with_file_storage(tmp_path):
     assert isinstance(loaded[1], ErrorSnapshot)
 
 
-@pytest.mark.xfail(reason="Known issue: ErrorSnapshot is dumped twice (worker + main process)")
 def test_error_objects_dump_count_with_mock(tmp_path):
-    """Use mocking to count actual dump calls for error objects.
+    """Verify ErrorSnapshot objects are dumped exactly once.
 
-    CONFIRMED BUG: ErrorSnapshot is dumped twice because:
-    1. First dump in _update_array with in_post_process=False (during execution)
-    2. Second dump in _update_array with in_post_process=True (during post-processing)
-
-    The XOR logic (array.dump_in_subprocess ^ in_post_process) is bypassed for error objects
-    because is_error_object=True causes immediate dump regardless of XOR result.
+    Regression test: Previously, ErrorSnapshot was dumped twice because error objects
+    bypassed the XOR logic in _update_array. Now error objects follow the same
+    dump logic as normal values, ensuring exactly one dump per output.
     """
 
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")

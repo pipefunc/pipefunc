@@ -1097,12 +1097,13 @@ def _update_array(
     for array, _output in zip(arrays, outputs):
         if not array.full_shape_is_resolved():
             _maybe_set_internal_shape(_output, array)
-        # Error objects bypass XOR logic and dump immediately when created because:
-        # 1. They short-circuit execution (subsequent functions skip when seeing errors)
-        # 2. Without immediate dump, the XOR logic could prevent saving them entirely
-        # Normal values use XOR to dump exactly once (subprocess OR main process)
-        is_error_object = isinstance(_output, (ErrorSnapshot, PropagatedErrorSnapshot))
-        if is_error_object or force_dump or (array.dump_in_subprocess ^ in_post_process):
+        # XOR logic ensures dump happens exactly once:
+        # - dump_in_subprocess=True + in_post_process=False → dump (in subprocess)
+        # - dump_in_subprocess=True + in_post_process=True → skip (already dumped)
+        # - dump_in_subprocess=False + in_post_process=False → skip (will dump later)
+        # - dump_in_subprocess=False + in_post_process=True → dump (in main process)
+        # Error objects follow the same logic - no special treatment needed.
+        if force_dump or (array.dump_in_subprocess ^ in_post_process):
             if output_key is None:  # Only calculate the output key if needed
                 external_shape = external_shape_from_mask(shape, shape_mask)
                 output_key = func.mapspec.output_key(external_shape, index)  # type: ignore[arg-type]
