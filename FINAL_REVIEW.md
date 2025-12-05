@@ -337,27 +337,53 @@ All fixes were verified by:
 
 ## Remaining TODOs / Open Risks
 
-1. **SLURM map-scope filtering is still unvalidated**
-   `should_filter_error_indices` only gates `resources_scope=="element"`, so map-scope resources plus propagated errors may still submit useless jobs. Needs a test using a real `SlurmExecutor` (or a faithful mock that forces `is_slurm_executor` to `True`) to decide whether map-scope should also skip/route error indices.
+### Investigated and Assessed (Low/No Risk)
 
-2. **ErrorSnapshot double-dump and storage compatibility**
-   Error objects bypass the XOR guard in `_update_array`, so they are written in both executor and post-process phases. Currently an inefficiency, but could fail with storages that cannot handle object dtype or concurrent writes. Todo: deduplicate error writes or explicitly guarantee storages accept overwrite of identical error payloads.
+1. **Performance: StorageBase numeric array loading** ✅ ALREADY OPTIMIZED
+   - The code at `_error_handling.py:72-82` already checks `dtype` BEFORE calling `to_array()` on StorageBase
+   - If dtype is not object, it skips loading entirely
+   - Double-check after `to_array()` handles cases where dtype wasn't known beforehand
 
-3. **Global `func.error_snapshot` mutation is not thread/process safe**
-   `handle_pipefunc_error` writes to `func.error_snapshot`, so concurrent executions of the same `PipeFunc` can race and attach the wrong snapshot. Need a per-call snapshot store or locking to avoid cross-contamination in multi-thread/process runs.
+2. **Global `func.error_snapshot` mutation (thread-safety)** ⚠️ BY DESIGN
+   - `handle_pipefunc_error` writes to `func.error_snapshot` on each error
+   - In `error_handling="continue"` mode, the **returned snapshots** (stored in result arrays) are correct per-thread
+   - The `func.error_snapshot` attribute is a debug convenience for interactive use
+   - Test `test_parallel_error_snapshot_race` validates correct per-thread snapshots are returned
+   - Risk: Low - only affects the convenience attribute, not the actual error data
 
-4. **Deep propagation pickling may blow recursion**
-   `PropagatedErrorSnapshot._pickle_error_info` recursively pickles nested errors without a depth guard. Extremely deep propagation chains could hit recursion limits or fail to deserialize. Consider iterative encoding/decoding or a maximum-depth safeguard.
+3. **Deep propagation pickling recursion** ⚠️ THEORETICAL RISK
+   - `PropagatedErrorSnapshot._pickle_error_info` recursively pickles nested errors
+   - Python's default recursion limit is 1000
+   - Practical pipelines rarely exceed 10-20 stages deep
+   - Risk: Very low - only affects extreme edge cases (1000+ stage pipelines)
+   - Future: Could add depth guard if needed
 
-5. **Array-containing errors lack root-cause surfaces**
-   `get_root_causes` ignores `type=="partial"` entries, so users cannot trace array-level failures. Decide whether to surface representative indices or nested snapshots for partial errors, and document the policy.
+4. **Partial array errors in `get_root_causes`** ✅ DOCUMENTED BEHAVIOR
+   - `get_root_causes()` explicitly ignores `type=="partial"` entries
+   - Docstring states: "For array-containing errors (reductions), this currently returns an empty list"
+   - Users can access `error_info` metadata directly for partial errors
+   - Risk: None - this is by design and documented
 
-6. **Untested/under-tested edge cases**
+### Still Unvalidated / Future Work
+
+5. **SLURM map-scope filtering**
+   - `should_filter_error_indices` only gates `resources_scope=="element"`
+   - Map-scope resources plus propagated errors may still submit useless jobs
+   - Needs real SlurmExecutor or faithful mock to validate
+   - Risk: Medium - only affects SLURM users with map-scope resources
+
+6. **ErrorSnapshot double-dump inefficiency**
+   - Error objects bypass the XOR guard in `_update_array`
+   - Written in both executor and post-process phases
+   - Currently inefficient but not incorrect
+   - Test: `test_error_objects_dump_count_with_mock` (xfail) documents this
+   - Risk: Low - inefficiency only, not correctness issue
+
+7. **Untested/under-tested edge cases**
    - Nested pipelines in continue mode
-   - Mixed storages (e.g., FileArray + SharedMemoryArray) when only some storages carry errors
-   - Async cancellation/timeout behavior under continue mode
-   - Memory footprint for very large arrays containing many errors
-   Add targeted tests or measurements to cover these scenarios.
+   - Mixed storages (FileArray + SharedMemoryArray) with errors
+   - Async cancellation/timeout under continue mode
+   - Memory footprint for very large error-bearing arrays
 
 ---
 
