@@ -359,11 +359,11 @@ All fixes were verified by:
 
 ### Still Unvalidated / Future Work
 
-5. **SLURM map-scope filtering**
-   - `should_filter_error_indices` only gates `resources_scope=="element"`
-   - Map-scope resources plus propagated errors may still submit useless jobs
-   - Needs real SlurmExecutor or faithful mock to validate
-   - Risk: Medium - only affects SLURM users with map-scope resources
+5. **SLURM map-scope filtering** ✅ RESOLVED & FIXED
+   - **Problem**: `should_filter_error_indices` restricted local filtering to `resources_scope=="element"`. This caused map-scope resources with upstream errors to still submit pointless jobs to SLURM.
+   - **Fix**: Removed the `resources_scope` check in `pipefunc/map/_adaptive_scheduler_slurm_executor.py`. Now, all scopes filter error indices locally when using SLURM and `continue` mode.
+   - **Verification**: Verified with a mock-based test (`test_map_scope_filters_error_indices_with_mock_slurm`) confirming that error indices are routed to local processing instead of the remote executor.
+   - **Risk**: Resolved.
 
 6. **ErrorSnapshot double-dump inefficiency**
    - Error objects bypass the XOR guard in `_update_array`
@@ -386,11 +386,14 @@ All fixes were verified by:
 - `pipefunc/_error_handling.py` - Added 0-D array handling (+8 lines)
 - `pipefunc/map/_run.py` - Added output_picker error handling (+50 lines, -7 lines)
 - `pipefunc/map/_run_info.py` - Added error_handling validation (+81 lines, -39 lines refactored)
+- `pipefunc/map/_adaptive_scheduler_slurm_executor.py` - Enabled error filtering for map-scope resources
 
 ### Test Files Added/Modified:
 - `tests/integration/map/test_error_handling.py` - Added 4 new tests (+115 lines)
 - `tests/unit/error_handling/test_error_info_and_snapshots.py` - Added 2 new tests (+50 lines)
 - `tests/integration/map/test_error_handling_potential_issues.py` - New file for investigating potential issues
+- `tests/integration/map/test_adaptive_slurm_executor.py` - Added regression test for SLURM map-scope filtering
+- `tests/map/test_resume_validation.py` - Fixed regex in test case
 
 ### Commits:
 - `eb7bd3de` - fix: address error handling bugs found in PR review

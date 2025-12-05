@@ -171,7 +171,7 @@ def test_resume_validation_auto_with_mismatched_inputs(tmp_path: Path) -> None:
 
     # Second run with different inputs - should fail
     inputs2 = {"x": [4, 5, 6]}
-    with pytest.raises(ValueError, match="Inputs.*do not match previous run"):
+    with pytest.raises(ValueError, match="`inputs` do not match previous run"):
         pipeline.map(
             inputs2,
             run_folder=tmp_path,

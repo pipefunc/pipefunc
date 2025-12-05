@@ -824,3 +824,70 @@ async def test_slurm_executor_simple(
     # Give the event loop a moment to process the cancellation
     await asyncio.sleep(0)
     assert runner.task.cancelled()
+
+
+@pytest.mark.asyncio
+async def test_map_scope_filters_error_indices_with_mock_slurm() -> None:
+    """Map-scope resources must not submit error indices to the executor.
+
+    This tests that `resources_scope="map"` also filters out error indices
+    when using a SLURM executor with error_handling="continue".
+    """
+    from pipefunc.map import _run as map_run
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]", resources={"cpus": 1})
+    def double_it(x: int) -> int:
+        if x == 5:
+            msg = "intentional error"
+            raise ValueError(msg)
+        return 2 * x
+
+    # IMPORTANT: This function uses resources_scope="map" (default)
+    @pipefunc(
+        output_name="z",
+        mapspec="y[i] -> z[i]",
+        resources={"cpus": 1},
+        resources_scope="map",
+    )
+    def add_one(y: int) -> int:
+        return y + 1
+
+    pipeline = Pipeline([double_it, add_one])
+    inputs = {"x": list(range(10))}
+    executor = MockSlurmExecutor(cores_per_node=2)
+
+    # Capture submitted indices by function name
+    original_submit = map_run._submit
+    submission_funcs: list[tuple[str, list[int]]] = []
+
+    def wrapped_submit(func, *args, **kwargs):
+        process_index_callable = getattr(func, "keywords", {}).get("process_index")
+        if process_index_callable is not None:
+            captured_func = process_index_callable.keywords.get("func")
+            if captured_func is not None:
+                chunk = args[4] if len(args) > 4 else []
+                submission_funcs.append((captured_func.__name__, list(chunk)))
+        return original_submit(func, *args, **kwargs)
+
+    with mock.patch("pipefunc.map._run._submit", side_effect=wrapped_submit):
+        runner = pipeline.map_async(
+            inputs,
+            executor=executor,
+            resume=False,
+            error_handling="continue",
+            show_progress="headless",
+        )
+        result = await runner.task
+
+    # Upstream produced an error at index 5
+    assert len(result["y"].output) == 10
+    assert isinstance(result["y"].output[5], ErrorSnapshot)
+
+    # Submission behavior: downstream map-scope must ALSO exclude the error index
+    add_one_submissions = [s for s in submission_funcs if s[0] == "add_one"]
+    add_one_indices = [idx for _, indices in add_one_submissions for idx in indices]
+    expected_add_one = [i for i in range(10) if i != 5]
+
+    # This assertion would fail before the fix
+    assert sorted(add_one_indices) == expected_add_one
+    assert 5 not in add_one_indices
