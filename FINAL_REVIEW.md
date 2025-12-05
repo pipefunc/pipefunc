@@ -337,32 +337,25 @@ All fixes were verified by:
 
 ## Remaining TODOs / Open Risks
 
-### Investigated and Assessed (Low/No Risk)
+### Investigated and Assessed (Not Issues)
 
 1. **Performance: StorageBase numeric array loading** ✅ ALREADY OPTIMIZED
    - The code at `_error_handling.py:72-82` already checks `dtype` BEFORE calling `to_array()` on StorageBase
    - If dtype is not object, it skips loading entirely
-   - Double-check after `to_array()` handles cases where dtype wasn't known beforehand
 
-2. **Global `func.error_snapshot` mutation (thread-safety)** ⚠️ BY DESIGN
-   - `handle_pipefunc_error` writes to `func.error_snapshot` on each error
+2. **Global `func.error_snapshot` mutation (thread-safety)** ✅ NOT AN ISSUE
    - In `error_handling="continue"` mode, the **returned snapshots** (stored in result arrays) are correct per-thread
-   - The `func.error_snapshot` attribute is a debug convenience for interactive use
+   - The `func.error_snapshot` attribute is just a debug convenience for interactive use
    - Test `test_parallel_error_snapshot_race` validates correct per-thread snapshots are returned
-   - Risk: Low - only affects the convenience attribute, not the actual error data
 
-3. **Deep propagation pickling recursion** ⚠️ THEORETICAL RISK
-   - `PropagatedErrorSnapshot._pickle_error_info` recursively pickles nested errors
+3. **Deep propagation pickling recursion** ✅ NOT AN ISSUE
    - Python's default recursion limit is 1000
    - Practical pipelines rarely exceed 10-20 stages deep
-   - Risk: Very low - only affects extreme edge cases (1000+ stage pipelines)
-   - Future: Could add depth guard if needed
 
 4. **Partial array errors in `get_root_causes`** ✅ DOCUMENTED BEHAVIOR
    - `get_root_causes()` explicitly ignores `type=="partial"` entries
    - Docstring states: "For array-containing errors (reductions), this currently returns an empty list"
    - Users can access `error_info` metadata directly for partial errors
-   - Risk: None - this is by design and documented
 
 ### Still Unvalidated / Future Work
 
