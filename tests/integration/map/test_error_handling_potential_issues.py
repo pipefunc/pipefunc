@@ -20,7 +20,7 @@ from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
 from pipefunc.resources import Resources
 
 # =============================================================================
-# ErrorSnapshot dump count tests
+# Test 1: ErrorSnapshot dump count (regression test for double-dump fix)
 # =============================================================================
 
 
@@ -89,12 +89,17 @@ def test_error_objects_dump_count_with_mock(tmp_path):
 
 
 # =============================================================================
-# Map-scope resources with partial errors
+# Test 2: Map-scope resources behavior with partial errors
 # =============================================================================
 
 
 def test_map_scope_resources_with_partial_errors():
-    """Test map-scope resources when some inputs have errors."""
+    """Test map-scope resources when some inputs have errors.
+
+    When map-level inputs contain errors and resources_variable is None,
+    resources are skipped (by design) because the resource function can't
+    be called meaningfully.
+    """
     resource_calls = []
 
     def track_resources(x):
@@ -131,9 +136,15 @@ def test_map_scope_resources_with_partial_errors():
 
 
 def test_map_scope_resources_variable_with_partial_errors():
-    """Test map-scope resources with resources_variable when inputs have errors."""
+    """Test map-scope resources with resources_variable when inputs have errors.
+
+    When resources_variable is set, the resources function IS called
+    and receives the error-containing array.
+    """
+    resource_calls = []
 
     def track_resources(y):
+        resource_calls.append(("resources", y))
         return Resources(cpus=len(y) if hasattr(y, "__len__") else 1)
 
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
@@ -165,12 +176,18 @@ def test_map_scope_resources_variable_with_partial_errors():
 
 
 # =============================================================================
-# Resource evaluation error handling
+# Test 3: Resource evaluation error handling
 # =============================================================================
 
 
 def test_resource_evaluation_error_creates_propagated_snapshot():
-    """Test that resource evaluation errors create PropagatedErrorSnapshot."""
+    """Test that resource evaluation errors create PropagatedErrorSnapshot.
+
+    Resource evaluation errors are wrapped in PropagatedErrorSnapshot,
+    not ErrorSnapshot directly. The inner ErrorSnapshot stores the
+    resources callable (not the user function) because that's where
+    the error occurred.
+    """
 
     def bad_resources(x):
         msg = "resource evaluation failed"
@@ -195,9 +212,11 @@ def test_resource_evaluation_error_creates_propagated_snapshot():
 
     for i in range(3):
         output = result["y"].output[i]
-        assert isinstance(output, PropagatedErrorSnapshot)
-        assert "__pipefunc_internal_resource_error__" in output.error_info
+        assert isinstance(output, PropagatedErrorSnapshot), (
+            f"Expected PropagatedErrorSnapshot at index {i}, got {type(output)}"
+        )
 
+        assert "__pipefunc_internal_resource_error__" in output.error_info
         resource_error_info = output.error_info["__pipefunc_internal_resource_error__"]
         assert resource_error_info.type == "full"
 
@@ -207,7 +226,11 @@ def test_resource_evaluation_error_creates_propagated_snapshot():
 
 
 def test_resource_error_reproduce():
-    """Test that reproduce() on resource error re-raises the error."""
+    """Test that reproduce() on resource error re-raises the error.
+
+    reproduce() on the inner ErrorSnapshot re-runs the resource
+    evaluation function, which is correct since that's where the error occurred.
+    """
 
     def bad_resources(x):
         msg = "resource evaluation failed"
@@ -238,12 +261,17 @@ def test_resource_error_reproduce():
 
 
 # =============================================================================
-# SLURM error index filtering
+# Test 4: SLURM error index filtering
 # =============================================================================
 
 
 def test_slurm_filtering_with_resources_scopes():
-    """Test should_filter_error_indices for different resource scopes."""
+    """Test should_filter_error_indices for different resource scopes.
+
+    Both element and map scopes should filter error indices when using
+    SLURM with continue mode (after the fix that removed the element-only
+    restriction).
+    """
     from pipefunc.map._adaptive_scheduler_slurm_executor import should_filter_error_indices
 
     @pipefunc(
@@ -266,7 +294,6 @@ def test_slurm_filtering_with_resources_scopes():
 
     mock_executor = MagicMock()
 
-    # Patch is_slurm_executor to return True for our mock
     with patch(
         "pipefunc.map._adaptive_scheduler_slurm_executor.is_slurm_executor",
         return_value=True,
@@ -280,8 +307,8 @@ def test_slurm_filtering_with_resources_scopes():
         assert not should_filter_error_indices(map_scope, mock_executor, "raise")
 
 
-def test_slurm_filtering_with_non_slurm_executor():
-    """Test that non-SLURM executors don't trigger filtering."""
+def test_slurm_filtering_various_combinations():
+    """Test should_filter_error_indices with various executor/scope/mode combinations."""
     from pipefunc.map._adaptive_scheduler_slurm_executor import should_filter_error_indices
 
     @pipefunc(
@@ -290,8 +317,39 @@ def test_slurm_filtering_with_non_slurm_executor():
         resources=Resources(cpus=1),
         resources_scope="element",
     )
-    def func(x: int) -> int:
-        return x * 2
+    def element_func(x: int) -> int:
+        return x
 
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        assert not should_filter_error_indices(func, executor, "continue")
+    @pipefunc(
+        output_name="z",
+        mapspec="x[i] -> z[i]",
+        resources=Resources(cpus=1),
+        resources_scope="map",
+    )
+    def map_func(x: int) -> int:
+        return x
+
+    @pipefunc(output_name="w", mapspec="x[i] -> w[i]")
+    def no_resources_func(x: int) -> int:
+        return x
+
+    mock_executor = MagicMock()
+
+    # With SLURM executor (mocked)
+    with patch(
+        "pipefunc.map._adaptive_scheduler_slurm_executor.is_slurm_executor",
+        return_value=True,
+    ):
+        # continue mode should filter for all resource scopes
+        assert should_filter_error_indices(element_func, mock_executor, "continue")
+        assert should_filter_error_indices(map_func, mock_executor, "continue")
+        assert should_filter_error_indices(no_resources_func, mock_executor, "continue")
+
+        # raise mode should never filter
+        assert not should_filter_error_indices(element_func, mock_executor, "raise")
+        assert not should_filter_error_indices(map_func, mock_executor, "raise")
+
+    # With non-SLURM executor
+    with ThreadPoolExecutor(max_workers=1) as thread_executor:
+        assert not should_filter_error_indices(element_func, thread_executor, "continue")
+        assert not should_filter_error_indices(map_func, thread_executor, "continue")
