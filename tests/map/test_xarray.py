@@ -576,6 +576,58 @@ def test_aggregation_to_array(tmp_path: Path) -> None:
     np.testing.assert_array_equal(row_sums_value, expected_row_sums)
 
 
+def test_scalar_output_with_getitem() -> None:
+    """Test scalar output with __getitem__ doesn't break to_dataframe().
+
+    When an object implements __getitem__, numpy iterates over it when creating
+    an array, producing unexpected shapes. This causes xarray conversion to fail.
+    See: https://github.com/pipefunc/pipefunc/issues/924
+    """
+
+    class IndexableObject:
+        """A simple object that supports indexing via __getitem__."""
+
+        def __init__(self, items: list[int]) -> None:
+            self._items = items
+
+        def __getitem__(self, idx: int) -> int:
+            return self._items[idx]
+
+        def __len__(self) -> int:
+            return len(self._items)
+
+        def __repr__(self) -> str:
+            return f"IndexableObject({self._items})"
+
+    @pipefunc(output_name="obj")
+    def create_object(size: int) -> IndexableObject:
+        """Create a scalar (non-mapped) indexable object."""
+        return IndexableObject(list(range(size)))
+
+    @pipefunc(output_name="result", mapspec="x[i] -> result[i]")
+    def process(obj: IndexableObject, x: int) -> int:
+        """Process using the shared object and mapped input."""
+        return len(obj) * x
+
+    pipeline = Pipeline([create_object, process])
+
+    results = pipeline.map(
+        {"size": 5, "x": [1, 2, 3]},
+        parallel=False,
+        storage="dict",
+    )
+
+    # Pipeline execution works fine
+    assert isinstance(results["obj"].output, IndexableObject)
+    assert results["result"].output.tolist() == [5, 10, 15]
+
+    # to_dataframe() should work without raising ValueError
+    df = results.to_dataframe()
+    assert "obj" in df.columns
+    assert "result" in df.columns
+    assert isinstance(df["obj"].iloc[0], IndexableObject)
+
+
 def test_unhashable_types() -> None:
     class Unhashable:
         def __init__(self, value):
