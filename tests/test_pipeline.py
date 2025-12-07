@@ -44,12 +44,12 @@ def test_pipeline_and_all_arg_combinations() -> None:
 
     fc = pipeline.func("c")
     fd = pipeline.func("d")
-    c = f1(a=2, b=3)
+    c = f1.run(a=2, b=3)
     assert fc(a=2, b=3) == c == fc(b=3, a=2) == 5
-    assert fd(a=2, b=3) == f2(b=3, c=c) == fd(b=3, c=c) == 15
+    assert fd(a=2, b=3) == f2.run(b=3, c=c) == fd(b=3, c=c) == 15
 
     fe = pipeline.func("e")
-    assert fe(a=2, b=3, x=1) == fe(a=2, b=3, d=15, x=1) == f3(c=c, d=15, x=1) == 75
+    assert fe(a=2, b=3, x=1) == fe(a=2, b=3, d=15, x=1) == f3.run(c=c, d=15, x=1) == 75
 
     all_args = pipeline.all_arg_combinations
     assert all_args == {
@@ -64,9 +64,9 @@ def test_pipeline_and_all_arg_combinations() -> None:
     }
 
     kw = {"a": 2, "b": 3, "x": 1}
-    kw["c"] = f1(a=kw["a"], b=kw["b"])
-    kw["d"] = f2(b=kw["b"], c=kw["c"])
-    kw["e"] = f3(c=kw["c"], d=kw["d"], x=kw["x"])
+    kw["c"] = f1.run(a=kw["a"], b=kw["b"])
+    kw["d"] = f2.run(b=kw["b"], c=kw["c"])
+    kw["e"] = f3.run(c=kw["c"], d=kw["d"], x=kw["x"])
     for params in all_args["e"]:
         _kw = {k: kw[k] for k in params}
         assert fe(**_kw) == kw["e"]
@@ -76,7 +76,7 @@ def test_pipeline_and_all_arg_combinations() -> None:
     assert f_nested.output_name == ("c", "d")
     assert f_nested.parameters == ("a", "b", "x")
     assert f_nested.defaults == {"x": 1}
-    assert f_nested(a=2, b=3) == (5, 15)
+    assert f_nested.run(a=2, b=3) == (5, 15)
     assert f_nested.renames == {}
     f_nested.update_renames({"a": "a1", "b": "b1"})
     assert f_nested.renames == {"a": "a1", "b": "b1"}
@@ -89,7 +89,7 @@ def test_pipeline_and_all_arg_combinations() -> None:
     assert f_nested.parameters == ("a2", "b2", "x")
     f_nested_copy = f_nested.copy()
     assert f_nested_copy.renames == f_nested.renames
-    assert f_nested_copy(a2=2, b2=3) == (5, 15)
+    assert f_nested_copy.run(a2=2, b2=3) == (5, 15)
     f_nested_copy.update_renames({}, overwrite=True)
     pipeline = Pipeline([f_nested_copy, f3])
     assert pipeline("e", a=2, b=3, x=1) == 75
@@ -121,12 +121,12 @@ def test_pipeline_and_all_arg_combinations_rename(f2):
 
     fc = pipeline.func("c")
     fd = pipeline.func("d")
-    c = f1(a=2, b=3)
+    c = f1.run(a=2, b=3)
     assert fc(a=2, b=3) == c == fc(b=3, a=2) == 5
-    assert fd(a=2, b=3, xx=1) == f2(b=3, c=c, xx=1) == fd(b=3, c=c, xx=1) == 15
+    assert fd(a=2, b=3, xx=1) == f2.run(b=3, c=c, xx=1) == fd(b=3, c=c, xx=1) == 15
 
     fe = pipeline.func("e")
-    assert fe(a=2, b=3, x=1, xx=1) == fe(a=2, b=3, d=15, x=1) == f3(c=c, d=15, x=1) == 75
+    assert fe(a=2, b=3, x=1, xx=1) == fe(a=2, b=3, d=15, x=1) == f3.run(c=c, d=15, x=1) == 75
 
     all_args = pipeline.all_arg_combinations
     assert all_args == {
@@ -524,9 +524,9 @@ def test_setting_defaults() -> None:
     assert f.parameters == ("a1", "b")
     assert f.defaults == {"b": 2}
     with pytest.raises(ValueError, match="Unexpected keyword arguments"):
-        f(a=0)
+        f.run(a=0)
 
-    assert f(a1=0) == 2
+    assert f.run(a1=0) == 2
 
     pipeline = Pipeline([f])
     assert pipeline("c", a1=0) == 2
@@ -546,8 +546,8 @@ def test_setting_defaults() -> None:
     def h(a="a", b="b"):
         return a, b
 
-    assert h() == ("b_new", "a_new")
-    assert h(a="aa", b="bb") == ("bb", "aa")
+    assert h.run() == ("b_new", "a_new")
+    assert h.run(a="aa", b="bb") == ("bb", "aa")
 
 
 def test_subpipeline() -> None:
@@ -771,7 +771,7 @@ def test_unhashable_bound() -> None:
     def f(a, b):
         return a, b
 
-    assert f(a=1) == (1, [])
+    assert f.run(a=1) == (1, [])
     pipeline = Pipeline([f])
     assert pipeline(a=1) == (1, [])
 
