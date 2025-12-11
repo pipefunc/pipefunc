@@ -1046,19 +1046,41 @@ def _run_iteration_and_process(
     return_results: bool = True,
     force_dump: bool = False,
 ) -> tuple[Any, ...]:
-    selected_kwargs, error_infos = _prepare_kwargs_for_execution(
-        func,
-        kwargs,
-        shape,
-        shape_mask,
-        index,
-        error_handling,
-        map_error_info,
-    )
-    # Early error detection centralized through the guard helper
-    ctx = ErrorContext(mode=error_handling, error_info=error_infos.element)
-    output = _get_or_set_cache(func, selected_kwargs, cache, ctx, error_handling)
-    outputs = _pick_output(func, output, error_handling)
+    if error_handling == "raise":
+        # Hot-path for default raise mode: avoid continue-mode scaffolding.
+        selected_kwargs = _select_kwargs(func, kwargs, shape, shape_mask, index)
+        if callable(func.resources):  # type: ignore[has-type]
+            kw_for_resources = kwargs if func.resources_scope == "map" else selected_kwargs
+            evaluated_resources = func.resources(kw_for_resources)  # type: ignore[has-type]
+            selected_kwargs[_EVALUATED_RESOURCES] = evaluated_resources
+        if cache is None:
+            try:
+                output = func(**selected_kwargs)
+            except Exception as e:
+                handle_pipefunc_error(e, func, selected_kwargs, "raise")
+                raise  # pragma: no cover
+        else:
+            output = _get_or_set_cache_raise(func, selected_kwargs, cache)
+
+        output_names = at_least_tuple(func.output_name)
+        if func.output_picker is None:
+            outputs = tuple(output for _ in output_names)
+        else:
+            outputs = tuple(func.output_picker(output, name) for name in output_names)
+    else:
+        selected_kwargs, error_infos = _prepare_kwargs_for_execution(
+            func,
+            kwargs,
+            shape,
+            shape_mask,
+            index,
+            error_handling,
+            map_error_info,
+        )
+        # Early error detection centralized through the guard helper
+        ctx = ErrorContext(mode=error_handling, error_info=error_infos.element)
+        output = _get_or_set_cache(func, selected_kwargs, cache, ctx, error_handling)
+        outputs = _pick_output(func, output, error_handling)
     has_dumped = _update_array(
         func,
         arrays,
@@ -1072,6 +1094,29 @@ def _run_iteration_and_process(
     if has_dumped and not return_results:
         return _InternalShape.from_outputs(outputs)
     return outputs
+
+
+def _get_or_set_cache_raise(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    cache: _CacheBase,
+) -> Any:
+    """Cache helper for raise mode without continue-mode guards."""
+    cache_key = (func._cache_id, "raise", to_hashable(kwargs))
+    if cache_key in cache:
+        return cache.get(cache_key)
+    if isinstance(cache, HybridCache):
+        t = time.monotonic()
+    try:
+        result = func(**kwargs)
+    except Exception as e:
+        handle_pipefunc_error(e, func, kwargs, "raise")
+        raise  # pragma: no cover
+    if isinstance(cache, HybridCache):
+        cache.put(cache_key, result, time.monotonic() - t)
+    else:
+        cache.put(cache_key, result)
+    return result
 
 
 def _update_array(
@@ -1626,8 +1671,19 @@ def _execute_single(
 
     # Otherwise, run the function
     _load_data(kwargs)
-    _res, error_infos = _prepare_execution_environment(func, kwargs, kwargs, error_handling, None)
+    if error_handling == "raise":
+        if _EVALUATED_RESOURCES not in kwargs and callable(func.resources):
+            evaluated_resources = func.resources(kwargs)  # type: ignore[has-type]
+            kwargs[_EVALUATED_RESOURCES] = evaluated_resources
+        if cache is None:
+            try:
+                return func(**kwargs)
+            except Exception as e:
+                handle_pipefunc_error(e, func, kwargs, "raise")
+                raise  # pragma: no cover
+        return _get_or_set_cache_raise(func, kwargs, cache)
 
+    _res, error_infos = _prepare_execution_environment(func, kwargs, kwargs, error_handling, None)
     ctx = ErrorContext(mode=error_handling, error_info=error_infos.element)
     return _get_or_set_cache(func, kwargs, cache, ctx, error_handling)
 
