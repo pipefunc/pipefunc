@@ -15,6 +15,7 @@ Automatic CLI <cli>
 MCP Server Integration <mcp>
 SLURM integration <slurm>
 Resource Management <resource-management>
+Function Chaining Helper <chaining>
 Simplifying Pipelines <simplifying-pipelines>
 Adaptive integration <adaptive-integration>
 Testing <testing>
@@ -49,6 +50,7 @@ Below are the key concepts discussed in this section. Click on any topic to lear
 - **[Automatic CLI](./cli):** Automatically generate a CLI for your pipeline, complete with documentation.
 - **[SLURM Integration](./slurm):** Submit pipeline.map calls to SLURM clusters with `pipefunc` and [`adaptive-scheduler`](https://adaptive-scheduler.readthedocs.io/en/latest/).
 - **[Resource Management](./resource-management):** Specify and dynamically allocate resources (CPU, memory, GPU) for individual functions.
+- **[Function Chaining Helper](./chaining):** Connect functions linearly with the `chain` helper for simple data flow pipelines.
 - **[Simplifying Pipelines](./simplifying-pipelines):** Merge nodes with `simplified_pipeline` and `NestedPipeFunc`. Understand the trade-offs.
 - **[Adaptive Integration](./adaptive-integration):** Optimize parameter space exploration with `adaptive` library integration.
 - **[Testing](./testing):** Best practices for testing, including mocking functions in pipelines.

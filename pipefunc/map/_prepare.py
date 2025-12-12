@@ -52,10 +52,13 @@ def prepare_run(
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     storage: str | dict[OUTPUT_TYPE, str] | None,
-    cleanup: bool,
+    cleanup: bool | None,
+    resume: bool,
+    resume_validation: Literal["auto", "strict", "skip"],
     fixed_indices: dict[str, int | slice] | None,
     auto_subpipeline: bool,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None,
+    error_handling: Literal["raise", "continue"] = "raise",
     in_async: bool,
 ) -> Prepared:
     if not parallel and executor:
@@ -79,7 +82,10 @@ def prepare_run(
         internal_shapes,
         executor=executor,
         storage=_expand_output_name_in_storage(pipeline, storage),
+        error_handling=error_handling,
         cleanup=cleanup,
+        resume=resume,
+        resume_validation=resume_validation,
     )
     outputs = ResultDict(_inputs_=inputs, _pipeline_=pipeline)
     store = run_info.init_store()

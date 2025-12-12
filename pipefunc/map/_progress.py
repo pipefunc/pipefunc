@@ -46,11 +46,16 @@ class Status:
         *,
         n: int = 1,
     ) -> None:
-        self.n_in_progress -= n
+        failures = 0
         if future is not None and future.exception() is not None:
-            self.n_failed += n
-        else:
-            self.n_completed += n
+            failures = n
+        self.mark_finished(successes=n - failures, failures=failures)
+
+    def mark_finished(self, *, successes: int, failures: int = 0) -> None:
+        n = successes + failures
+        self.n_in_progress -= n
+        self.n_completed += successes
+        self.n_failed += failures
 
         if self.n_total is not None and self.n_attempted >= self.n_total:
             self.end_time = time.monotonic()

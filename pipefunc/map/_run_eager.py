@@ -9,13 +9,16 @@ from pipefunc._pipefunc import PipeFunc
 from pipefunc.map._run import (
     _finalize_run_map,
     _KwargsTask,
+    _MapTask,
     _maybe_executor,
     _process_task,
+    _SingleTask,
     _submit_func,
     prepare_run,
 )
 
 from ._adaptive_scheduler_slurm_executor import maybe_finalize_slurm_executors
+from ._run_info import _handle_cleanup_deprecation
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -48,11 +51,14 @@ def run_map_eager(
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
     storage: StorageType | None = None,
     persist_memory: bool = True,
-    cleanup: bool = True,
+    cleanup: bool | None = None,
+    resume: bool = False,
+    resume_validation: Literal["auto", "strict", "skip"] = "auto",
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
+    error_handling: Literal["raise", "continue"] = "raise",
 ) -> ResultDict:
     """Eagerly schedule pipeline functions as soon as their dependencies are met.
 
@@ -129,7 +135,34 @@ def run_map_eager(
         Whether to write results to disk when memory based storage is used.
         Does not have any effect when file based storage is used.
     cleanup
+        .. deprecated:: 0.89.0
+            Use `resume` parameter instead. Will be removed in version 1.0.0.
+
         Whether to clean up the ``run_folder`` before running the pipeline.
+        When set, takes priority over ``resume`` parameter.
+        ``cleanup=True`` is equivalent to ``resume=False``.
+        ``cleanup=False`` is equivalent to ``resume=True``.
+    resume
+        Whether to resume data from a previous run in the ``run_folder``.
+
+        - ``False`` (default): Clean up the ``run_folder`` before running (fresh start).
+        - ``True``: Attempt to load and resume results from a previous run.
+
+        Note: If ``cleanup`` is specified, it takes priority over this parameter.
+    resume_validation
+        Controls validation strictness when reusing data from a previous run
+        (only applies when ``resume=True``):
+
+        - ``"auto"`` (default): Validate that inputs/defaults match the previous run.
+          If equality comparison fails (returns ``None``), warn but proceed anyway.
+        - ``"strict"``: Validate that inputs/defaults match. Raise an error if
+          equality comparison fails.
+        - ``"skip"``: Skip input/default validation entirely. **Use when your input
+          objects have broken ``__eq__`` implementations that return incorrect results.**
+          You are responsible for ensuring inputs are actually identical.
+
+        Note: Shapes and MapSpecs are always validated regardless of this setting.
+        Ignored when ``resume=False``.
     fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
@@ -156,8 +189,15 @@ def run_map_eager(
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+    error_handling
+        How to handle errors during function execution:
+
+        - ``"raise"`` (default): Stop execution on first error and raise exception
+        - ``"continue"``: Continue execution, collecting errors as ErrorSnapshot objects
 
     """
+    resume = _handle_cleanup_deprecation(cleanup, resume, stacklevel=2)
+
     # Prepare the run (this call sets up the run folder, storage, progress, etc.)
     prep = prepare_run(
         pipeline=pipeline,
@@ -170,10 +210,13 @@ def run_map_eager(
         chunksizes=chunksizes,
         storage=storage,
         cleanup=cleanup,
+        resume=resume,
+        resume_validation=resume_validation,
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,
         in_async=False,
+        error_handling=error_handling,
     )
 
     dependency_info = _build_dependency_graph(prep.pipeline)
@@ -286,15 +329,14 @@ class _FunctionTracker:
         self.func_futures[func] = set()
 
         # Track futures for this function
-        if func.requires_mapping:
-            r, _ = kwargs_task.task
-            for task in r:
-                fut = _ensure_future(task)
+        if isinstance(kwargs_task.task, _MapTask):
+            for chunk_task in kwargs_task.task.chunk_tasks:
+                fut = _ensure_future(chunk_task.value)
                 self.future_to_func[fut] = func
                 self.func_futures[func].add(fut)
         else:
-            task = kwargs_task.task
-            fut = _ensure_future(task)
+            assert isinstance(kwargs_task.task, _SingleTask)
+            fut = _ensure_future(kwargs_task.task.value)
             self.future_to_func[fut] = func
             self.func_futures[func].add(fut)
 

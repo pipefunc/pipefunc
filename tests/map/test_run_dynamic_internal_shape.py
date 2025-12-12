@@ -223,7 +223,7 @@ def test_2d_internal_shape(
     _ = pipeline.map(
         {"a": [0, 0]},
         run_folder=tmp_path,
-        cleanup=False,
+        resume=True,
         show_progress="headless",
         return_results=return_results,
         scheduling_strategy=scheduling_strategy,

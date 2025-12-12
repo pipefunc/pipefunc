@@ -119,5 +119,9 @@ docs/source/*results
 docs/source/*run_folder*
 .codspeed
 .env*
-.code/
 uv.lock
+docs/source/concepts/cli-example.py
+.code/
+runs/
+test/
+.adaptive_scheduler/

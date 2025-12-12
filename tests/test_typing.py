@@ -21,6 +21,7 @@ import numpy as np
 import numpy.typing as npt
 import pytest
 
+import pipefunc.typing as typing_module
 from pipefunc.typing import (
     Array,
     ArrayElementType,
@@ -431,6 +432,43 @@ def test_safe_get_type_hints_exception_handling():
         "return": NoneType,
     }
     assert safe_get_type_hints(func) == expected
+
+
+def test_safe_get_type_hints_handles_none_annotations():
+    def func(a: Any, b: Any, c: Any) -> Any:
+        return None
+
+    func.__annotations__["a"] = "UndefinedType"
+    func.__annotations__["b"] = "None"
+    func.__annotations__["c"] = None
+    func.__annotations__["return"] = "None"
+
+    hints = safe_get_type_hints(func)
+
+    assert isinstance(hints["a"], Unresolvable)
+    assert hints["a"].type_str == "UndefinedType"
+    assert hints["b"] is NoneType
+    assert hints["c"] is NoneType
+    assert hints["return"] is NoneType
+
+
+def test_safe_get_type_hints_resolved_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    def func(a: None) -> None:  # type: ignore[valid-type]
+        return None
+
+    original_resolve = typing_module._resolve_type
+
+    def fake_resolve(type_: Any, memo: typing_module.TypeCheckMemo) -> Any:
+        if type_ is type(None):
+            return None
+        return original_resolve(type_, memo)
+
+    monkeypatch.setattr(typing_module, "_resolve_type", fake_resolve)
+
+    hints = safe_get_type_hints(func)
+
+    assert hints["a"] is NoneType
+    assert hints["return"] is NoneType
 
 
 def test_safe_get_type_hints_eval_fallback():

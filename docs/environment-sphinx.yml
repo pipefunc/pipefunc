@@ -36,8 +36,8 @@ dependencies:
   - graphviz-anywidget>=0.7.0
   - ipywidgets
   # optional-dependencies: zarr
-  - zarr>=2,<3
-  - numcodecs<0.16.0
+  - zarr>=3
+  - numcodecs
   # optional-dependencies: docs
   - emoji
   - jupytext
