@@ -1032,6 +1032,37 @@ def _count_errors_in_result(result: Any) -> int:
     return int(_entry_contains_error(result))
 
 
+def _select_kwargs_and_eval_resources_raise(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    shape: ShapeTuple,
+    shape_mask: tuple[bool, ...],
+    index: int,
+) -> dict[str, Any]:
+    """Select per-index kwargs and evaluate resources for raise mode."""
+    selected_kwargs = _select_kwargs(func, kwargs, shape, shape_mask, index)
+    if callable(func.resources):  # type: ignore[has-type]
+        kw_for_resources = kwargs if func.resources_scope == "map" else selected_kwargs
+        evaluated_resources = func.resources(kw_for_resources)  # type: ignore[has-type]
+        selected_kwargs[_EVALUATED_RESOURCES] = evaluated_resources
+    return selected_kwargs
+
+
+def _run_iteration_raise(
+    func: PipeFunc,
+    selected_kwargs: dict[str, Any],
+    cache: _CacheBase | None,
+) -> Any:
+    """Execute a single iteration in raise mode."""
+    if cache is None:
+        try:
+            return func(**selected_kwargs)
+        except Exception as e:
+            handle_pipefunc_error(e, func, selected_kwargs, "raise")
+            raise  # pragma: no cover
+    return _get_or_set_cache_raise(func, selected_kwargs, cache)
+
+
 def _run_iteration_and_process(
     index: int,
     func: PipeFunc,
@@ -1048,25 +1079,15 @@ def _run_iteration_and_process(
 ) -> tuple[Any, ...]:
     if error_handling == "raise":
         # Hot-path for default raise mode: avoid continue-mode scaffolding.
-        selected_kwargs = _select_kwargs(func, kwargs, shape, shape_mask, index)
-        if callable(func.resources):  # type: ignore[has-type]
-            kw_for_resources = kwargs if func.resources_scope == "map" else selected_kwargs
-            evaluated_resources = func.resources(kw_for_resources)  # type: ignore[has-type]
-            selected_kwargs[_EVALUATED_RESOURCES] = evaluated_resources
-        if cache is None:
-            try:
-                output = func(**selected_kwargs)
-            except Exception as e:
-                handle_pipefunc_error(e, func, selected_kwargs, "raise")
-                raise  # pragma: no cover
-        else:
-            output = _get_or_set_cache_raise(func, selected_kwargs, cache)
-
-        output_names = at_least_tuple(func.output_name)
-        if func.output_picker is None:
-            outputs = tuple(output for _ in output_names)
-        else:
-            outputs = tuple(func.output_picker(output, name) for name in output_names)
+        selected_kwargs = _select_kwargs_and_eval_resources_raise(
+            func,
+            kwargs,
+            shape,
+            shape_mask,
+            index,
+        )
+        output = _run_iteration_raise(func, selected_kwargs, cache)
+        outputs = _pick_output(func, output, "raise")
     else:
         selected_kwargs, error_infos = _prepare_kwargs_for_execution(
             func,
@@ -1675,13 +1696,7 @@ def _execute_single(
         if _EVALUATED_RESOURCES not in kwargs and callable(func.resources):
             evaluated_resources = func.resources(kwargs)  # type: ignore[has-type]
             kwargs[_EVALUATED_RESOURCES] = evaluated_resources
-        if cache is None:
-            try:
-                return func(**kwargs)
-            except Exception as e:
-                handle_pipefunc_error(e, func, kwargs, "raise")
-                raise  # pragma: no cover
-        return _get_or_set_cache_raise(func, kwargs, cache)
+        return _run_iteration_raise(func, kwargs, cache)
 
     _res, error_infos = _prepare_execution_environment(func, kwargs, kwargs, error_handling, None)
     ctx = ErrorContext(mode=error_handling, error_info=error_infos.element)
