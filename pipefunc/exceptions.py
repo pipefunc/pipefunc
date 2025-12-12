@@ -55,8 +55,14 @@ class ErrorSnapshot:
         )
         self.traceback = "".join(tb)
 
+    def __repr__(self) -> str:
+        """Return a concise representation for use in arrays and containers."""
+        func_name = getattr(self.function, "__name__", "?")
+        exc_type = type(self.exception).__name__
+        return f"ErrorSnapshot({func_name!r}, {exc_type}: {self.exception})"
+
     def __str__(self) -> str:
-        """Return a string representation of the error snapshot."""
+        """Return a detailed string representation of the error snapshot."""
         args_repr = ", ".join(repr(a) for a in self.args)
         kwargs_repr = ", ".join(f"{k}={v!r}" for k, v in self.kwargs.items())
         func_name = f"{self.function.__module__}.{self.function.__qualname__}"
@@ -125,8 +131,13 @@ class PropagatedErrorSnapshot:
     attempted_kwargs: dict[str, Any]  # kwargs that were not errors
     timestamp: str = field(default_factory=_timestamp)
 
+    def __repr__(self) -> str:
+        """Return a concise representation for use in arrays and containers."""
+        func_name = getattr(self.skipped_function, "__name__", str(self.skipped_function))
+        return f"PropagatedErrorSnapshot({func_name!r}, reason={self.reason!r})"
+
     def __str__(self) -> str:
-        """Return a string representation of the propagated error snapshot."""
+        """Return a detailed string representation of the propagated error snapshot."""
         func_name = getattr(self.skipped_function, "__name__", str(self.skipped_function))
         error_summary = []
         for param, info in self.error_info.items():
