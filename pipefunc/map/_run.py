@@ -932,21 +932,20 @@ def _get_or_set_cache(
     error_handling: Literal["raise", "continue"],
 ) -> Any:
     """Compute with unified error guards and cache the result."""
-
-    def _compute() -> Any:
+    if cache is None:
         if ctx.mode == "continue" and ctx.error_info:
             return create_propagated_error(ctx.error_info, func, kwargs)
         return _call_user(func, kwargs, ctx)
-
-    if cache is None:
-        return _compute()
     cache_key = (func._cache_id, error_handling, to_hashable(kwargs))
 
     if cache_key in cache:
         return cache.get(cache_key)
     if isinstance(cache, HybridCache):
         t = time.monotonic()
-    result = _compute()
+    if ctx.mode == "continue" and ctx.error_info:
+        result = create_propagated_error(ctx.error_info, func, kwargs)
+    else:
+        result = _call_user(func, kwargs, ctx)
     if isinstance(cache, HybridCache):
         cache.put(cache_key, result, time.monotonic() - t)
     else:
@@ -962,6 +961,9 @@ _RESOURCE_EVALUATION_ERROR = "__pipefunc_internal_resource_error__"
 class ErrorContext:
     mode: Literal["raise", "continue"]
     error_info: dict[str, ErrorInfo] | None
+
+
+_CTX_RAISE: ErrorContext = ErrorContext(mode="raise", error_info=None)
 
 
 def _maybe_wrap_exception(
@@ -1048,21 +1050,6 @@ def _select_kwargs_and_eval_resources_raise(
     return selected_kwargs
 
 
-def _run_iteration_raise(
-    func: PipeFunc,
-    selected_kwargs: dict[str, Any],
-    cache: _CacheBase | None,
-) -> Any:
-    """Execute a single iteration in raise mode."""
-    if cache is None:
-        try:
-            return func(**selected_kwargs)
-        except Exception as e:
-            handle_pipefunc_error(e, func, selected_kwargs, "raise")
-            raise  # pragma: no cover
-    return _get_or_set_cache_raise(func, selected_kwargs, cache)
-
-
 def _run_iteration_and_process(
     index: int,
     func: PipeFunc,
@@ -1086,8 +1073,7 @@ def _run_iteration_and_process(
             shape_mask,
             index,
         )
-        output = _run_iteration_raise(func, selected_kwargs, cache)
-        outputs = _pick_output(func, output, "raise")
+        ctx = _CTX_RAISE
     else:
         selected_kwargs, error_infos = _prepare_kwargs_for_execution(
             func,
@@ -1100,8 +1086,8 @@ def _run_iteration_and_process(
         )
         # Early error detection centralized through the guard helper
         ctx = ErrorContext(mode=error_handling, error_info=error_infos.element)
-        output = _get_or_set_cache(func, selected_kwargs, cache, ctx, error_handling)
-        outputs = _pick_output(func, output, error_handling)
+    output = _get_or_set_cache(func, selected_kwargs, cache, ctx, error_handling)
+    outputs = _pick_output(func, output, error_handling)
     has_dumped = _update_array(
         func,
         arrays,
@@ -1115,29 +1101,6 @@ def _run_iteration_and_process(
     if has_dumped and not return_results:
         return _InternalShape.from_outputs(outputs)
     return outputs
-
-
-def _get_or_set_cache_raise(
-    func: PipeFunc,
-    kwargs: dict[str, Any],
-    cache: _CacheBase,
-) -> Any:
-    """Cache helper for raise mode without continue-mode guards."""
-    cache_key = (func._cache_id, "raise", to_hashable(kwargs))
-    if cache_key in cache:
-        return cache.get(cache_key)
-    if isinstance(cache, HybridCache):
-        t = time.monotonic()
-    try:
-        result = func(**kwargs)
-    except Exception as e:
-        handle_pipefunc_error(e, func, kwargs, "raise")
-        raise  # pragma: no cover
-    if isinstance(cache, HybridCache):
-        cache.put(cache_key, result, time.monotonic() - t)
-    else:
-        cache.put(cache_key, result)
-    return result
 
 
 def _update_array(
@@ -1693,7 +1656,7 @@ def _execute_single(
     # Otherwise, run the function
     _load_data(kwargs)
     if error_handling == "raise":
-        return _run_iteration_raise(func, kwargs, cache)
+        return _get_or_set_cache(func, kwargs, cache, _CTX_RAISE, "raise")
 
     _res, error_infos = _prepare_execution_environment(func, kwargs, kwargs, error_handling, None)
     ctx = ErrorContext(mode=error_handling, error_info=error_infos.element)
