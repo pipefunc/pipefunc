@@ -12,6 +12,7 @@ from pipefunc.map._run_info import RunInfo
 from pipefunc.map._storage_array._base import StorageBase
 from pipefunc.map.adaptive import (
     LearnersDict,
+    _execute_iteration_in_map_spec,
     create_learners,
     create_learners_from_sweep,
     to_adaptive_learner,
@@ -55,6 +56,36 @@ def test_basic(tmp_path: Path, storage: str) -> None:
     assert flat_learners["foo.z"][0].data == {0: 2, 1: 3, 2: 4, 3: 3, 4: 4, 5: 5, 6: 4, 7: 5, 8: 6}
     adaptive.runner.simple(flat_learners["prod"][0])
     assert flat_learners["prod"][0].data == {0: 172800}
+
+
+def test_adaptive_rejects_continue_mode(tmp_path: Path) -> None:
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def double(x: int) -> int:
+        return x * 2
+
+    pipeline = Pipeline([double])
+    inputs = {"x": [0, 1, 2]}
+
+    run_info = RunInfo.create(
+        tmp_path,
+        pipeline,
+        inputs,
+        storage="dict",
+        cleanup=True,
+        error_handling="continue",
+    )
+    store = run_info.init_store()
+    func = pipeline.functions[0]
+
+    with pytest.raises(NotImplementedError, match="error_handling='continue'"):
+        _execute_iteration_in_map_spec(
+            0,
+            func,
+            run_info,
+            store,
+            cache=None,
+            return_output=True,
+        )
 
 
 @pytest.mark.parametrize("storage", ["dict", "file_array"])

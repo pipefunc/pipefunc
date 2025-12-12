@@ -59,6 +59,7 @@ def run_map_eager_async(
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     display_widgets: bool = True,
     return_results: bool = True,
+    error_handling: Literal["raise", "continue"] = "raise",
     start: bool = True,
 ) -> AsyncMap:
     """Asynchronously run a pipeline with eager scheduling for optimal parallelism.
@@ -192,6 +193,11 @@ def run_map_eager_async(
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+    error_handling
+        How to handle errors during function execution:
+
+        - ``"raise"`` (default): Stop execution on first error and raise exception
+        - ``"continue"``: Continue execution, collecting errors as ErrorSnapshot objects
     start
         Whether to start the pipeline immediately. If ``False``, the pipeline is not started until the
         `start()` method on the `AsyncMap` instance is called.
@@ -216,6 +222,7 @@ def run_map_eager_async(
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,
         in_async=True,
+        error_handling=error_handling,
     )
 
     multi_run_manager = maybe_multi_run_manager(prep.executor)

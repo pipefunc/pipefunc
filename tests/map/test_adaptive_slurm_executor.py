@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import shutil
 import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -16,8 +17,12 @@ import pytest
 from adaptive_scheduler import RunManager, SlurmExecutor, SlurmTask
 from adaptive_scheduler._executor import TaskID
 
+import pipefunc.map._adaptive_scheduler_slurm_executor as slurm_mod
+import pipefunc.map._prepare as prepare_mod
 from pipefunc import NestedPipeFunc, Pipeline, pipefunc
+from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
 from pipefunc.map._result import ResultDict
+from pipefunc.map._run import _RESOURCE_EVALUATION_ERROR
 from pipefunc.map._storage_array._file import FileArray
 
 if TYPE_CHECKING:
@@ -334,6 +339,328 @@ async def test_number_of_jobs_created_with_resources(resources, resources_scope)
 
 
 @pytest.mark.asyncio
+async def test_map_scope_resources_populated_with_error_inputs():
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def invert(x: int) -> float:
+        if x == 0:
+            raise ZeroDivisionError
+        return 1 / x
+
+    @pipefunc(
+        output_name="z",
+        mapspec="y[i] -> z[i]",
+        resources=lambda kw: {"cpus": 1},  # noqa: ARG005
+        resources_scope="map",
+    )
+    def passthrough(y: float) -> float:
+        return y
+
+    pipeline = Pipeline([invert, passthrough])
+    executor = MockSlurmExecutor(cores_per_node=1)
+
+    runner = pipeline.map_async(
+        {"x": [0, 1]},
+        executor=executor,
+        error_handling="continue",
+    )
+
+    result = await runner.task
+
+    assert isinstance(result, ResultDict)
+    assert isinstance(result["z"].output[0], PropagatedErrorSnapshot)
+    assert result["z"].output[1] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_map_scope_all_error_inputs_skip_executor_submission() -> None:
+    """Document current behaviour when every map index already has an error.
+
+    Context (October 2025): a prior failure report showed that when upstream map
+    entries produce `ErrorSnapshot` / `PropagatedErrorSnapshot` objects and the
+    downstream `PipeFunc` uses map-scope resources, we still submit work to the
+    executor—even though every element will immediately propagate the error.
+    The minimal test below recreates that situation using the in-test
+    `MockSlurmExecutor` (no actual Slurm cluster required):
+
+    1. `always_fail` guarantees both items raise, so the downstream map receives
+       only propagated errors when `error_handling="continue"`.
+    2. `passthrough` declares map-scope resources, which is where the bug was
+       originally reported.
+    3. We patch `_submit` (shared by all executors) so we can count how many
+       pieces of work are actually scheduled. In the desired behaviour this
+       should remain zero; today it still increments, so we hard-fail with a
+       descriptive assertion message.
+
+    Keep this test failing until the executor submission logic short-circuits
+    the all-error case.
+    """
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def always_fail(x: int) -> int:  # pragma: no cover - executed via pipeline
+        msg = "boom"
+        raise RuntimeError(msg)
+
+    @pipefunc(
+        output_name="z",
+        mapspec="y[i] -> z[i]",
+        resources=lambda kw: {"cpus": 1},  # noqa: ARG005
+        resources_scope="map",
+    )
+    def passthrough(y: int) -> int:  # pragma: no cover - executed via pipeline
+        return y
+
+    pipeline = Pipeline([always_fail, passthrough])
+    executor = MockSlurmExecutor(cores_per_node=1)
+
+    from pipefunc.map import _run as map_run
+
+    original_submit = map_run._submit
+    submission_funcs: list[str] = []
+
+    def wrapped_submit(func, *args, **kwargs):
+        process_index_callable = func.keywords.get("process_index")
+        if process_index_callable is not None:
+            captured_func = process_index_callable.keywords.get("func")
+            if captured_func is not None:
+                submission_funcs.append(captured_func.__name__)
+        return original_submit(func, *args, **kwargs)
+
+    with mock.patch("pipefunc.map._run._submit", side_effect=wrapped_submit):
+        runner = pipeline.map_async(
+            {"x": [0, 1]},
+            executor=executor,
+            error_handling="continue",
+        )
+
+        result = await runner.task
+
+    assert isinstance(result, ResultDict)
+    # Upstream `always_fail` must still be submitted, but downstream `passthrough`
+    # should short-circuit instead of enqueuing work on the executor.
+    assert "passthrough" not in submission_funcs
+
+
+@pytest.mark.asyncio
+async def test_map_scope_all_error_inputs_with_progress_avoids_executor() -> None:
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def always_fail(x: int) -> int:  # pragma: no cover - executed via pipeline
+        msg = "boom"
+        raise RuntimeError(msg)
+
+    @pipefunc(
+        output_name="z",
+        mapspec="y[i] -> z[i]",
+        resources=lambda kw: {"cpus": 1},  # noqa: ARG005
+        resources_scope="map",
+    )
+    def passthrough(y: int) -> int:  # pragma: no cover - executed via pipeline
+        return y
+
+    pipeline = Pipeline([always_fail, passthrough])
+    executor = MockSlurmExecutor(cores_per_node=1)
+
+    from pipefunc.map import _run as map_run
+
+    original_submit = map_run._submit
+    submission_funcs: list[str] = []
+
+    def wrapped_submit(func, *args, **kwargs):
+        process_index_callable = func.keywords.get("process_index")
+        if process_index_callable is not None:
+            captured_func = process_index_callable.keywords.get("func")
+            if captured_func is not None:
+                submission_funcs.append(captured_func.__name__)
+        return original_submit(func, *args, **kwargs)
+
+    with mock.patch("pipefunc.map._run._submit", side_effect=wrapped_submit):
+        runner = pipeline.map_async(
+            {"x": [0, 1]},
+            executor=executor,
+            error_handling="continue",
+            show_progress="headless",
+        )
+
+        result = await runner.task
+
+    assert isinstance(result, ResultDict)
+    assert "passthrough" not in submission_funcs
+
+
+@pytest.mark.asyncio
+async def test_element_scope_filters_error_indices_with_mock_slurm() -> None:
+    """Element-scope resources must not submit error indices to the executor.
+
+    This recreates a mixed-success scenario where upstream map has a failure at
+    one index and the downstream element-scope function declares callable
+    resources. Only valid indices should be submitted to the SLURM executor;
+    error indices are processed locally and propagate as error snapshots.
+    """
+
+    from pipefunc.map import _run as map_run
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]", resources={"cpus": 1})
+    def double_it(x: int) -> int:  # pragma: no cover - executed via pipeline
+        if x == 5:
+            msg = "intentional error"
+            raise ValueError(msg)
+        return 2 * x
+
+    @pipefunc(
+        output_name="z",
+        mapspec="y[i] -> z[i]",
+        resources=lambda kwargs: {"cpus": int(kwargs["y"] % 3) + 1},
+        resources_scope="element",
+    )
+    def add_one(y: int) -> int:  # pragma: no cover - executed via pipeline
+        return y + 1
+
+    @pipefunc(output_name="z_sum")
+    def sum_it(z):  # pragma: no cover - executed via pipeline
+        return sum(z)
+
+    pipeline = Pipeline([double_it, add_one, sum_it])
+    inputs = {"x": list(range(10))}
+    executor = MockSlurmExecutor(cores_per_node=2)
+
+    # Capture submitted indices by function name
+    original_submit = map_run._submit
+    submission_funcs: list[tuple[str, list[int]]] = []
+
+    def wrapped_submit(func, *args, **kwargs):
+        process_index_callable = getattr(func, "keywords", {}).get("process_index")
+        if process_index_callable is not None:
+            captured_func = process_index_callable.keywords.get("func")
+            if captured_func is not None:
+                chunk = args[4] if len(args) > 4 else []
+                submission_funcs.append((captured_func.__name__, list(chunk)))
+        return original_submit(func, *args, **kwargs)
+
+    with mock.patch("pipefunc.map._run._submit", side_effect=wrapped_submit):
+        runner = pipeline.map_async(
+            inputs,
+            executor=executor,
+            resume=False,
+            error_handling="continue",
+            show_progress="headless",
+        )
+        result = await runner.task
+
+    # Upstream produced an error at index 5
+    assert len(result["y"].output) == 10
+    assert isinstance(result["y"].output[5], ErrorSnapshot)
+
+    # Submission behavior: downstream element-scope must exclude the error index
+    double_submissions = [s for s in submission_funcs if s[0] == "double_it"]
+    double_indices = [idx for _, indices in double_submissions for idx in indices]
+    assert sorted(double_indices) == list(range(10))
+
+    add_one_submissions = [s for s in submission_funcs if s[0] == "add_one"]
+    add_one_indices = [idx for _, indices in add_one_submissions for idx in indices]
+    expected_add_one = [i for i in range(10) if i != 5]
+    assert sorted(add_one_indices) == expected_add_one
+
+    # A downstream reduce without element mapping must not be submitted when inputs contain errors
+    sum_it_submissions = [s for s in submission_funcs if s[0] == "sum_it"]
+    assert not sum_it_submissions
+
+
+@pytest.mark.asyncio
+async def test_eager_element_scope_filters_error_indices_with_mock_slurm() -> None:
+    """Eager scheduler should apply the same SLURM element-scope routing policy."""
+
+    from pipefunc.map import _run as map_run
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]", resources={"cpus": 1})
+    def double_it(x: int) -> int:  # pragma: no cover
+        if x == 5:
+            msg = "boom"
+            raise ValueError(msg)
+        return 2 * x
+
+    @pipefunc(
+        output_name="z",
+        mapspec="y[i] -> z[i]",
+        resources=lambda kwargs: {"cpus": int(kwargs["y"] % 3) + 1},
+        resources_scope="element",
+    )
+    def add_one(y: int) -> int:  # pragma: no cover
+        return y + 1
+
+    pipeline = Pipeline([double_it, add_one])
+    executor = MockSlurmExecutor(cores_per_node=1)
+    inputs = {"x": list(range(10))}
+
+    original_submit = map_run._submit
+    submission: list[tuple[str, list[int]]] = []
+
+    def wrapped_submit(func, *args, **kwargs):
+        process_index_callable = getattr(func, "keywords", {}).get("process_index")
+        if process_index_callable is not None:
+            captured_func = process_index_callable.keywords.get("func")
+            if captured_func is not None:
+                chunk = args[4] if len(args) > 4 else []
+                submission.append((captured_func.__name__, list(chunk)))
+        return original_submit(func, *args, **kwargs)
+
+    with mock.patch("pipefunc.map._run._submit", side_effect=wrapped_submit):
+        runner = pipeline.map_async(
+            inputs,
+            executor=executor,
+            error_handling="continue",
+            show_progress="headless",
+            scheduling_strategy="eager",
+        )
+        result = await runner.task
+
+    # Downstream should exclude the error index 5
+    add_chunks = [idx for name, idxs in submission if name == "add_one" for idx in idxs]
+    assert sorted(add_chunks) == [i for i in range(10) if i != 5]
+    # Upstream still submitted all
+    y_chunks = [idx for name, idxs in submission if name == "double_it" for idx in idxs]
+    assert sorted(y_chunks) == list(range(10))
+    # Outputs consistent with error propagation
+    assert isinstance(result["y"].output[5], ErrorSnapshot)
+
+
+@pytest.mark.asyncio
+async def test_slurm_chunksize_is_one_for_executor_submissions() -> None:
+    """SLURM executor should submit chunks of size 1 regardless of inputs."""
+
+    from pipefunc.map import _run as map_run
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def id_fn(x: int) -> int:  # pragma: no cover
+        return x
+
+    pipeline = Pipeline([id_fn])
+    executor = MockSlurmExecutor(cores_per_node=1)
+    inputs = {"x": list(range(10))}
+
+    original_submit = map_run._submit
+    chunk_lengths: list[int] = []
+
+    def wrapped_submit(func, _ex, _status, _progress, chunksize, *args):
+        # record the declared chunksize and that it equals the real chunk length
+        chunk = args[0] if args else []
+        chunk_lengths.append(len(chunk))
+        assert chunksize == len(chunk)
+        return original_submit(func, _ex, _status, _progress, chunksize, *args)
+
+    with mock.patch("pipefunc.map._run._submit", side_effect=wrapped_submit):
+        runner = pipeline.map_async(
+            inputs,
+            executor=executor,
+            show_progress="headless",
+        )
+        result = await runner.task
+
+    assert len(result["y"].output) == 10
+    # Every submitted chunk must be of size 1 for SLURM
+    assert chunk_lengths
+    assert all(n == 1 for n in chunk_lengths)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("resources_scope", ["element", "map"])
 @pytest.mark.parametrize("use_mock", [True, False])
 async def test_with_nested_pipefunc(
@@ -431,6 +758,54 @@ async def test_setting_executor_type_in_resources(pipeline: Pipeline, tmp_path: 
         assert call_args.kwargs["nodes"] == 2
 
 
+def test_single_resources_failure_slurm_no_retry_unit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resource hook failures should not be retried in the Slurm helper."""
+
+    call_count = 0
+
+    def failing_resources(_kwargs: dict[str, Any]) -> dict[str, int]:
+        nonlocal call_count
+        call_count += 1
+        msg = "resource boom"
+        raise RuntimeError(msg)
+
+    @pipefunc(output_name="fail", resources=failing_resources)
+    def process(x: int) -> int:
+        return x * 2
+
+    pipeline = Pipeline([process])
+    executor = MockSlurmExecutor()
+
+    # NOTE: pipefunc forbids using a Slurm executor with the synchronous `Pipeline.map`
+    # API. We patch the guard here so we can exercise the single-function execution
+    # path while still going through the public pipeline entry point.
+    def _allow_slurm_validation(_executor_arg: Any, _in_async: bool) -> None:
+        return None
+
+    monkeypatch.setattr(slurm_mod, "validate_slurm_executor", _allow_slurm_validation)
+    monkeypatch.setattr(prepare_mod, "validate_slurm_executor", _allow_slurm_validation)
+
+    result = pipeline.map(
+        {"x": 5},
+        executor={"fail": executor},  # type: ignore[arg-type]
+        error_handling="continue",
+    )
+
+    assert call_count == 1
+    assert not executor._mock_tasks, "executor should not receive tasks when resources fail"
+    output = result["fail"].output
+    assert isinstance(output, PropagatedErrorSnapshot)
+    assert process.error_snapshot is None
+    assert _RESOURCE_EVALUATION_ERROR in output.error_info
+    resource_info = output.error_info[_RESOURCE_EVALUATION_ERROR]
+    assert resource_info.type == "full"
+    assert isinstance(resource_info.error, ErrorSnapshot)
+    error_func = resource_info.error.function
+    while isinstance(error_func, functools.partial) and "resources_callable" in error_func.keywords:
+        error_func = error_func.keywords["resources_callable"]
+    assert error_func is failing_resources
+
+
 @pytest.mark.asyncio
 async def test_slurm_executor_simple(
     pipeline: Pipeline,
@@ -449,3 +824,70 @@ async def test_slurm_executor_simple(
     # Give the event loop a moment to process the cancellation
     await asyncio.sleep(0)
     assert runner.task.cancelled()
+
+
+@pytest.mark.asyncio
+async def test_map_scope_filters_error_indices_with_mock_slurm() -> None:
+    """Map-scope resources must not submit error indices to the executor.
+
+    This tests that `resources_scope="map"` also filters out error indices
+    when using a SLURM executor with error_handling="continue".
+    """
+    from pipefunc.map import _run as map_run
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]", resources={"cpus": 1})
+    def double_it(x: int) -> int:
+        if x == 5:
+            msg = "intentional error"
+            raise ValueError(msg)
+        return 2 * x
+
+    # IMPORTANT: This function uses resources_scope="map" (default)
+    @pipefunc(
+        output_name="z",
+        mapspec="y[i] -> z[i]",
+        resources={"cpus": 1},
+        resources_scope="map",
+    )
+    def add_one(y: int) -> int:
+        return y + 1
+
+    pipeline = Pipeline([double_it, add_one])
+    inputs = {"x": list(range(10))}
+    executor = MockSlurmExecutor(cores_per_node=2)
+
+    # Capture submitted indices by function name
+    original_submit = map_run._submit
+    submission_funcs: list[tuple[str, list[int]]] = []
+
+    def wrapped_submit(func, *args, **kwargs):
+        process_index_callable = getattr(func, "keywords", {}).get("process_index")
+        if process_index_callable is not None:
+            captured_func = process_index_callable.keywords.get("func")
+            if captured_func is not None:
+                chunk = args[4] if len(args) > 4 else []
+                submission_funcs.append((captured_func.__name__, list(chunk)))
+        return original_submit(func, *args, **kwargs)
+
+    with mock.patch("pipefunc.map._run._submit", side_effect=wrapped_submit):
+        runner = pipeline.map_async(
+            inputs,
+            executor=executor,
+            resume=False,
+            error_handling="continue",
+            show_progress="headless",
+        )
+        result = await runner.task
+
+    # Upstream produced an error at index 5
+    assert len(result["y"].output) == 10
+    assert isinstance(result["y"].output[5], ErrorSnapshot)
+
+    # Submission behavior: downstream map-scope must ALSO exclude the error index
+    add_one_submissions = [s for s in submission_funcs if s[0] == "add_one"]
+    add_one_indices = [idx for _, indices in add_one_submissions for idx in indices]
+    expected_add_one = [i for i in range(10) if i != 5]
+
+    # This assertion would fail before the fix
+    assert sorted(add_one_indices) == expected_add_one
+    assert 5 not in add_one_indices
