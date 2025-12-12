@@ -1693,9 +1693,6 @@ def _execute_single(
     # Otherwise, run the function
     _load_data(kwargs)
     if error_handling == "raise":
-        if _EVALUATED_RESOURCES not in kwargs and callable(func.resources):
-            evaluated_resources = func.resources(kwargs)  # type: ignore[has-type]
-            kwargs[_EVALUATED_RESOURCES] = evaluated_resources
         return _run_iteration_raise(func, kwargs, cache)
 
     _res, error_infos = _prepare_execution_environment(func, kwargs, kwargs, error_handling, None)
