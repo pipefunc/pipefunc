@@ -1,4 +1,4 @@
-ARG UV_VERSION=0.9.17
+ARG UV_VERSION=0.9.21
 ARG DEBIAN_VERSION=bookworm
 
 FROM ghcr.io/astral-sh/uv:$UV_VERSION AS uv
