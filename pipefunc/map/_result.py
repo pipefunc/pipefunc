@@ -198,5 +198,5 @@ def _is_np_subdtype(annotation: Any) -> bool:
             or np.issubdtype(annotation, np.floating)
             or np.issubdtype(annotation, np.bool_)
         )
-    except TypeError:
+    except (TypeError, ValueError):
         return False
