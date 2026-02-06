@@ -891,3 +891,46 @@ async def test_map_scope_filters_error_indices_with_mock_slurm() -> None:
     # This assertion would fail before the fix
     assert sorted(add_one_indices) == expected_add_one
     assert 5 not in add_one_indices
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("scheduling_strategy", ["eager", "generation"])
+async def test_single_executor_with_extra_scheduler_kwargs_across_generations(
+    tmp_path: Path,
+    scheduling_strategy: Literal["eager", "generation"],
+) -> None:
+    """Regression test: a single SlurmExecutor with extra_scheduler_kwargs must work
+    across multiple pipeline generations without AssertionError.
+
+    Before the fix in adaptive-scheduler, slurm_run() mutated the caller's
+    extra_scheduler_kwargs dict in-place and SlurmExecutor.new() shallow-copied
+    mutable fields, causing the second finalize() to fail with:
+        AssertionError: assert "extra_scheduler" not in extra_scheduler_kwargs
+    """
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def double_it(x: int) -> int:
+        return 2 * x
+
+    @pipefunc(output_name="z", mapspec="y[i] -> z[i]")
+    def add_one(y: int) -> int:
+        return y + 1
+
+    @pipefunc(output_name="z_sum")
+    def sum_it(z):
+        return sum(z)
+
+    pipeline = Pipeline([double_it, add_one, sum_it])
+
+    original_kwargs = {"extra_env_vars": ["FOO=bar"]}
+    executor = MockSlurmExecutor(extra_scheduler_kwargs=dict(original_kwargs))
+    runner = pipeline.map_async(
+        {"x": range(5)},
+        run_folder=tmp_path / "run",
+        executor=executor,
+        scheduling_strategy=scheduling_strategy,
+    )
+    result = await runner.task
+    assert result["z_sum"].output == 25
+    # Verify the original dict was not mutated
+    assert "extra_scheduler" not in original_kwargs

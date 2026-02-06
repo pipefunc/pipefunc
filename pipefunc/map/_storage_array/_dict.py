@@ -79,7 +79,7 @@ class DictArray(StorageBase):
 
     def _internal_mask(self) -> np.ma.MaskedArray:
         if self.internal_shape:
-            return np.ma.empty(self.internal_shape, dtype=object)
+            return np.ma.empty(self.resolved_internal_shape, dtype=object)
         return np.ma.masked
 
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
