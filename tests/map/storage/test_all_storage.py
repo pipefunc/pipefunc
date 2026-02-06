@@ -399,7 +399,7 @@ def test_file_array_with_internal_arrays_full_array_different_order(
 
     # Test slicing
     result = arr[:, 0, 0, :, :]
-    expected = np.ma.array(data1, mask=False, dtype=object)
+    expected: np.ma.MaskedArray = np.ma.array(data1, mask=False, dtype=object)
     assert np.array_equal(result, expected)
 
 

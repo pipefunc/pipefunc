@@ -255,7 +255,7 @@ class FileArray(StorageBase):
         masking out missing data.
         """
         mask = self.mask_linear()
-        return np.ma.MaskedArray(mask, mask=mask, dtype=bool).reshape(self.shape)
+        return np.ma.MaskedArray(mask, mask=mask, dtype=bool).reshape(self.resolved_shape)
 
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None:
         """Dump 'value' into the file associated with 'key'.
