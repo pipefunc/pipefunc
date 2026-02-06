@@ -1,12 +1,18 @@
 import importlib.util
 import inspect
 import re
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
-from pipefunc.helpers import collect_kwargs, get_attribute_factory, launch_maps
+from pipefunc.helpers import (
+    _validate_slurm_executor_names,
+    collect_kwargs,
+    get_attribute_factory,
+    launch_maps,
+)
 
 has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
 has_adaptive_scheduler = importlib.util.find_spec("adaptive_scheduler") is not None
@@ -238,6 +244,45 @@ async def test_validate_async_maps_slurm_executor_name(pipeline: Pipeline) -> No
         ),
     ):
         await launch_maps(*runners)
+
+
+@pytest.mark.skipif(not has_adaptive_scheduler, reason="adaptive_scheduler not installed")
+def test_validate_slurm_executor_names_allows_shared_instance_single_runner() -> None:
+    from adaptive_scheduler import SlurmExecutor
+
+    executor = SlurmExecutor(
+        name="shared-test",
+        partition="default",
+        nodes=1,
+        cores_per_node=1,
+    )
+
+    async_map = SimpleNamespace(
+        _prepared=SimpleNamespace(executor={"a": executor, "b": executor}),
+    )
+
+    _validate_slurm_executor_names((async_map,), "launch_maps")  # type: ignore[arg-type]
+
+
+@pytest.mark.skipif(not has_adaptive_scheduler, reason="adaptive_scheduler not installed")
+def test_validate_slurm_executor_names_rejects_different_instances_same_name() -> None:
+    from adaptive_scheduler import SlurmExecutor
+
+    ex1 = SlurmExecutor(name="duplicate", partition="default", nodes=1, cores_per_node=1)
+    ex2 = SlurmExecutor(name="duplicate", partition="default", nodes=1, cores_per_node=1)
+
+    # Different instances with same name within one runner
+    single_map = SimpleNamespace(
+        _prepared=SimpleNamespace(executor={"a": ex1, "b": ex2}),
+    )
+    with pytest.raises(ValueError, match="must have instances with a unique `name`"):
+        _validate_slurm_executor_names((single_map,), "launch_maps")  # type: ignore[arg-type]
+
+    # Same name across different runners
+    map1 = SimpleNamespace(_prepared=SimpleNamespace(executor={"a": ex1}))
+    map2 = SimpleNamespace(_prepared=SimpleNamespace(executor={"a": ex2}))
+    with pytest.raises(ValueError, match="must have instances with a unique `name`"):
+        _validate_slurm_executor_names((map1, map2), "launch_maps")  # type: ignore[arg-type]
 
 
 def test_unique_run_folders(pipeline: Pipeline) -> None:
