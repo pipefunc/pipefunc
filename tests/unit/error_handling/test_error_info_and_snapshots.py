@@ -105,6 +105,10 @@ def test_error_snapshot_methods():
             kwargs={},
         )
 
+    # Test repr representation
+    repr_str = repr(error)
+    assert repr_str == "ErrorSnapshot('failing_func', ValueError: Cannot process 42)"
+
     # Test string representation
     str_repr = str(error)
     assert "ErrorSnapshot:" in str_repr
@@ -163,6 +167,11 @@ def test_propagated_error_snapshot_methods():
     root_causes = outer_propagated.get_root_causes()
     assert len(root_causes) == 1
     assert root_causes[0] == original_error
+
+    # Test repr representation
+    repr_str = repr(outer_propagated)
+    assert "PropagatedErrorSnapshot(" in repr_str
+    assert "reason='input_is_error'" in repr_str
 
     # Test string representation
     str_repr = str(outer_propagated)
