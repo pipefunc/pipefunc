@@ -285,6 +285,15 @@ def test_validate_slurm_executor_names_rejects_different_instances_same_name() -
         _validate_slurm_executor_names((map1, map2), "launch_maps")  # type: ignore[arg-type]
 
 
+def test_validate_slurm_executor_names_skips_non_slurm_executors() -> None:
+    non_slurm_executor = SimpleNamespace(name="not-slurm")
+    async_map = SimpleNamespace(
+        _prepared=SimpleNamespace(executor={"a": non_slurm_executor}),
+    )
+    # Should not raise - non-Slurm executors are skipped
+    _validate_slurm_executor_names((async_map,), "launch_maps")  # type: ignore[arg-type]
+
+
 def test_unique_run_folders(pipeline: Pipeline) -> None:
     runners = [
         pipeline.map_async(inputs={"x": [1, 2, 3, 4, 5]}, start=False, run_folder="test")
