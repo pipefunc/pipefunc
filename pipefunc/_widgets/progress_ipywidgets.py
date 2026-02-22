@@ -150,13 +150,23 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
             auto_update=auto_update,
             in_async=in_async,
         )
+        self._combine_scopes: bool = False
         self._widgets = self._create_widgets()
+
+    @property
+    def _progress_dict(self) -> dict[OUTPUT_TYPE, Status]:
+        """Return the progress dictionary."""
+        return self.progress_dict if not self._combine_scopes else self.combined_progress()
+
+    def _toggle_combine_scopes(self, _: Any = None) -> None:
+        self._combine_scopes = not self._combine_scopes
+        self._widgets.children = self._create_widgets().children
 
     def update_progress(self, _: Any = None, *, force: bool = False) -> None:
         """Update the progress values and labels."""
         t_start = time.monotonic()
         return_early = self._should_throttle_update(force)
-        for name, status in self.progress_dict.items():
+        for name, status in self._progress_dict.items():
             if status.progress == 0 or name in self._marked_completed:
                 continue
             if return_early and status.progress < 1.0:
@@ -200,7 +210,7 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
             eta = "Completed"
         else:
             estimated_time_left = status.remaining_time(elapsed_time=elapsed_time)
-            eta = f"ETA: {estimated_time_left:.2f} sec"
+            eta = f"ETA: {estimated_time_left:.2f} sec" if estimated_time_left is not None else "∞"
         speed = f"{status.n_attempted / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
         labels["speed"].value = _span("speed-label", f"Speed: {speed} iterations/sec")
         labels["estimated_time"].value = _span(
@@ -288,8 +298,11 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
         )
 
     def _create_progress_vboxes(self) -> None:
+        progress_dict = self._progress_dict
+        self._labels = _create_labels(progress_dict)
+        self._progress_bars = _create_progress_bars(progress_dict)
         self._progress_vboxes: dict[OUTPUT_TYPE, widgets.VBox] = {}
-        for name in self.progress_dict:
+        for name in self._progress_dict:
             labels = self._labels[name]
             labels_box = widgets.HBox(
                 [labels["percentage"], labels["estimated_time"], labels["speed"]],
@@ -313,10 +326,16 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
             "interval-label",
             "Auto-update every: N/A",
         )
-        self._labels = _create_labels(self.progress_dict)
-        self._progress_bars = _create_progress_bars(self.progress_dict)
-        self._create_buttons()
         self._create_progress_vboxes()
+        self._create_buttons()
+
+        self._combine_scopes_checkbox = widgets.Checkbox(
+            value=self._combine_scopes,
+            description="Combine Scopes",
+            indent=False,
+        )
+        self._combine_scopes_checkbox.observe(self._toggle_combine_scopes, names="value")
+
         if not self.task:
             hide(self._buttons_box)
             hide(self._auto_update_interval_label)
@@ -324,6 +343,7 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
             *self._progress_vboxes.values(),
             self._buttons_box,
             self._auto_update_interval_label,
+            self._combine_scopes_checkbox,
         ]
         return widgets.VBox(children, layout=widgets.Layout(max_width="700px"))
 
