@@ -13,6 +13,7 @@ from pipefunc.map._storage_array._base import (
     iterate_shape_indices,
     select_by_mask,
 )
+from pipefunc.map._storage_array._chunked_file import ChunkedFileArray
 from pipefunc.map._storage_array._dict import DictArray
 from pipefunc.map._storage_array._file import FileArray
 
@@ -23,12 +24,17 @@ if TYPE_CHECKING:
 has_zarr = importlib.util.find_spec("zarr") is not None
 
 
-@pytest.fixture(params=["file_array", "zarr_array", "dict"])
+@pytest.fixture(params=["file_array", "zarr_array", "dict", "chunked_file_array"])
 def array_type(request, tmp_path: Path):
     if request.param == "file_array":
 
         def _array_type(shape, internal_shape=None, shape_mask=None):
             return FileArray(tmp_path, shape, internal_shape, shape_mask)
+
+    if request.param == "chunked_file_array":
+
+        def _array_type(shape, internal_shape=None, shape_mask=None):
+            return ChunkedFileArray(tmp_path, shape, internal_shape, shape_mask, chunk_size=10)
     elif request.param == "zarr_array":
         if not has_zarr:
             pytest.skip("zarr not installed")
