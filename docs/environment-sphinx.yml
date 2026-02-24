@@ -11,6 +11,11 @@ dependencies:
   - cloudpickle
   - networkx
   - numpy
+  # extras from `.github/update-environment.py`
+  - luigi
+  - airflow
+  - dask
+  - kedro
   # optional-dependencies: adaptive
   - adaptive
   - adaptive-scheduler>=2.14.0
@@ -55,3 +60,6 @@ dependencies:
   - nltk
   - scikit-image
   - seaborn
+  - pip:
+    - myst-nb
+    - pydra
