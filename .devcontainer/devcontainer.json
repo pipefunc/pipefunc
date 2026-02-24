@@ -38,6 +38,6 @@
         "UV_PROJECT_ENVIRONMENT": "/home/vscode/.venv"
     },
     "postCreateCommand": "uv venv && . /home/vscode/.venv/bin/activate && uv pip install -e '.[dev]'",
-    "postStartCommand": "uv run pre-commit install",
+    "postStartCommand": "uv run prek install",
     "remoteUser": "vscode"
 }

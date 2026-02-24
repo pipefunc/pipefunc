@@ -166,10 +166,16 @@ pip install -e ".[dev]"
 
 ## :hammer_and_wrench: Development
 
-We use [`pre-commit`](https://pre-commit.com/) to manage pre-commit hooks, which helps us ensure that our code is always clean and compliant with our coding standards.
-To set it up, install pre-commit with pip and then run the install command:
+We use [`prek`](https://prek.j178.dev/) to manage our git hooks. It understands the existing `.pre-commit-config.yaml`, so after installing the development dependencies you can enable the hooks with:
 
 ```bash
-pip install pre-commit
-pre-commit install
+prek install
 ```
+
+To check everything locally, run all hooks with:
+
+```bash
+prek run --all-files
+```
+
+If you prefer not to install the dev extras, you can obtain the standalone binary via `uv tool install prek` or `brew install prek`—see the [installation guide](https://prek.j178.dev/quickstart/#installation) for additional options.
