@@ -139,6 +139,7 @@ asyncio_default_fixture_loop_scope = "module"
 addopts = """
     -vvv
     --cov=pipefunc
+    --cov=tests
     --cov-report term
     --cov-report html
     --cov-report xml
