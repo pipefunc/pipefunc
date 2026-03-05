@@ -49,8 +49,10 @@ def status_from_run_folder(
 
     heartbeat = load_run_status_heartbeat(run_folder)
     if heartbeat is not None:
+        disk_outputs, _ = _progress_info_from_disk(metadata)
         return _status_from_heartbeat(
             heartbeat,
+            disk_outputs=disk_outputs,
             run_info_json=run_info_json,
             include_outputs=include_outputs,
             include_run_info=include_run_info,
@@ -210,6 +212,7 @@ def _deserialize_storage(storage: str | dict[str, str]) -> str | dict[Any, str]:
 def _status_from_heartbeat(
     heartbeat: dict[str, Any],
     *,
+    disk_outputs: dict[str, Any],
     run_info_json: dict[str, Any],
     include_outputs: bool,
     include_run_info: bool,
@@ -222,6 +225,10 @@ def _status_from_heartbeat(
     )
     result.pop("status_source", None)
     result["status_source"] = "heartbeat"
+    result["outputs"] = _merge_disk_output_metadata(
+        heartbeat_outputs=result.get("outputs", {}),
+        disk_outputs=disk_outputs,
+    )
     if not include_outputs:
         result.pop("outputs", None)
     if include_run_info:
@@ -229,6 +236,19 @@ def _status_from_heartbeat(
     else:
         result.pop("run_info", None)
     return add_heartbeat_staleness(result)
+
+
+def _merge_disk_output_metadata(
+    *,
+    heartbeat_outputs: dict[str, Any],
+    disk_outputs: dict[str, Any],
+) -> dict[str, Any]:
+    outputs: dict[str, Any] = {}
+    for output_name, heartbeat_output in heartbeat_outputs.items():
+        merged = dict(disk_outputs.get(output_name, {}))
+        merged.update(heartbeat_output)
+        outputs[output_name] = merged
+    return outputs
 
 
 def _progress_info_from_disk(metadata: dict[str, Any]) -> tuple[dict[str, Any], bool]:
