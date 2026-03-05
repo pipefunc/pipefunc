@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -40,6 +41,21 @@ def slow_pipeline() -> Pipeline:
     return Pipeline([slow_square, aggregate])
 
 
+async def _wait_for_heartbeat_status(
+    run_folder: Path,
+    *,
+    timeout: float = 1.0,
+) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        status = status_from_run_folder(run_folder)
+        if status["status_source"] == "heartbeat":
+            return status
+        await asyncio.sleep(0.01)
+    msg = "Timed out waiting for heartbeat-backed status"
+    raise AssertionError(msg)
+
+
 def test_status_from_run_folder_completed(simple_pipeline: Pipeline, tmp_path: Path) -> None:
     run_folder = tmp_path / "completed"
     simple_pipeline.map(inputs={"x": 1, "y": 2}, run_folder=run_folder, parallel=False)
@@ -74,6 +90,50 @@ async def test_status_from_run_folder_incomplete(slow_pipeline: Pipeline, tmp_pa
         assert "values" in status["outputs"]
         assert "total" in status["outputs"]
         await runner.task
+    finally:
+        executor.shutdown(wait=True)
+
+
+@pytest.mark.asyncio
+async def test_status_from_run_folder_uses_heartbeat_by_default(
+    slow_pipeline: Pipeline,
+    tmp_path: Path,
+) -> None:
+    run_folder = tmp_path / "heartbeat"
+    executor = ThreadPoolExecutor(max_workers=1)
+    runner = slow_pipeline.map_async(
+        inputs={"x": list(range(40))},
+        run_folder=run_folder,
+        executor=executor,
+        display_widgets=False,
+    )
+    try:
+        status = await _wait_for_heartbeat_status(run_folder)
+
+        assert runner.progress is not None
+        assert status["status_source"] == "heartbeat"
+        assert (run_folder / "pipefunc_status.json").exists()
+        assert status["outputs"]["values"]["function_name"] == "slow_square"
+        assert status["outputs"]["total"]["function_name"] == "aggregate"
+
+        saw_active_functions = False
+        for _ in range(100):
+            status = status_from_run_folder(run_folder)
+            if status["status"] == "running" and status["active_functions"]:
+                saw_active_functions = True
+                break
+            await asyncio.sleep(0.01)
+
+        assert saw_active_functions is True
+        assert "slow_square" in status["active_functions"]
+
+        await runner.task
+        final_status = status_from_run_folder(run_folder)
+
+        assert final_status["status"] == "completed"
+        assert final_status["status_source"] == "heartbeat"
+        assert final_status["active_functions"] == []
+        assert final_status["stale"] is False
     finally:
         executor.shutdown(wait=True)
 

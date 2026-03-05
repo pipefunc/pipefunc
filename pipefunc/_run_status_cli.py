@@ -109,6 +109,8 @@ def _watch_command(args: argparse.Namespace) -> int:
             return 1
         if payload["status"] == "completed":
             return 0
+        if payload["status"] in {"cancelled", "failed"}:
+            return 1
         if args.timeout is not None and (time.monotonic() - started) >= args.timeout:
             return 2
         time.sleep(args.interval)

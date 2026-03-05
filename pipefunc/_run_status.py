@@ -7,6 +7,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from pipefunc._run_status_heartbeat import (
+    add_heartbeat_staleness,
+    load_run_status_heartbeat,
+    run_status_path,
+)
 from pipefunc.map import load_all_outputs
 from pipefunc.map._run_info import (
     RunInfo,
@@ -27,8 +32,9 @@ def status_from_run_folder(
 ) -> dict[str, Any]:
     """Summarize the status of a persisted run folder.
 
-    The status is inferred from files on disk and does not query any external
-    scheduler. That means incomplete runs are reported heuristically as
+    If a live heartbeat file is present, it is preferred. Otherwise the status
+    is inferred from files on disk and does not query any external scheduler.
+    That means incomplete runs without a heartbeat are reported heuristically as
     ``"pending"``, ``"running"``, or ``"incomplete"``.
     """
     try:
@@ -41,21 +47,27 @@ def status_from_run_folder(
             "error": str(e),
         }
 
+    heartbeat = load_run_status_heartbeat(run_folder)
+    if heartbeat is not None:
+        return _status_from_heartbeat(
+            heartbeat,
+            run_info_json=run_info_json,
+            include_outputs=include_outputs,
+            include_run_info=include_run_info,
+        )
+
     outputs, all_complete = _progress_info_from_disk(metadata)
     progress_fraction = _overall_progress(outputs)
     status = _derive_status(all_complete=all_complete, progress_fraction=progress_fraction)
 
-    result = {
-        "run_folder": str(metadata["run_folder"]),
-        "status": status,
-        "status_source": "disk_heuristic",
-        "all_complete": all_complete,
-        "progress_fraction": progress_fraction,
-        "n_outputs": len(outputs),
-        "n_outputs_completed": sum(1 for output in outputs.values() if output["complete"]),
-        "last_modified": _isoformat_timestamp(run_info_path.stat().st_mtime),
-        "pipefunc_version": run_info_json.get("pipefunc_version", "unknown"),
-    }
+    result = _build_status_result(
+        run_folder=metadata["run_folder"],
+        status=status,
+        status_source="disk_heuristic",
+        outputs=outputs,
+        last_modified=_isoformat_timestamp(run_info_path.stat().st_mtime),
+        pipefunc_version=run_info_json.get("pipefunc_version", "unknown"),
+    )
     if include_outputs:
         result["outputs"] = outputs
     if include_run_info:
@@ -91,7 +103,9 @@ def list_run_statuses(
         run_info_path = RunInfo.path(run_folder)
         if not run_info_path.exists():
             continue
-        candidates.append((run_info_path.stat().st_mtime, run_folder))
+        status_file = run_status_path(run_folder)
+        status_mtime = status_file.stat().st_mtime if status_file.exists() else 0.0
+        candidates.append((max(run_info_path.stat().st_mtime, status_mtime), run_folder))
 
     candidates.sort(key=lambda item: item[0], reverse=True)
     if max_runs is not None and max_runs > 0:
@@ -191,6 +205,30 @@ def _deserialize_storage(storage: str | dict[str, str]) -> str | dict[Any, str]:
     if isinstance(storage, str):
         return storage
     return {_maybe_str_to_tuple(key): value for key, value in storage.items()}
+
+
+def _status_from_heartbeat(
+    heartbeat: dict[str, Any],
+    *,
+    run_info_json: dict[str, Any],
+    include_outputs: bool,
+    include_run_info: bool,
+) -> dict[str, Any]:
+    result = dict(heartbeat)
+    result["run_folder"] = str(Path(result["run_folder"]).absolute())
+    result["pipefunc_version"] = run_info_json.get(
+        "pipefunc_version",
+        result.get("pipefunc_version", "unknown"),
+    )
+    result.pop("status_source", None)
+    result["status_source"] = "heartbeat"
+    if not include_outputs:
+        result.pop("outputs", None)
+    if include_run_info:
+        result["run_info"] = run_info_json
+    else:
+        result.pop("run_info", None)
+    return add_heartbeat_staleness(result)
 
 
 def _progress_info_from_disk(metadata: dict[str, Any]) -> tuple[dict[str, Any], bool]:
@@ -297,6 +335,28 @@ def _derive_status(*, all_complete: bool, progress_fraction: float | None) -> st
     if progress_fraction == 0.0:
         return "pending"
     return "running"
+
+
+def _build_status_result(
+    *,
+    run_folder: Path,
+    status: str,
+    status_source: str,
+    outputs: dict[str, Any],
+    last_modified: str,
+    pipefunc_version: str,
+) -> dict[str, Any]:
+    return {
+        "run_folder": str(run_folder),
+        "status": status,
+        "status_source": status_source,
+        "all_complete": all(output["complete"] for output in outputs.values()),
+        "progress_fraction": _overall_progress(outputs),
+        "n_outputs": len(outputs),
+        "n_outputs_completed": sum(1 for output in outputs.values() if output["complete"]),
+        "last_modified": last_modified,
+        "pipefunc_version": pipefunc_version,
+    }
 
 
 def _isoformat_timestamp(timestamp: float) -> str:
