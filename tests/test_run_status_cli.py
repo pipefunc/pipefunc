@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -19,9 +21,16 @@ from pipefunc._run_status import (
 from pipefunc._run_status_cli import main
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
     from pipefunc.typing import Array
+
+
+@dataclass
+class BlockingScalarPipeline:
+    pipeline: Pipeline
+    release: threading.Event
 
 
 @pytest.fixture
@@ -37,7 +46,7 @@ def simple_pipeline() -> Pipeline:
 def slow_pipeline() -> Pipeline:
     @pipefunc(output_name="values", mapspec="x[i] -> values[i]")
     def slow_square(x: float) -> float:
-        time.sleep(0.02)
+        time.sleep(0.01)
         return x**2
 
     @pipefunc(output_name="total")
@@ -51,10 +60,31 @@ def slow_pipeline() -> Pipeline:
 def slow_scalar_pipeline() -> Pipeline:
     @pipefunc(output_name="result")
     def slow_increment(x: int) -> int:
-        time.sleep(0.2)
+        time.sleep(0.05)
         return x + 1
 
     return Pipeline([slow_increment])
+
+
+@pytest.fixture
+def fast_scalar_pipeline() -> Pipeline:
+    @pipefunc(output_name="result")
+    def increment(x: int) -> int:
+        return x + 1
+
+    return Pipeline([increment])
+
+
+@pytest.fixture
+def blocking_scalar_pipeline() -> BlockingScalarPipeline:
+    release = threading.Event()
+
+    @pipefunc(output_name="result")
+    def block(x: int) -> int:
+        release.wait(timeout=1.0)
+        return x + 1
+
+    return BlockingScalarPipeline(Pipeline([block]), release)
 
 
 @pytest.fixture
@@ -70,7 +100,7 @@ def mapspec_pipeline() -> Pipeline:
 def failing_pipeline() -> Pipeline:
     @pipefunc(output_name="values", mapspec="x[i] -> values[i]")
     def sometimes_fail(x: int) -> int:
-        time.sleep(0.02)
+        time.sleep(0.01)
         if x == 2:
             msg = "boom"
             raise RuntimeError(msg)
@@ -79,19 +109,56 @@ def failing_pipeline() -> Pipeline:
     return Pipeline([sometimes_fail])
 
 
+@pytest.fixture(scope="module")
+def completed_run_folder(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    @pipefunc(output_name="result")
+    def add_numbers(x: float, y: float) -> float:
+        return x + y
+
+    run_folder = tmp_path_factory.mktemp("run-status-completed") / "completed"
+    Pipeline([add_numbers]).map(inputs={"x": 2, "y": 5}, run_folder=run_folder, parallel=False)
+    return run_folder
+
+
+@pytest.fixture(scope="module")
+def completed_runs_folder(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    @pipefunc(output_name="result")
+    def add_numbers(x: float, y: float) -> float:
+        return x + y
+
+    runs_folder = tmp_path_factory.mktemp("run-status-list")
+    pipeline = Pipeline([add_numbers])
+    pipeline.map(inputs={"x": 1, "y": 2}, run_folder=runs_folder / "run-1", parallel=False)
+    pipeline.map(inputs={"x": 3, "y": 4}, run_folder=runs_folder / "run-2", parallel=False)
+    return runs_folder
+
+
+async def _wait_for_status(
+    run_folder: Path,
+    *,
+    predicate: Callable[[dict[str, Any]], bool] | None = None,
+    timeout: float = 1.0,
+) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout
+    last_status: dict[str, Any] | None = None
+    while time.monotonic() < deadline:
+        last_status = status_from_run_folder(run_folder)
+        if predicate is None:
+            if last_status["status_source"] == "heartbeat":
+                return last_status
+        elif predicate(last_status):
+            return last_status
+        await asyncio.sleep(0.005)
+    msg = f"Timed out waiting for run status condition, last_status={last_status!r}"
+    raise AssertionError(msg)
+
+
 async def _wait_for_heartbeat_status(
     run_folder: Path,
     *,
     timeout: float = 1.0,
 ) -> dict[str, Any]:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        status = status_from_run_folder(run_folder)
-        if status["status_source"] == "heartbeat":
-            return status
-        await asyncio.sleep(0.01)
-    msg = "Timed out waiting for heartbeat-backed status"
-    raise AssertionError(msg)
+    return await _wait_for_status(run_folder, timeout=timeout)
 
 
 def _load_run_info_json(run_folder: Path) -> dict[str, Any]:
@@ -102,11 +169,8 @@ def _write_run_info_json(run_folder: Path, payload: dict[str, Any]) -> None:
     (run_folder / "run_info.json").write_text(json.dumps(payload, indent=2, sort_keys=True))
 
 
-def test_status_from_run_folder_completed(simple_pipeline: Pipeline, tmp_path: Path) -> None:
-    run_folder = tmp_path / "completed"
-    simple_pipeline.map(inputs={"x": 1, "y": 2}, run_folder=run_folder, parallel=False)
-
-    status = status_from_run_folder(run_folder)
+def test_status_from_run_folder_completed(completed_run_folder: Path) -> None:
+    status = status_from_run_folder(completed_run_folder)
 
     assert status["status"] == "completed"
     assert status["status_source"] == "disk_heuristic"
@@ -123,7 +187,7 @@ async def test_status_from_run_folder_incomplete(slow_pipeline: Pipeline, tmp_pa
     run_folder = tmp_path / "incomplete"
     executor = ThreadPoolExecutor(max_workers=1)
     runner = slow_pipeline.map_async(
-        inputs={"x": [1, 2, 3, 4, 5]},
+        inputs={"x": [1, 2, 3, 4]},
         run_folder=run_folder,
         executor=executor,
         show_progress="headless",
@@ -148,7 +212,7 @@ async def test_status_from_run_folder_uses_heartbeat_by_default(
     run_folder = tmp_path / "heartbeat"
     executor = ThreadPoolExecutor(max_workers=1)
     runner = slow_pipeline.map_async(
-        inputs={"x": list(range(40))},
+        inputs={"x": list(range(8))},
         run_folder=run_folder,
         executor=executor,
         display_widgets=False,
@@ -164,16 +228,11 @@ async def test_status_from_run_folder_uses_heartbeat_by_default(
         assert status["outputs"]["total"]["function_name"] == "aggregate"
         assert "run_info" in status_with_run_info
 
-        saw_active_functions = False
-        for _ in range(100):
-            status = status_from_run_folder(run_folder)
-            if status["status"] == "running" and status["active_functions"]:
-                saw_active_functions = True
-                break
-            await asyncio.sleep(0.01)
-
-        assert saw_active_functions is True
-        assert "slow_square" in status["active_functions"]
+        running_status = await _wait_for_status(
+            run_folder,
+            predicate=lambda s: s["status"] == "running" and bool(s["active_functions"]),
+        )
+        assert "slow_square" in running_status["active_functions"]
 
         await runner.task
         final_status = status_from_run_folder(run_folder)
@@ -194,7 +253,7 @@ async def test_list_run_statuses_compact_heartbeat_view(
     run_folder = tmp_path / "heartbeat-list"
     executor = ThreadPoolExecutor(max_workers=1)
     runner = slow_pipeline.map_async(
-        inputs={"x": list(range(20))},
+        inputs={"x": list(range(6))},
         run_folder=run_folder,
         executor=executor,
         display_widgets=False,
@@ -212,12 +271,12 @@ async def test_list_run_statuses_compact_heartbeat_view(
 
 @pytest.mark.asyncio
 async def test_heartbeat_loop_updates_during_single_running_task(
-    slow_scalar_pipeline: Pipeline,
+    blocking_scalar_pipeline: BlockingScalarPipeline,
     tmp_path: Path,
 ) -> None:
     run_folder = tmp_path / "single-heartbeat"
     executor = ThreadPoolExecutor(max_workers=1)
-    runner = slow_scalar_pipeline.map_async(
+    runner = blocking_scalar_pipeline.pipeline.map_async(
         inputs={"x": 1},
         run_folder=run_folder,
         executor=executor,
@@ -232,31 +291,33 @@ async def test_heartbeat_loop_updates_during_single_running_task(
         runner.heartbeat.heartbeat_interval_seconds = 0.02
         runner.start()
 
-        first_status = await _wait_for_heartbeat_status(run_folder)
+        first_status = await _wait_for_status(
+            run_folder,
+            predicate=lambda s: s["status_source"] == "heartbeat" and s["status"] == "running",
+        )
         first_updated_at = first_status["updated_at"]
 
-        for _ in range(50):
-            await asyncio.sleep(0.01)
-            second_status = status_from_run_folder(run_folder)
-            if second_status["updated_at"] != first_updated_at:
-                break
-        else:
-            pytest.fail("Expected periodic heartbeat update during running task")
+        second_status = await _wait_for_status(
+            run_folder,
+            predicate=lambda s: s["updated_at"] != first_updated_at,
+        )
 
         assert second_status["status"] == "running"
         assert second_status["updated_at"] != first_updated_at
+        blocking_scalar_pipeline.release.set()
         await runner.task
     finally:
+        blocking_scalar_pipeline.release.set()
         executor.shutdown(wait=True)
 
 
 def test_heartbeat_request_write_after_sync_result(
-    slow_scalar_pipeline: Pipeline,
+    fast_scalar_pipeline: Pipeline,
     tmp_path: Path,
 ) -> None:
     run_folder = tmp_path / "sync-heartbeat"
     executor = ThreadPoolExecutor(max_workers=1)
-    runner = slow_scalar_pipeline.map_async(
+    runner = fast_scalar_pipeline.map_async(
         inputs={"x": 1},
         run_folder=run_folder,
         executor=executor,
@@ -278,40 +339,28 @@ def test_heartbeat_request_write_after_sync_result(
 
 @pytest.mark.asyncio
 async def test_heartbeat_cancelled_status(
-    slow_pipeline: Pipeline,
+    blocking_scalar_pipeline: BlockingScalarPipeline,
     tmp_path: Path,
 ) -> None:
     run_folder = tmp_path / "cancelled-heartbeat"
     executor = ThreadPoolExecutor(max_workers=1)
-    runner = slow_pipeline.map_async(
-        inputs={"x": list(range(100))},
+    runner = blocking_scalar_pipeline.pipeline.map_async(
+        inputs={"x": 1},
         run_folder=run_folder,
         executor=executor,
         display_widgets=False,
     )
     try:
-        for _ in range(100):
-            status = status_from_run_folder(run_folder)
-            if status.get("active_functions"):
-                break
-            await asyncio.sleep(0.01)
-        else:
-            pytest.fail("Expected active heartbeat before cancelling run")
+        await _wait_for_status(run_folder, predicate=lambda s: bool(s.get("active_functions")))
 
         runner.task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await runner.task
 
-        for _ in range(50):
-            status = status_from_run_folder(run_folder)
-            if status["status"] == "cancelled":
-                break
-            await asyncio.sleep(0.01)
-        else:
-            pytest.fail("Expected cancelled heartbeat status")
-
+        status = await _wait_for_status(run_folder, predicate=lambda s: s["status"] == "cancelled")
         assert status["stale"] is False
     finally:
+        blocking_scalar_pipeline.release.set()
         executor.shutdown(wait=True)
 
 
@@ -337,7 +386,7 @@ async def test_status_from_run_folder_disk_heuristic_pending_and_running(
     run_folder = tmp_path / "disk-heuristic"
     executor = ThreadPoolExecutor(max_workers=1)
     runner = slow_pipeline.map_async(
-        inputs={"x": list(range(20))},
+        inputs={"x": list(range(6))},
         run_folder=run_folder,
         executor=executor,
         show_progress=False,
@@ -352,13 +401,10 @@ async def test_status_from_run_folder_disk_heuristic_pending_and_running(
 
         runner.start()
 
-        for _ in range(100):
-            running_status = status_from_run_folder(run_folder)
-            if running_status["status"] == "running":
-                break
-            await asyncio.sleep(0.01)
-        else:
-            pytest.fail("Expected disk heuristic to observe a running state")
+        running_status = await _wait_for_status(
+            run_folder,
+            predicate=lambda s: s["status_source"] == "disk_heuristic" and s["status"] == "running",
+        )
 
         assert running_status["status_source"] == "disk_heuristic"
         assert 0.0 < running_status["progress_fraction"] < 1.0
@@ -385,13 +431,7 @@ async def test_heartbeat_failed_run_reports_failed_function_counters(
         with pytest.raises(RuntimeError, match="boom"):
             await runner.task
 
-        for _ in range(50):
-            status = status_from_run_folder(run_folder)
-            if status["status"] == "failed":
-                break
-            await asyncio.sleep(0.01)
-        else:
-            pytest.fail("Expected failed heartbeat status")
+        status = await _wait_for_status(run_folder, predicate=lambda s: s["status"] == "failed")
 
         assert status["status_source"] == "heartbeat"
         assert status["functions"][0]["state"] == "running"
@@ -443,42 +483,24 @@ def test_list_runs_skips_broken_entries(
     assert history["runs"][0]["run_folder"] == str(good_run.absolute())
 
 
-def test_load_outputs_subset(
-    simple_pipeline: Pipeline,
-    tmp_path: Path,
-) -> None:
-    run_folder = tmp_path / "load-outputs"
-    simple_pipeline.map(inputs={"x": 2, "y": 5}, run_folder=run_folder, parallel=False)
-
-    payload = load_outputs(run_folder, ["result"])
+def test_load_outputs_subset(completed_run_folder: Path) -> None:
+    payload = load_outputs(completed_run_folder, ["result"])
 
     assert payload == {"result": 7}
 
 
-def test_load_outputs_all(
-    simple_pipeline: Pipeline,
-    tmp_path: Path,
-) -> None:
-    run_folder = tmp_path / "load-outputs-all"
-    simple_pipeline.map(inputs={"x": 2, "y": 5}, run_folder=run_folder, parallel=False)
-
-    payload = load_outputs(run_folder)
+def test_load_outputs_all(completed_run_folder: Path) -> None:
+    payload = load_outputs(completed_run_folder)
 
     assert payload == {"result": 7}
 
 
-def test_run_info_success(
-    simple_pipeline: Pipeline,
-    tmp_path: Path,
-) -> None:
-    run_folder = tmp_path / "run-info-success"
-    simple_pipeline.map(inputs={"x": 1, "y": 2}, run_folder=run_folder, parallel=False)
-
-    payload = run_info(run_folder)
+def test_run_info_success(completed_run_folder: Path) -> None:
+    payload = run_info(completed_run_folder)
 
     assert payload["all_complete"] is True
     assert payload["outputs"]["result"]["bytes"] > 0
-    assert payload["run_info"]["run_folder"] == str(run_folder.absolute())
+    assert payload["run_info"]["run_folder"] == str(completed_run_folder.absolute())
 
 
 def test_status_from_run_folder_dict_storage_unknown_progress(
@@ -591,54 +613,38 @@ def test_status_from_run_folder_invalid_heartbeat_timestamp(
     assert status["outputs"]["result"]["bytes"] > 0
 
 
-def test_list_run_statuses(simple_pipeline: Pipeline, tmp_path: Path) -> None:
-    run_folder = tmp_path / "run-1"
-    simple_pipeline.map(inputs={"x": 1, "y": 2}, run_folder=run_folder, parallel=False)
-
-    payload = list_run_statuses(tmp_path)
+def test_list_run_statuses(completed_run_folder: Path) -> None:
+    payload = list_run_statuses(completed_run_folder.parent)
 
     assert payload["error"] is None
     assert payload["total_count"] == 1
-    assert payload["runs"][0]["run_folder"] == str(run_folder.absolute())
+    assert payload["runs"][0]["run_folder"] == str(completed_run_folder.absolute())
     assert payload["runs"][0]["status"] == "completed"
 
 
-def test_list_run_statuses_respects_max_runs(simple_pipeline: Pipeline, tmp_path: Path) -> None:
-    run_folder_1 = tmp_path / "run-1"
-    run_folder_2 = tmp_path / "run-2"
-    simple_pipeline.map(inputs={"x": 1, "y": 2}, run_folder=run_folder_1, parallel=False)
-    simple_pipeline.map(inputs={"x": 3, "y": 4}, run_folder=run_folder_2, parallel=False)
-
-    payload = list_run_statuses(tmp_path, max_runs=1)
+def test_list_run_statuses_respects_max_runs(completed_runs_folder: Path) -> None:
+    payload = list_run_statuses(completed_runs_folder, max_runs=1)
 
     assert payload["total_count"] == 1
 
 
 def test_status_cli(
-    simple_pipeline: Pipeline,
-    tmp_path: Path,
+    completed_run_folder: Path,
     capsys: pytest.CaptureFixture,
 ) -> None:
-    run_folder = tmp_path / "cli-status"
-    simple_pipeline.map(inputs={"x": 1, "y": 2}, run_folder=run_folder, parallel=False)
-
-    code = main(["status", str(run_folder)])
+    code = main(["status", str(completed_run_folder)])
     payload = json.loads(capsys.readouterr().out)
 
     assert code == 0
     assert payload["status"] == "completed"
-    assert payload["run_folder"] == str(run_folder.absolute())
+    assert payload["run_folder"] == str(completed_run_folder.absolute())
 
 
 def test_status_cli_pretty_with_run_info(
-    simple_pipeline: Pipeline,
-    tmp_path: Path,
+    completed_run_folder: Path,
     capsys: pytest.CaptureFixture,
 ) -> None:
-    run_folder = tmp_path / "cli-status-pretty"
-    simple_pipeline.map(inputs={"x": 1, "y": 2}, run_folder=run_folder, parallel=False)
-
-    code = main(["status", str(run_folder), "--include-run-info", "--pretty"])
+    code = main(["status", str(completed_run_folder), "--include-run-info", "--pretty"])
     payload = json.loads(capsys.readouterr().out)
 
     assert code == 0
@@ -647,14 +653,10 @@ def test_status_cli_pretty_with_run_info(
 
 
 def test_list_runs_cli(
-    simple_pipeline: Pipeline,
-    tmp_path: Path,
+    completed_run_folder: Path,
     capsys: pytest.CaptureFixture,
 ) -> None:
-    run_folder = tmp_path / "cli-list"
-    simple_pipeline.map(inputs={"x": 1, "y": 2}, run_folder=run_folder, parallel=False)
-
-    code = main(["list-runs", str(tmp_path)])
+    code = main(["list-runs", str(completed_run_folder.parent)])
     payload = json.loads(capsys.readouterr().out)
 
     assert code == 0
@@ -663,14 +665,10 @@ def test_list_runs_cli(
 
 
 def test_watch_cli(
-    simple_pipeline: Pipeline,
-    tmp_path: Path,
+    completed_run_folder: Path,
     capsys: pytest.CaptureFixture,
 ) -> None:
-    run_folder = tmp_path / "cli-watch"
-    simple_pipeline.map(inputs={"x": 1, "y": 2}, run_folder=run_folder, parallel=False)
-
-    code = main(["watch", str(run_folder), "--interval", "0.01", "--timeout", "0.1"])
+    code = main(["watch", str(completed_run_folder), "--interval", "0.01", "--timeout", "0.1"])
     lines = capsys.readouterr().out.strip().splitlines()
     payload = json.loads(lines[-1])
 
@@ -688,41 +686,42 @@ def test_watch_cli_missing_run_folder(capsys: pytest.CaptureFixture) -> None:
 
 @pytest.mark.asyncio
 async def test_watch_cli_timeout_for_running_job(
-    slow_scalar_pipeline: Pipeline,
+    blocking_scalar_pipeline: BlockingScalarPipeline,
     tmp_path: Path,
     capsys: pytest.CaptureFixture,
 ) -> None:
     run_folder = tmp_path / "cli-watch-timeout"
     executor = ThreadPoolExecutor(max_workers=1)
-    runner = slow_scalar_pipeline.map_async(
+    runner = blocking_scalar_pipeline.pipeline.map_async(
         inputs={"x": 1},
         run_folder=run_folder,
         executor=executor,
         display_widgets=False,
     )
     try:
-        await _wait_for_heartbeat_status(run_folder)
+        await _wait_for_status(run_folder, predicate=lambda s: s["status"] == "running")
 
         code = main(["watch", str(run_folder), "--interval", "0.01", "--timeout", "0.02"])
         payload = json.loads(capsys.readouterr().out.splitlines()[-1])
 
         assert code == 2
-        assert payload["status"] in {"pending", "running"}
+        assert payload["status"] == "running"
     finally:
+        blocking_scalar_pipeline.release.set()
         await runner.task
         executor.shutdown(wait=True)
 
 
 @pytest.mark.asyncio
 async def test_watch_cli_cancelled_job(
-    slow_pipeline: Pipeline,
+    blocking_scalar_pipeline: BlockingScalarPipeline,
     tmp_path: Path,
     capsys: pytest.CaptureFixture,
 ) -> None:
     run_folder = tmp_path / "cli-watch-cancelled"
     executor = ThreadPoolExecutor(max_workers=1)
-    runner = slow_pipeline.map_async(
-        inputs={"x": list(range(100))},
+    runner = blocking_scalar_pipeline.pipeline.map_async(
+        inputs={"x": 1},
         run_folder=run_folder,
         executor=executor,
         display_widgets=False,
@@ -739,6 +738,7 @@ async def test_watch_cli_cancelled_job(
         assert code == 1
         assert payload["status"] == "cancelled"
     finally:
+        blocking_scalar_pipeline.release.set()
         executor.shutdown(wait=True)
 
 

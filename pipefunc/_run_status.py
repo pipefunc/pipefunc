@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from pipefunc._run_status_heartbeat import (
+    _overall_progress,
     add_heartbeat_staleness,
     load_run_status_heartbeat,
     run_status_path,
@@ -332,17 +333,6 @@ def _storage_bytes(storage: StorageBase) -> int:
     folder = getattr(storage, "folder", None)
     assert folder is not None
     return sum(path.stat().st_size for path in Path(folder).rglob("*") if path.is_file())
-
-
-def _overall_progress(outputs: dict[str, Any]) -> float | None:
-    values = [
-        float(output["progress"])
-        for output in outputs.values()
-        if isinstance(output["progress"], int | float)
-    ]
-    if not values:
-        return None
-    return sum(values) / len(values)
 
 
 def _derive_status(*, all_complete: bool, progress_fraction: float | None) -> str:
