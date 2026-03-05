@@ -11,17 +11,9 @@ import fastmcp
 import pydantic
 from rich.console import Console
 
+from pipefunc import _run_status
 from pipefunc._pipeline._autodoc import PipelineDocumentation, format_pipeline_docs
 from pipefunc._pipeline._base import Pipeline
-from pipefunc._run_status import (
-    list_historical_runs as _list_historical_runs_impl,
-)
-from pipefunc._run_status import (
-    load_outputs as _load_outputs_impl,
-)
-from pipefunc._run_status import (
-    run_info as _run_info_impl,
-)
 from pipefunc._utils import requires
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run_eager_async import AsyncMap
@@ -668,12 +660,12 @@ class _Runs(TypedDict):
 
 def _list_historical_runs(folder: str = "runs", max_runs: int | None = None) -> _Runs:
     """List all historical pipeline runs from disk, sorted by modification time."""
-    return cast(_Runs, _list_historical_runs_impl(folder, max_runs))
+    return cast(_Runs, _run_status.list_historical_runs(folder, max_runs))
 
 
 def _run_info(run_folder: str) -> dict[str, Any]:
-    return _run_info_impl(run_folder)
+    return _run_status.run_info(run_folder)
 
 
 def _load_outputs(run_folder: str, output_names: list[str] | None = None) -> dict[str, Any]:
-    return _load_outputs_impl(run_folder, output_names)
+    return _run_status.load_outputs(run_folder, output_names)
