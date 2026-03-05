@@ -62,8 +62,7 @@ class RunStatusHeartbeatWriter:
     def write_now(self, *, task: asyncio.Task[Any] | None = None) -> None:
         """Write the current heartbeat snapshot immediately."""
         run_folder = self.run_info.run_folder
-        if run_folder is None:
-            return
+        assert run_folder is not None
         payload = build_run_status_snapshot(
             run_info=self.run_info,
             progress_dict=self.progress_dict,
@@ -237,11 +236,9 @@ def _output_payload(function_name: str, status: Status) -> dict[str, Any]:
 def _status_state(status: Status) -> str:
     if status.progress >= 1.0:
         return "completed"
-    if status.n_in_progress > 0:
+    if status.n_in_progress > 0 or status.start_time is not None or status.n_attempted > 0:
         return "running"
-    if status.start_time is None and status.n_attempted == 0:
-        return "pending"
-    return "incomplete"
+    return "pending"
 
 
 def _derive_run_status(

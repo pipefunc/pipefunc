@@ -40,12 +40,7 @@ def status_from_run_folder(
     try:
         metadata, run_info_json, run_info_path = _load_run_metadata(run_folder)
     except Exception as e:  # noqa: BLE001
-        return {
-            "run_folder": str(Path(run_folder).absolute()),
-            "status": "missing",
-            "status_source": "disk_heuristic",
-            "error": str(e),
-        }
+        return _error_status_result(run_folder=run_folder, error=e, status="missing")
 
     heartbeat = load_run_status_heartbeat(run_folder)
     if heartbeat is not None:
@@ -114,7 +109,11 @@ def list_run_statuses(
         candidates = candidates[:max_runs]
 
     for _mtime, run_folder in candidates:
-        result["runs"].append(status_from_run_folder(run_folder, include_outputs=False))
+        try:
+            status = status_from_run_folder(run_folder, include_outputs=False)
+        except Exception as e:  # noqa: BLE001
+            status = _error_status_result(run_folder=run_folder, error=e, status="error")
+        result["runs"].append(status)
 
     result["total_count"] = len(result["runs"])
     return result
@@ -331,8 +330,7 @@ def _storage_name_for_output(storage: str | dict[Any, str], output_name: str) ->
 
 def _storage_bytes(storage: StorageBase) -> int:
     folder = getattr(storage, "folder", None)
-    if folder is None:
-        return 0
+    assert folder is not None
     return sum(path.stat().st_size for path in Path(folder).rglob("*") if path.is_file())
 
 
@@ -376,6 +374,20 @@ def _build_status_result(
         "n_outputs_completed": sum(1 for output in outputs.values() if output["complete"]),
         "last_modified": last_modified,
         "pipefunc_version": pipefunc_version,
+    }
+
+
+def _error_status_result(
+    *,
+    run_folder: str | Path,
+    error: Exception,
+    status: str,
+) -> dict[str, Any]:
+    return {
+        "run_folder": str(Path(run_folder).absolute()),
+        "status": status,
+        "status_source": "disk_heuristic",
+        "error": str(error),
     }
 
 
