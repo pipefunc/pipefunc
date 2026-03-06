@@ -120,6 +120,9 @@ def _create_progress_tracker(
     if progress is not None:
         return progress
     if in_async and run_folder is not None and show_progress is not False:
+        # A headless tracker is needed so the heartbeat writer has a
+        # progress_dict to snapshot, even when the user didn't request a
+        # visible progress bar.
         return init_tracker(store, pipeline.sorted_functions, "headless", in_async)
     return None
 

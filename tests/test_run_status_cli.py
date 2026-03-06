@@ -58,16 +58,6 @@ def slow_pipeline() -> Pipeline:
 
 
 @pytest.fixture
-def slow_scalar_pipeline() -> Pipeline:
-    @pipefunc(output_name="result")
-    def slow_increment(x: int) -> int:
-        time.sleep(0.05)
-        return x + 1
-
-    return Pipeline([slow_increment])
-
-
-@pytest.fixture
 def fast_scalar_pipeline() -> Pipeline:
     @pipefunc(output_name="result")
     def increment(x: int) -> int:

@@ -13,9 +13,6 @@ kernelspec:
 
 # Persisted Run Inspection
 
-```{try-notebook}
-```
-
 ```{contents} ToC
 :depth: 2
 ```
