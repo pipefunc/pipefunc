@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import cloudpickle
+import cloudpickle  # type: ignore[import-untyped]
 import numpy as np
 
 from pipefunc._utils import dump, load
@@ -37,6 +37,7 @@ class FileArray(StorageBase):
     __getitem__ returns "np.ma.masked" for non-existent files.
     """
 
+    folder: Path
     storage_id = "file_array"
     requires_serialization = True
 

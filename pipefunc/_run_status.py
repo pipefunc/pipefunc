@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from pipefunc._run_status_heartbeat import (
     _overall_progress,
@@ -343,7 +343,8 @@ def _storage_name_for_output(storage: str | dict[Any, str], output_name: str) ->
 
 
 def _storage_bytes(storage: StorageBase) -> int:
-    folder = cast("str | Path", cast("Any", storage).folder)
+    folder = storage.folder
+    assert folder is not None
     return sum(path.stat().st_size for path in Path(folder).rglob("*") if path.is_file())
 
 
