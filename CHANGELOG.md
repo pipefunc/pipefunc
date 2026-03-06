@@ -5,6 +5,285 @@ If it is out of date, please run
 
 GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 
+## v0.91.1 (2026-03-06)
+
+### 🧹 Maintenance
+
+- suppress google-crc32c pure-python fallback warning ([#942](https://github.com/pipefunc/pipefunc/pull/942))
+
+### 📊 Stats
+
+- `.md`: +0 lines, -3 lines
+- `.py`: +9 lines, -12 lines
+
+## v0.91.0 (2026-03-06)
+
+### ✨ Enhancements
+
+- harden persisted run status error handling ([#940](https://github.com/pipefunc/pipefunc/pull/940))
+- Add persisted run status CLI ([#938](https://github.com/pipefunc/pipefunc/pull/938))
+
+### 📦 Dependencies
+
+- ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.10.8 ([#937](https://github.com/pipefunc/pipefunc/pull/937))
+- ⬆️ Update release-drafter/release-drafter action to v6.3.0 ([#939](https://github.com/pipefunc/pipefunc/pull/939))
+
+### 🧪 Testing
+
+- Add tests to reach 100% code coverage ([#936](https://github.com/pipefunc/pipefunc/pull/936))
+
+### 📊 Stats
+
+- `.yaml`: +1 lines, -1 lines
+- `.md`: +130 lines, -0 lines
+- `.py`: +1900 lines, -119 lines
+- `.toml`: +3 lines, -0 lines
+- `other`: +1 lines, -1 lines
+
+## v0.90.3 (2026-02-06)
+
+### 🐛 Bug Fixes
+
+- Fix Slurm executor validation in launch_maps ([#912](https://github.com/pipefunc/pipefunc/pull/912))
+
+### 📦 Dependencies
+
+- ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.10.0 ([#931](https://github.com/pipefunc/pipefunc/pull/931))
+- ⬆️ Update release-drafter/release-drafter action to v6.2.0 ([#933](https://github.com/pipefunc/pipefunc/pull/933))
+- ⬆️ Update python to v3.14.3 ([#934](https://github.com/pipefunc/pipefunc/pull/934))
+- ⬆️ Update release-drafter/release-drafter action to v6.1.1 ([#932](https://github.com/pipefunc/pipefunc/pull/932))
+- ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.9.24 ([#930](https://github.com/pipefunc/pipefunc/pull/930))
+
+### 🧪 Testing
+
+- Add regression test for SlurmExecutor reuse across pipeline generations ([#935](https://github.com/pipefunc/pipefunc/pull/935))
+
+### 📊 Stats
+
+- `.yml`: +1 lines, -1 lines
+- `.yaml`: +2 lines, -2 lines
+- `.py`: +106 lines, -12 lines
+- `other`: +1 lines, -1 lines
+
+## v0.90.2 (2026-01-05)
+
+### 📝 Other
+
+- Fix CI failure on Python 3.13/3.14 with numpy 2.4.0+ ([#929](https://github.com/pipefunc/pipefunc/pull/929))
+
+### 📦 Dependencies
+
+- ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.9.21 ([#928](https://github.com/pipefunc/pipefunc/pull/928))
+
+### 📊 Stats
+
+- `.py`: +1 lines, -1 lines
+- `other`: +1 lines, -1 lines
+
+## v0.90.1 (2025-12-12)
+
+### 📝 Other
+
+- Add concise __repr__ methods to ErrorSnapshot and PropagatedErrorSnapshot ([#927](https://github.com/pipefunc/pipefunc/pull/927))
+
+### 📊 Stats
+
+- `.py`: +13 lines, -2 lines
+
+## v0.90.0 (2025-12-12)
+
+### ✨ Enhancements
+
+- `error_handling` options (`raise` and `continue`) ([#854](https://github.com/pipefunc/pipefunc/pull/854))
+
+### 📦 Dependencies
+
+- ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.9.17 ([#922](https://github.com/pipefunc/pipefunc/pull/922))
+- ⬆️ Update python to v3.14.2 ([#926](https://github.com/pipefunc/pipefunc/pull/926))
+
+### 📊 Stats
+
+- `.yml`: +1 lines, -1 lines
+- `.yaml`: +1 lines, -1 lines
+- `.md`: +135 lines, -45 lines
+- `.py`: +4852 lines, -158 lines
+- `other`: +6 lines, -2 lines
+
+## v0.89.0 (2025-12-03)
+
+### Closed Issues
+
+- Results.to_dataframe() fails for scalar outputs with __getitem__ ([#924](https://github.com/pipefunc/pipefunc/issues/924))
+
+### 📦 Dependencies
+
+- ⬆️ Update actions/checkout action to v6 ([#923](https://github.com/pipefunc/pipefunc/pull/923))
+- ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.9.7 ([#908](https://github.com/pipefunc/pipefunc/pull/908))
+
+### 🐛 Bug Fixes
+
+- Fix Results.to_dataframe() for scalar outputs with __getitem__ ([#925](https://github.com/pipefunc/pipefunc/pull/925))
+
+### 🧹 Maintenance
+
+- Deprecate `cleanup` parameter in favor of `resume` parameter  ([#921](https://github.com/pipefunc/pipefunc/pull/921))
+
+### ✨ Enhancements
+
+- Add `reuse_validation` parameter to `pipeline.map()` ([#920](https://github.com/pipefunc/pipefunc/pull/920))
+
+### 📚 Documentation
+
+- Fix 'Function Chaining Helper' docs typo ([#919](https://github.com/pipefunc/pipefunc/pull/919))
+
+### 📊 Stats
+
+- `.yml`: +6 lines, -6 lines
+- `.yaml`: +1 lines, -1 lines
+- `.md`: +5 lines, -5 lines
+- `.py`: +783 lines, -51 lines
+- `other`: +1 lines, -1 lines
+
+## v0.88.0 (2025-11-04)
+
+### 📚 Documentation
+
+- Add missing 'Function Chaining Helper' in index ([#918](https://github.com/pipefunc/pipefunc/pull/918))
+
+### ✨ Enhancements
+
+- Add `pipefunc.helpers.chain` for auto-renaming linear pipelines ([#909](https://github.com/pipefunc/pipefunc/pull/909))
+- Support and require Zarr v3 ([#523](https://github.com/pipefunc/pipefunc/pull/523))
+- Extend `AsyncMap.result()` for use in scripts ([#911](https://github.com/pipefunc/pipefunc/pull/911))
+
+### 🤖 CI
+
+- Add Python 3.14 variants to pytest uv workflow ([#913](https://github.com/pipefunc/pipefunc/pull/913))
+- Fix free-threaded dependencies ([#917](https://github.com/pipefunc/pipefunc/pull/917))
+
+### 🧪 Testing
+
+- Allow async map call order variance ([#916](https://github.com/pipefunc/pipefunc/pull/916))
+
+### 🧹 Maintenance
+
+- Drop Python 3.10 support ([#914](https://github.com/pipefunc/pipefunc/pull/914))
+
+### 📦 Dependencies
+
+- ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.9.4 ([#904](https://github.com/pipefunc/pipefunc/pull/904))
+- ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.9.1 ([#900](https://github.com/pipefunc/pipefunc/pull/900))
+
+### 📝 Other
+
+- Add ProcessPool error snapshot regression test ([#907](https://github.com/pipefunc/pipefunc/pull/907))
+- Skip SLURM tests when /bin/bash is missing ([#906](https://github.com/pipefunc/pipefunc/pull/906))
+
+### 📊 Stats
+
+- `.yml`: +9 lines, -9 lines
+- `.md`: +91 lines, -0 lines
+- `.py`: +1053 lines, -92 lines
+- `.toml`: +6 lines, -5 lines
+- `other`: +1 lines, -1 lines
+
+## v0.87.1 (2025-10-10)
+
+### 📚 Documentation
+
+- Add comparison section with Hamilton ([#502](https://github.com/pipefunc/pipefunc/pull/502))
+
+### 🐛 Bug Fixes
+
+- Fix 1D array single outputs stored as coordinates instead of data variables ([#899](https://github.com/pipefunc/pipefunc/pull/899))
+
+### 📊 Stats
+
+- `.md`: +27 lines, -0 lines
+- `.py`: +287 lines, -15 lines
+
+## v0.87.0 (2025-10-09)
+
+### 🐛 Bug Fixes
+
+- Fix path resolution and add legacy format support for RunInfo.load ([#898](https://github.com/pipefunc/pipefunc/pull/898))
+- Fix path resolution when loading from different working directory ([#893](https://github.com/pipefunc/pipefunc/pull/893))
+- Fix load_dataframe failing on list/tuple outputs not in mapspec ([#892](https://github.com/pipefunc/pipefunc/pull/892))
+
+### ✨ Enhancements
+
+- Add first-class Polars DataFrame support ([#882](https://github.com/pipefunc/pipefunc/pull/882))
+- Add rename_axes method to ArraySpec and MapSpec and add PipeFunc.update_mapspec_axes ([#889](https://github.com/pipefunc/pipefunc/pull/889))
+
+### 📝 Other
+
+- Revert "BUG: Fix path resolution when loading from different working directory (#893)" ([#897](https://github.com/pipefunc/pipefunc/pull/897))
+
+### 📚 Documentation
+
+- Add MCP Server Integration documentation ([#891](https://github.com/pipefunc/pipefunc/pull/891))
+
+### 🧹 Maintenance
+
+- Skip coverage on version branch (get to 100%) ([#894](https://github.com/pipefunc/pipefunc/pull/894))
+- Update fastmcp to >=2.12.0 and fix compatibility issues ([#890](https://github.com/pipefunc/pipefunc/pull/890))
+- Factor out `_get_item_sliced` from `DictArray.__getitem__` to simplify diff of #720 ([#884](https://github.com/pipefunc/pipefunc/pull/884))
+
+### 📦 Dependencies
+
+- ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.9.0 ([#885](https://github.com/pipefunc/pipefunc/pull/885))
+- ⬆️ Update astral-sh/setup-uv action to v7 ([#888](https://github.com/pipefunc/pipefunc/pull/888))
+- ⬆️ Update github/codeql-action action to v4 ([#887](https://github.com/pipefunc/pipefunc/pull/887))
+- ⬆️ Update python to v3.14.0 ([#886](https://github.com/pipefunc/pipefunc/pull/886))
+- ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.8.23 ([#753](https://github.com/pipefunc/pipefunc/pull/753))
+- ⬆️ Update actions/checkout action to v5 ([#870](https://github.com/pipefunc/pipefunc/pull/870))
+- ⬆️ Update CodSpeedHQ/action action to v4 ([#872](https://github.com/pipefunc/pipefunc/pull/872))
+- ⬆️ Update actions/setup-python action to v6 ([#873](https://github.com/pipefunc/pipefunc/pull/873))
+
+### 🧪 Testing
+
+- add regression coverage for regular arrays ([#883](https://github.com/pipefunc/pipefunc/pull/883))
+
+### 🤖 CI
+
+- Set `mode: instrumentation` in codspeed.yml ([#875](https://github.com/pipefunc/pipefunc/pull/875))
+
+### 📊 Stats
+
+- `.yml`: +20 lines, -21 lines
+- `.yaml`: +3 lines, -3 lines
+- `.md`: +238 lines, -0 lines
+- `.py`: +1013 lines, -115 lines
+- `.toml`: +5 lines, -3 lines
+- `other`: +3 lines, -1 lines
+
+## v0.86.0 (2025-09-10)
+
+### ✨ Enhancements
+
+- Extract type annotations from NamedTuple return types ([#874](https://github.com/pipefunc/pipefunc/pull/874))
+
+### 📦 Dependencies
+
+- ⬆️ Update python to v3.13.7 ([#869](https://github.com/pipefunc/pipefunc/pull/869))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#861](https://github.com/pipefunc/pipefunc/pull/861))
+
+### 📚 Documentation
+
+- Add `llms.txt` and `llms-full.txt` to the documentation ([#866](https://github.com/pipefunc/pipefunc/pull/866))
+- Update `CHANGELOG.md` until v0.85.2 ([#864](https://github.com/pipefunc/pipefunc/pull/864))
+
+### 📊 Stats
+
+- `.yml`: +3 lines, -1 lines
+- `.yaml`: +3 lines, -3 lines
+- `.md`: +115 lines, -1 lines
+- `.py`: +146 lines, -0 lines
+- `.toml`: +2 lines, -0 lines
+
 ## v0.85.2 (2025-07-15)
 
 ### ✨ Enhancements
@@ -25,6 +304,10 @@ GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 - `.py`: +145 lines, -63 lines
 
 ## v0.85.1 (2025-07-10)
+
+### Closed Issues
+
+- BUG: `Pipeline.update_defaults` with inputs that do not support `__eq__` fails. ([#856](https://github.com/pipefunc/pipefunc/issues/856))
 
 ### 🐛 Bug Fixes
 
@@ -88,6 +371,10 @@ GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 - `.toml`: +4 lines, -1 lines
 
 ## v0.83.0 (2025-06-20)
+
+### Closed Issues
+
+- update_defaults does not allow for a scope-keyed nested dictionary ([#810](https://github.com/pipefunc/pipefunc/issues/810))
 
 ### 🧹 Maintenance
 
@@ -164,6 +451,10 @@ GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 - `.py`: +240 lines, -25 lines
 
 ## v0.82.0 (2025-06-18)
+
+### Closed Issues
+
+- `Pipeline.subpipeline` handles optional inputs as required when validating new `root_args` ([#825](https://github.com/pipefunc/pipefunc/issues/825))
 
 ### ✨ Enhancements
 
@@ -399,6 +690,11 @@ GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 - `.py`: +44 lines, -11 lines
 
 ## v0.74.0 (2025-05-12)
+
+### Closed Issues
+
+- Have visual indicator if `map_async`'s task fails ([#752](https://github.com/pipefunc/pipefunc/issues/752))
+- Enhancement: Allow `chunksizes={"": None, "outp": 10}` ([#751](https://github.com/pipefunc/pipefunc/issues/751))
 
 ### ✨ Enhancements
 
