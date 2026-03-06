@@ -94,11 +94,20 @@ pipefunc-cli watch runs/my-run --interval 1 --timeout 300 --pretty
 This is useful when `map_async` is running in another process and you want to
 tail progress from a second terminal.
 
+```{important}
+Live heartbeat-based monitoring requires progress tracking to be enabled for the
+async run. In scripts or services, use `show_progress="headless"` with
+{meth}`~pipefunc.Pipeline.map_async` when you want `pipefunc-cli` to report live
+`running`, `failed`, or `cancelled` states without rendering a progress UI.
+Without a heartbeat file, `pipefunc-cli` falls back to filesystem heuristics.
+```
+
 ## How Status Is Determined
 
-For live async runs, `pipefunc` writes a `pipefunc_status.json` heartbeat. When
-that file is present and valid, `pipefunc-cli` prefers it because it can report
-live states such as `running`, `failed`, or `cancelled`.
+For async runs with progress tracking enabled, `pipefunc` writes a
+`pipefunc_status.json` heartbeat. When that file is present and valid,
+`pipefunc-cli` prefers it because it can report live states such as `running`,
+`failed`, or `cancelled`.
 
 When no heartbeat is available, status is inferred from the persisted run
 folder itself:
