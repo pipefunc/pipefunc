@@ -630,6 +630,17 @@ def test_status_from_run_folder_corrupted_run_info_shapes(
     assert status["outputs"]["values"]["bytes"] > 0
 
 
+def test_status_from_run_folder_corrupted_run_info_json_returns_error(tmp_path: Path) -> None:
+    run_folder = tmp_path / "corrupt-run-info"
+    run_folder.mkdir()
+    (run_folder / "run_info.json").write_text("{")
+
+    status = status_from_run_folder(run_folder)
+
+    assert status["status"] == "error"
+    assert "Expecting property name enclosed in double quotes" in status["error"]
+
+
 def test_list_runs_handles_corrupted_storage_metadata(
     mapspec_pipeline: Pipeline,
     tmp_path: Path,
@@ -645,6 +656,55 @@ def test_list_runs_handles_corrupted_storage_metadata(
 
     assert statuses["runs"][0]["status"] == "error"
     assert "Cannot find storage class" in statuses["runs"][0]["error"]
+
+
+def test_status_from_run_folder_corrupted_storage_metadata_returns_error(
+    mapspec_pipeline: Pipeline,
+    tmp_path: Path,
+) -> None:
+    run_folder = tmp_path / "broken-storage-status"
+    mapspec_pipeline.map(inputs={"x": [1, 2, 3]}, run_folder=run_folder, parallel=False)
+
+    run_info_json = _load_run_info_json(run_folder)
+    run_info_json["storage"] = {}
+    _write_run_info_json(run_folder, run_info_json)
+
+    status = status_from_run_folder(run_folder)
+
+    assert status["status"] == "error"
+    assert "Cannot find storage class" in status["error"]
+
+
+@pytest.mark.asyncio
+async def test_status_from_run_folder_heartbeat_reports_output_metadata_error(
+    slow_pipeline: Pipeline,
+    tmp_path: Path,
+) -> None:
+    run_folder = tmp_path / "heartbeat-broken-storage"
+    executor = ThreadPoolExecutor(max_workers=1)
+    runner = slow_pipeline.map_async(
+        inputs={"x": list(range(6))},
+        run_folder=run_folder,
+        executor=executor,
+        display_widgets=False,
+    )
+    try:
+        await _wait_for_heartbeat_status(run_folder)
+
+        run_info_json = _load_run_info_json(run_folder)
+        run_info_json["storage"] = {}
+        _write_run_info_json(run_folder, run_info_json)
+
+        status = status_from_run_folder(run_folder)
+
+        assert status["status_source"] == "heartbeat"
+        assert status["status"] in {"pending", "running", "completed"}
+        assert "Cannot find storage class" in status["error"]
+        assert "values" in status["outputs"]
+        assert "function_name" in status["outputs"]["values"]
+    finally:
+        await runner.task
+        executor.shutdown(wait=True)
 
 
 def test_status_from_run_folder_invalid_heartbeat_falls_back_to_disk(
@@ -696,6 +756,22 @@ def test_status_from_run_folder_invalid_heartbeat_timestamp(
     assert status["status_source"] == "heartbeat"
     assert status["stale"] is False
     assert status["outputs"]["result"]["bytes"] > 0
+
+
+def test_status_from_run_folder_invalid_heartbeat_payload_returns_error(
+    simple_pipeline: Pipeline,
+    tmp_path: Path,
+) -> None:
+    run_folder = tmp_path / "invalid-heartbeat-payload"
+    simple_pipeline.map(inputs={"x": 1, "y": 2}, run_folder=run_folder, parallel=False)
+
+    heartbeat_path = run_folder / "pipefunc_status.json"
+    heartbeat_path.write_text(json.dumps(["not-a-mapping"]))
+
+    status = status_from_run_folder(run_folder)
+
+    assert status["status"] == "error"
+    assert "dictionary update sequence element" in status["error"]
 
 
 def test_list_run_statuses(completed_run_folder: Path) -> None:
@@ -834,3 +910,23 @@ def test_status_cli_missing_run_folder(capsys: pytest.CaptureFixture) -> None:
     assert code == 1
     assert payload["status"] == "missing"
     assert "error" in payload
+
+
+def test_status_cli_corrupted_storage_returns_json_error(
+    mapspec_pipeline: Pipeline,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture,
+) -> None:
+    run_folder = tmp_path / "cli-broken-storage"
+    mapspec_pipeline.map(inputs={"x": [1, 2, 3]}, run_folder=run_folder, parallel=False)
+
+    run_info_json = _load_run_info_json(run_folder)
+    run_info_json["storage"] = {}
+    _write_run_info_json(run_folder, run_info_json)
+
+    code = main(["status", str(run_folder)])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert code == 1
+    assert payload["status"] == "error"
+    assert "Cannot find storage class" in payload["error"]
