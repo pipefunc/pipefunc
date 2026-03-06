@@ -8,7 +8,7 @@ import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-import cloudpickle
+import cloudpickle  # type: ignore[import-untyped]
 import numpy as np
 import zarr  # noqa: TC002
 from numcodecs.abc import Codec
