@@ -40,37 +40,28 @@ def status_from_run_folder(
     """
     try:
         metadata, run_info_json, run_info_path = _load_run_metadata(run_folder)
-    except Exception as e:  # noqa: BLE001
+    except FileNotFoundError as e:
         return _error_status_result(run_folder=run_folder, error=e, status="missing")
+    except Exception as e:  # noqa: BLE001
+        return _error_status_result(run_folder=run_folder, error=e, status="error")
 
     heartbeat = load_run_status_heartbeat(run_folder)
     if heartbeat is not None:
-        return _status_from_heartbeat(
-            heartbeat,
-            run_folder=metadata["run_folder"],
-            disk_outputs=_progress_info_from_disk(metadata)[0] if include_outputs else None,
+        return _heartbeat_status_result(
+            heartbeat=heartbeat,
+            metadata=metadata,
             run_info_json=run_info_json,
             include_outputs=include_outputs,
             include_run_info=include_run_info,
         )
 
-    outputs, all_complete = _progress_info_from_disk(metadata)
-    progress_fraction = _overall_progress(outputs)
-    status = _derive_status(all_complete=all_complete, progress_fraction=progress_fraction)
-
-    result = _build_status_result(
-        run_folder=metadata["run_folder"],
-        status=status,
-        status_source="disk_heuristic",
-        outputs=outputs,
-        last_modified=_isoformat_timestamp(run_info_path.stat().st_mtime),
-        pipefunc_version=run_info_json.get("pipefunc_version", "unknown"),
+    return _disk_status_result(
+        metadata=metadata,
+        run_info_json=run_info_json,
+        run_info_path=run_info_path,
+        include_outputs=include_outputs,
+        include_run_info=include_run_info,
     )
-    if include_outputs:
-        result["outputs"] = outputs
-    if include_run_info:
-        result["run_info"] = run_info_json
-    return result
 
 
 def list_run_statuses(
@@ -110,10 +101,7 @@ def list_run_statuses(
         candidates = candidates[:max_runs]
 
     for _mtime, run_folder in candidates:
-        try:
-            status = status_from_run_folder(run_folder, include_outputs=False)
-        except Exception as e:  # noqa: BLE001
-            status = _error_status_result(run_folder=run_folder, error=e, status="error")
+        status = status_from_run_folder(run_folder, include_outputs=False)
         result["runs"].append(status)
 
     result["total_count"] = len(result["runs"])
@@ -242,6 +230,69 @@ def _status_from_heartbeat(
     else:
         result.pop("run_info", None)
     return add_heartbeat_staleness(result)
+
+
+def _heartbeat_status_result(
+    *,
+    heartbeat: dict[str, Any],
+    metadata: dict[str, Any],
+    run_info_json: dict[str, Any],
+    include_outputs: bool,
+    include_run_info: bool,
+) -> dict[str, Any]:
+    disk_outputs = None
+    output_metadata_error = None
+    if include_outputs:
+        try:
+            disk_outputs = _progress_info_from_disk(metadata)[0]
+        except Exception as e:  # noqa: BLE001
+            output_metadata_error = str(e)
+
+    try:
+        result = _status_from_heartbeat(
+            heartbeat,
+            run_folder=metadata["run_folder"],
+            disk_outputs=disk_outputs,
+            run_info_json=run_info_json,
+            include_outputs=include_outputs,
+            include_run_info=include_run_info,
+        )
+    except Exception as e:  # noqa: BLE001
+        return _error_status_result(run_folder=metadata["run_folder"], error=e, status="error")
+
+    if output_metadata_error is not None:
+        result["error"] = output_metadata_error
+    return result
+
+
+def _disk_status_result(
+    *,
+    metadata: dict[str, Any],
+    run_info_json: dict[str, Any],
+    run_info_path: Path,
+    include_outputs: bool,
+    include_run_info: bool,
+) -> dict[str, Any]:
+    try:
+        outputs, all_complete = _progress_info_from_disk(metadata)
+        progress_fraction = _overall_progress(outputs)
+        status = _derive_status(all_complete=all_complete, progress_fraction=progress_fraction)
+        result = _build_status_result(
+            run_folder=metadata["run_folder"],
+            status=status,
+            status_source="disk_heuristic",
+            outputs=outputs,
+            last_modified=_isoformat_timestamp(run_info_path.stat().st_mtime),
+            pipefunc_version=run_info_json.get("pipefunc_version", "unknown"),
+        )
+    except Exception as e:  # noqa: BLE001
+        return _error_status_result(run_folder=metadata["run_folder"], error=e, status="error")
+
+    if include_outputs:
+        result["outputs"] = outputs
+    if include_run_info:
+        result["run_info"] = run_info_json
+    return result
 
 
 def _merge_disk_output_metadata(
