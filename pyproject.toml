@@ -107,6 +107,9 @@ homepage = "https://pipefunc.readthedocs.io/"
 documentation = "https://pipefunc.readthedocs.io/"
 repository = "https://github.com/pipefunc/pipefunc"
 
+[project.scripts]
+pipefunc-cli = "pipefunc._run_status_cli:main"
+
 [project.readme]
 content-type = "text/markdown"
 file = "README.md"

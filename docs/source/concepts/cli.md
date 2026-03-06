@@ -17,6 +17,12 @@ The {meth}`~pipefunc.Pipeline.cli()` method provides an out‐of‐the‐box com
 This feature leverages your pipeline’s input schema—generated automatically via Pydantic—and even extracts detailed parameter descriptions from your docstrings.
 With a single call to `pipeline.cli()`, you can run your entire pipeline without writing any additional command-line parsing code, load inputs from a JSON file, or simply view the pipeline documentation.
 
+```{note}
+This page is about generating a CLI for a specific pipeline via
+{meth}`~pipefunc.Pipeline.cli`. For inspecting persisted run folders after a
+`map` or `map_async` call, see [Persisted Run Inspection](./run-status).
+```
+
 In other words, you can:
 
 - **Automatically generate a CLI** from your pipeline’s input parameters.

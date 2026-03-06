@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
 from pipefunc._utils import at_least_tuple, is_installed, is_running_in_ipynb, requires
@@ -10,6 +10,7 @@ from ._shapes import shape_is_resolved
 from ._storage_array._base import StorageBase
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from concurrent.futures import Future
 
     from pipefunc import PipeFunc
@@ -30,6 +31,11 @@ class Status:
     n_failed: int = 0
     start_time: float | None = None
     end_time: float | None = None
+    _update_callbacks: list[Callable[[], None]] = field(
+        default_factory=list,
+        repr=False,
+        compare=False,
+    )
 
     @property
     def n_left(self) -> int:
@@ -39,6 +45,7 @@ class Status:
         if self.start_time is None:
             self.start_time = time.monotonic()
         self.n_in_progress += n
+        self._notify_updated()
 
     def mark_complete(
         self,
@@ -59,6 +66,7 @@ class Status:
 
         if self.n_total is not None and self.n_attempted >= self.n_total:
             self.end_time = time.monotonic()
+        self._notify_updated()
 
     @property
     def progress(self) -> float:
@@ -88,6 +96,14 @@ class Status:
         if progress == 0:
             return None
         return (1.0 - progress) * (elapsed_time / progress)
+
+    def add_update_callback(self, callback: Callable[[], None]) -> None:
+        if callback not in self._update_callbacks:
+            self._update_callbacks.append(callback)
+
+    def _notify_updated(self) -> None:
+        for callback in self._update_callbacks:
+            callback()
 
 
 def _progress_tracker_implementation(

@@ -22,6 +22,7 @@ from pipefunc._error_handling import (
     scan_inputs_for_errors,
 )
 from pipefunc._pipefunc_utils import handle_pipefunc_error
+from pipefunc._run_status_heartbeat import FunctionStatusBinding, RunStatusHeartbeatWriter
 from pipefunc._utils import (
     at_least_tuple,
     dump,
@@ -54,7 +55,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine, Generator, Iterable, Sequence
 
     import pydantic
-    from adaptive_scheduler import MultiRunManager
+    from adaptive_scheduler import MultiRunManager  # type: ignore[import-untyped]
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
@@ -278,6 +279,7 @@ class AsyncMap:
     progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None
     multi_run_manager: MultiRunManager | None
     status_widget: AsyncTaskStatusWidget | None
+    heartbeat: RunStatusHeartbeatWriter | None
     _run_pipeline: Callable[[], Coroutine[Any, Any, ResultDict]]
     _display_widgets: bool
     _prepared: Prepared
@@ -373,6 +375,8 @@ class AsyncMap:
         task.add_done_callback(self._cache_task_result)
         if self.progress is not None:
             self.progress.attach_task(task)
+        if self.heartbeat is not None:
+            self.heartbeat.attach_task(task)
         self.status_widget = maybe_async_task_status_widget(task)
         if self._display_widgets:
             self.display()
@@ -594,7 +598,6 @@ def run_map_async(
         multi_run_manager,
         start,
         display_widgets,
-        prep,
     )
 
 
@@ -604,20 +607,37 @@ def _finalize_run_map_async(
     multi_run_manager: MultiRunManager | None,
     start: bool,
     display_widgets: bool,
-    prepared: Prepared,
 ) -> AsyncMap:
     async_map = AsyncMap(
         run_info=prep.run_info,
         progress=prep.progress,
         multi_run_manager=multi_run_manager,
         status_widget=None,
+        heartbeat=_maybe_create_run_status_heartbeat(prep),
         _run_pipeline=run_pipeline,
         _display_widgets=display_widgets,
-        _prepared=prepared,
+        _prepared=prep,
     )
     if start:
         async_map.start()
     return async_map
+
+
+def _maybe_create_run_status_heartbeat(prep: Prepared) -> RunStatusHeartbeatWriter | None:
+    if prep.run_info.run_folder is None or prep.progress is None:
+        return None
+    function_bindings = {
+        func.output_name: FunctionStatusBinding(
+            function_name=func.__name__,
+            output_names=at_least_tuple(func.output_name),
+        )
+        for func in prep.pipeline.sorted_functions
+    }
+    return RunStatusHeartbeatWriter(
+        run_info=prep.run_info,
+        progress_dict=prep.progress.progress_dict,
+        function_bindings=function_bindings,
+    )
 
 
 def _maybe_persist_memory(

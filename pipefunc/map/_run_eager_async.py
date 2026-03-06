@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     import pydantic
-    from adaptive_scheduler import MultiRunManager
+    from adaptive_scheduler import MultiRunManager  # type: ignore[import-untyped]
 
     from pipefunc import Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
@@ -253,7 +253,6 @@ def run_map_eager_async(
         multi_run_manager,
         start,
         display_widgets,
-        prep,
     )
 
 

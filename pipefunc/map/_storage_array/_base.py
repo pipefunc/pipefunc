@@ -49,6 +49,7 @@ def select_by_mask(
 class StorageBase(abc.ABC):
     """Base class for file-based arrays."""
 
+    folder: Path | None
     shape: ShapeTuple
     internal_shape: ShapeTuple
     shape_mask: tuple[bool, ...]

@@ -89,7 +89,13 @@ def prepare_run(
     )
     outputs = ResultDict(_inputs_=inputs, _pipeline_=pipeline)
     store = run_info.init_store()
-    progress = init_tracker(store, pipeline.sorted_functions, show_progress, in_async)
+    progress = _create_progress_tracker(
+        store=store,
+        pipeline=pipeline,
+        run_folder=run_info.run_folder,
+        show_progress=show_progress,
+        in_async=in_async,
+    )
     if executor is None and _cannot_be_parallelized(pipeline):
         parallel = False
     _check_parallel(parallel, store, executor)
@@ -100,6 +106,22 @@ def prepare_run(
         # If in_async, the progress is displayed in the `_finalize_run_map_async` function
         progress.display()
     return Prepared(pipeline, run_info, store, outputs, parallel, executor, chunksizes, progress)
+
+
+def _create_progress_tracker(
+    *,
+    store: dict[str, StoreType],
+    pipeline: Pipeline,
+    run_folder: Path | None,
+    show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None,
+    in_async: bool,
+) -> IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None:
+    progress = init_tracker(store, pipeline.sorted_functions, show_progress, in_async)
+    if progress is not None:
+        return progress
+    if in_async and run_folder is not None and show_progress is not False:
+        return init_tracker(store, pipeline.sorted_functions, "headless", in_async)
+    return None
 
 
 T = TypeVar("T")
