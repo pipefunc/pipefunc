@@ -28,11 +28,10 @@ __all__ = [
 ]
 
 with _suppress(ImportError):
-    import warnings as _warnings
+    import warnings
 
     # Suppress google-crc32c pure-python fallback warning (via zarr → numcodecs)
-    _warnings.filterwarnings("ignore", message=".*google-crc32c.*", category=RuntimeWarning)
-    del _warnings
+    warnings.filterwarnings("ignore", message=".*google-crc32c.*", category=RuntimeWarning)
 
     from ._storage_array._zarr import ZarrFileArray, ZarrMemoryArray, ZarrSharedMemoryArray
 
