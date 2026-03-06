@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -97,6 +98,15 @@ def mapspec_pipeline() -> Pipeline:
 
 
 @pytest.fixture
+def multi_output_mapspec_pipeline() -> Pipeline:
+    @pipefunc(output_name=("a", "b"), mapspec="x[i] -> a[i], b[i]")
+    def split(x: int) -> tuple[int, int]:
+        return x, 2 * x
+
+    return Pipeline([split])
+
+
+@pytest.fixture
 def failing_pipeline() -> Pipeline:
     @pipefunc(output_name="values", mapspec="x[i] -> values[i]")
     def sometimes_fail(x: int) -> int:
@@ -182,6 +192,21 @@ def test_status_from_run_folder_completed(completed_run_folder: Path) -> None:
     assert status["outputs"]["result"]["progress"] == 1.0
 
 
+def test_status_from_relocated_run_folder(simple_pipeline: Pipeline, tmp_path: Path) -> None:
+    original_run_folder = tmp_path / "original-run"
+    relocated_run_folder = tmp_path / "relocated-run"
+    simple_pipeline.map(inputs={"x": 1, "y": 2}, run_folder=original_run_folder, parallel=False)
+
+    shutil.copytree(original_run_folder, relocated_run_folder)
+    shutil.rmtree(original_run_folder)
+
+    status = status_from_run_folder(relocated_run_folder)
+
+    assert status["status"] == "completed"
+    assert status["run_folder"] == str(relocated_run_folder.absolute())
+    assert status["outputs"]["result"]["bytes"] > 0
+
+
 @pytest.mark.asyncio
 async def test_status_from_run_folder_incomplete(slow_pipeline: Pipeline, tmp_path: Path) -> None:
     run_folder = tmp_path / "incomplete"
@@ -265,6 +290,39 @@ async def test_list_run_statuses_compact_heartbeat_view(
         assert payload["runs"][0]["status_source"] == "heartbeat"
         assert "outputs" not in payload["runs"][0]
     finally:
+        await runner.task
+        executor.shutdown(wait=True)
+
+
+@pytest.mark.asyncio
+async def test_list_run_statuses_skips_disk_scan_for_heartbeat_runs(
+    blocking_scalar_pipeline: BlockingScalarPipeline,
+    tmp_path: Path,
+) -> None:
+    run_folder = tmp_path / "heartbeat-compact"
+    executor = ThreadPoolExecutor(max_workers=1)
+    runner = blocking_scalar_pipeline.pipeline.map_async(
+        inputs={"x": 1},
+        run_folder=run_folder,
+        executor=executor,
+        display_widgets=False,
+    )
+    try:
+        await _wait_for_status(run_folder, predicate=lambda s: s["status"] == "running")
+
+        run_info_json = _load_run_info_json(run_folder)
+        run_info_json["storage"] = {}
+        _write_run_info_json(run_folder, run_info_json)
+
+        status = status_from_run_folder(run_folder, include_outputs=False)
+        payload = list_run_statuses(tmp_path)
+
+        assert status["status_source"] == "heartbeat"
+        assert "outputs" not in status
+        assert payload["runs"][0]["status_source"] == "heartbeat"
+        assert payload["runs"][0]["run_folder"] == str(run_folder.absolute())
+    finally:
+        blocking_scalar_pipeline.release.set()
         await runner.task
         executor.shutdown(wait=True)
 
@@ -495,6 +553,12 @@ def test_load_outputs_all(completed_run_folder: Path) -> None:
     assert payload == {"result": 7}
 
 
+def test_load_outputs_unknown_output(completed_run_folder: Path) -> None:
+    payload = load_outputs(completed_run_folder, ["does_not_exist"])
+
+    assert payload["error"] == "Unknown output names: ['does_not_exist']"
+
+
 def test_run_info_success(completed_run_folder: Path) -> None:
     payload = run_info(completed_run_folder)
 
@@ -524,6 +588,27 @@ def test_status_from_run_folder_dict_storage_unknown_progress(
         "complete": False,
         "bytes": 0,
     }
+
+
+def test_status_from_run_folder_tuple_storage_override(
+    multi_output_mapspec_pipeline: Pipeline,
+    tmp_path: Path,
+) -> None:
+    run_folder = tmp_path / "tuple-storage"
+    multi_output_mapspec_pipeline.map(
+        inputs={"x": [1, 2, 3]},
+        run_folder=run_folder,
+        storage={"a": "file_array"},
+        parallel=False,
+    )
+
+    run_info_json = _load_run_info_json(run_folder)
+    status = status_from_run_folder(run_folder)
+
+    assert "a,b" in run_info_json["storage"]
+    assert status["status"] == "completed"
+    assert status["outputs"]["a"]["complete"] is True
+    assert status["outputs"]["b"]["complete"] is True
 
 
 def test_status_from_run_folder_corrupted_run_info_shapes(

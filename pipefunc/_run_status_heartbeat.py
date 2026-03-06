@@ -10,7 +10,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from pipefunc._utils import at_least_tuple
 
@@ -61,8 +61,7 @@ class RunStatusHeartbeatWriter:
 
     def write_now(self, *, task: asyncio.Task[Any] | None = None) -> None:
         """Write the current heartbeat snapshot immediately."""
-        run_folder = self.run_info.run_folder
-        assert run_folder is not None
+        run_folder = cast("Path", self.run_info.run_folder)
         payload = build_run_status_snapshot(
             run_info=self.run_info,
             progress_dict=self.progress_dict,

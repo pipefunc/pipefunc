@@ -97,6 +97,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional timeout in seconds. Exits with code 2 on timeout.",
     )
+    watch_parser.add_argument(
+        "--pretty",
+        action="store_true",
+        help="Pretty-print the JSON output.",
+    )
     return parser
 
 
@@ -104,7 +109,7 @@ def _watch_command(args: argparse.Namespace) -> int:
     started = time.monotonic()
     while True:
         payload = status_from_run_folder(args.run_folder, include_outputs=True)
-        _print_json(payload, pretty=False)
+        _print_json(payload, pretty=args.pretty)
         if "error" in payload:
             return 1
         if payload["status"] == "completed":

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from pipefunc._run_status_heartbeat import (
     _overall_progress,
@@ -45,10 +45,10 @@ def status_from_run_folder(
 
     heartbeat = load_run_status_heartbeat(run_folder)
     if heartbeat is not None:
-        disk_outputs, _ = _progress_info_from_disk(metadata)
         return _status_from_heartbeat(
             heartbeat,
-            disk_outputs=disk_outputs,
+            run_folder=metadata["run_folder"],
+            disk_outputs=_progress_info_from_disk(metadata)[0] if include_outputs else None,
             run_info_json=run_info_json,
             include_outputs=include_outputs,
             include_run_info=include_run_info,
@@ -176,6 +176,10 @@ def load_outputs(run_folder: str | Path, output_names: list[str] | None = None) 
     except Exception as e:  # noqa: BLE001
         return {"error": str(e)}
     if output_names is not None:
+        missing = [key for key in output_names if key not in result]
+        if missing:
+            msg = f"Unknown output names: {sorted(missing)}"
+            return {"error": msg}
         return {key: result[key] for key in output_names}
     return result
 
@@ -191,7 +195,7 @@ def _load_run_metadata(run_folder: str | Path) -> tuple[dict[str, Any], dict[str
     _legacy_fix(run_info_json, run_info_path.absolute().parent)
     metadata = {
         "all_output_names": sorted(run_info_json["all_output_names"]),
-        "run_folder": Path(run_info_json["run_folder"]),
+        "run_folder": run_folder_path,
         "storage": _deserialize_storage(run_info_json["storage"]),
         "resolved_shapes": _deserialize_mapping(run_info_json["resolved_shapes"]),
         "shape_masks": _deserialize_mapping(run_info_json["shape_masks"]),
@@ -212,24 +216,26 @@ def _deserialize_storage(storage: str | dict[str, str]) -> str | dict[Any, str]:
 def _status_from_heartbeat(
     heartbeat: dict[str, Any],
     *,
-    disk_outputs: dict[str, Any],
+    run_folder: Path,
+    disk_outputs: dict[str, Any] | None,
     run_info_json: dict[str, Any],
     include_outputs: bool,
     include_run_info: bool,
 ) -> dict[str, Any]:
     result = dict(heartbeat)
-    result["run_folder"] = str(Path(result["run_folder"]).absolute())
+    result["run_folder"] = str(run_folder.absolute())
     result["pipefunc_version"] = run_info_json.get(
         "pipefunc_version",
         result.get("pipefunc_version", "unknown"),
     )
     result.pop("status_source", None)
     result["status_source"] = "heartbeat"
-    result["outputs"] = _merge_disk_output_metadata(
-        heartbeat_outputs=result.get("outputs", {}),
-        disk_outputs=disk_outputs,
-    )
-    if not include_outputs:
+    if include_outputs:
+        result["outputs"] = _merge_disk_output_metadata(
+            heartbeat_outputs=result.get("outputs", {}),
+            disk_outputs=disk_outputs or {},
+        )
+    else:
         result.pop("outputs", None)
     if include_run_info:
         result["run_info"] = run_info_json
@@ -319,7 +325,14 @@ def _storage_name_for_output(storage: str | dict[Any, str], output_name: str) ->
     if isinstance(storage, str):
         return storage
     default = storage.get("")
-    storage_name = storage.get(output_name, default)
+    storage_name = storage.get(output_name)
+    if storage_name is None:
+        for key, value in storage.items():
+            if isinstance(key, tuple) and output_name in key:
+                storage_name = value
+                break
+    if storage_name is None:
+        storage_name = default
     if storage_name is None:
         msg = (
             f"Cannot find storage class for '{output_name}'. "
@@ -330,8 +343,7 @@ def _storage_name_for_output(storage: str | dict[Any, str], output_name: str) ->
 
 
 def _storage_bytes(storage: StorageBase) -> int:
-    folder = getattr(storage, "folder", None)
-    assert folder is not None
+    folder = cast("str | Path", cast("Any", storage).folder)
     return sum(path.stat().st_size for path in Path(folder).rglob("*") if path.is_file())
 
 
