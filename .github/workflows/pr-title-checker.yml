@@ -22,7 +22,7 @@ jobs:
           configuration_path: .github/pr-title-checker-config.json
 
       - name: Add comment to fix PR title
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v3
         if: ${{ steps.check.outputs.success == 'false'}}
         with:
           header: 'PR Title Check'
@@ -44,7 +44,7 @@ jobs:
 
       - name: Add comment that PR title is fixed
         if: ${{ steps.check.outputs.success == 'true'}}
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v3
         with:
           header: 'PR Title Check'
           recreate: true
