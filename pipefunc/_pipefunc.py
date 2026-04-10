@@ -1348,6 +1348,69 @@ class NestedPipeFunc(PipeFunc):
         f.debug = self.debug
         return f
 
+    @classmethod
+    def inject(
+        cls,
+        processing_funcs: list[PipeFunc | Callable[..., Any]],
+        input_overwrites: dict[str, str] | None = None,
+        output_overwrites: dict[str, str] | None = None,
+        **kwargs: dict[str, Any],
+    ) -> Callable[[PipeFunc | Callable[..., Any]], NestedPipeFunc]:
+        if input_overwrites is None:
+            input_overwrites = {}
+
+        if output_overwrites is None:
+            output_overwrites = {}
+
+        def process_func(f: PipeFunc | Callable[..., Any]) -> PipeFunc:
+            # This is mainly copied from Pipeline.add we need to promote callables to PipeFuncs before instantiating
+            # the NestedPipeFunc to update renames.
+            if isinstance(f, PipeFunc):
+                return f.copy()
+            if callable(f):
+                return PipeFunc(
+                    f,
+                    output_name=f.__name__,
+                )
+            msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
+            raise TypeError(msg)
+
+        def wrapper(wrapped_function: PipeFunc | Callable) -> NestedPipeFunc:
+            wrapped_func = process_func(wrapped_function)
+            original_outputs = wrapped_func.output_name
+            funcs = [wrapped_func, *list(map(process_func, processing_funcs))]
+
+            for overwrite_name, with_name in input_overwrites.items():
+                for func in funcs:
+                    if overwrite_name in func.parameters and with_name not in at_least_tuple(
+                        func.output_name,
+                    ):
+                        func.update_renames({overwrite_name: with_name})
+
+            for overwrite_name, with_name in output_overwrites.items():
+                placeholder_name = f"{overwrite_name}_intermediate"
+
+                for func in funcs:
+                    if overwrite_name in at_least_tuple(func.output_name):
+                        func.update_renames({overwrite_name: placeholder_name})
+                    if overwrite_name in func.parameters and with_name in at_least_tuple(
+                        func.output_name,
+                    ):
+                        func.update_renames(
+                            {overwrite_name: placeholder_name, with_name: overwrite_name},
+                        )
+                    elif overwrite_name not in func.parameters and with_name in at_least_tuple(
+                        func.output_name,
+                    ):
+                        func.update_renames({with_name: overwrite_name})
+
+            if "output_name" not in kwargs:
+                kwargs["output_name"] = original_outputs  # type: ignore[assignment]
+
+            return cls(funcs, **kwargs)  # type: ignore[arg-type]
+
+        return wrapper
+
     def _combine_mapspecs(self) -> MapSpec | None:
         mapspecs = [f.mapspec for f in self.pipeline.functions]
         if all(m is None for m in mapspecs):
