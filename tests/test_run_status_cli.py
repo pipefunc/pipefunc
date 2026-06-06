@@ -482,9 +482,15 @@ async def test_heartbeat_failed_run_reports_failed_function_counters(
         status = await _wait_for_status(run_folder, predicate=lambda s: s["status"] == "failed")
 
         assert status["status_source"] == "heartbeat"
-        assert status["functions"][0]["state"] == "running"
-        assert status["functions"][0]["n_failed"] == 1
-        assert status["functions"][0]["n_completed"] == 1
+        function_status = status["functions"][0]
+        assert function_status["n_failed"] == 1
+        # The already-submitted third chunk may finish before the final heartbeat is written.
+        assert function_status["n_completed"] in {1, 2}
+        assert (
+            function_status["n_completed"] + function_status["n_failed"]
+            <= function_status["n_total"]
+        )
+        assert function_status["state"] in {"running", "completed"}
     finally:
         executor.shutdown(wait=True)
 
