@@ -1,4 +1,4 @@
-# PipeFunc: Structure, Automate, and Simplify Your Computational Workflows 🕸
+# PipeFunc: Structure, Automate, and Simplify Your Computational Workflows
 
 > **_Stop_** micromanaging execution. Focus on the **science**. Capture your workflow's essence with **function pipelines**, represent **computations as DAGs**, and **automate parallel sweeps**.
 
@@ -18,22 +18,22 @@
 
 <!-- toc-start -->
 
-## :books: Table of Contents
+## Table of Contents
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
-- [:thinking: What is this?](#thinking-what-is-this)
-- [:rocket: Key Features](#rocket-key-features)
-- [:test_tube: How does it work?](#test_tube-how-does-it-work)
-- [:notebook: Jupyter Notebook Example](#notebook-jupyter-notebook-example)
-- [:computer: Installation](#computer-installation)
-- [:hammer_and_wrench: Development](#hammer_and_wrench-development)
+- [What is this?](#what-is-this)
+- [Key Features](#key-features)
+- [How does it work?](#how-does-it-work)
+- [Jupyter Notebook Example](#jupyter-notebook-example)
+- [Installation](#installation)
+- [Development](#development)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 <!-- toc-end -->
 
-## :thinking: What is this?
+## What is this?
 
 [![asciicast](https://asciinema.org/a/q5S3ffIxrAGmoLMOc0hOb3aod.svg)](https://asciinema.org/a/q5S3ffIxrAGmoLMOc0hOb3aod)
 
@@ -47,7 +47,7 @@ Visualize the pipeline as a directed graph, execute the pipeline for all (or spe
 
 Whether you're working with data processing, scientific computations, machine learning (AI) workflows, or any other scenario involving interdependent functions, `pipefunc` helps you focus on the logic of your code while it handles the intricacies of function dependencies and execution order.
 
-## :rocket: Key Features
+## Key Features
 
 1. 🚀 **Function Composition and Pipelining**: Create pipelines by using the `@pipefunc` decorator; execution order is automatically handled.
 1. 📊 **Pipeline Visualization**: Generate visual graphs of your pipelines to better understand the flow of data.
@@ -55,14 +55,14 @@ Whether you're working with data processing, scientific computations, machine le
 1. 🔁 **Map-Reduce Support**: Perform "map" operations to apply functions over data and "reduce" operations to aggregate results, allowing n-dimensional mappings.
 1. 👮 **Type Annotations Validation**: Validates the type annotations between functions to ensure type consistency.
 1. 🎛️ **Resource Usage Profiling**: Get reports on CPU usage, memory consumption, and execution time to identify bottlenecks and optimize your code.
-1. 🔄 **Automatic parallelization**: Automatically runs pipelines in parallel (local or remote) with shared memory and disk caching options.
-1. ⚡ **Ultra-Fast Performance**: Minimal overhead of [about 15 µs](https://pipefunc.readthedocs.io/en/latest/faq/#what-is-the-overhead-efficiency-performance-of-pipefunc) per function in the graph, ensuring blazingly fast execution.
+1. 🔄 **Automatic Parallelization**: Automatically runs pipelines in parallel (local or remote) with shared memory and disk caching options.
+1. ⚡ **Fast Performance**: Minimal overhead of [about 15 µs](https://pipefunc.readthedocs.io/en/latest/faq/#what-is-the-overhead-efficiency-performance-of-pipefunc) per function in the graph.
 1. 🔍 **Parameter Sweep Utilities**: Generate parameter combinations for parameter sweeps and optimize the sweeps with result caching.
 1. 💡 **Flexible Function Arguments**: Call functions with different argument combinations, letting `pipefunc` determine which other functions to call based on the provided arguments.
 1. 🏗️ **Leverages giants**: Builds on top of [NetworkX](https://networkx.org/) for graph algorithms, [NumPy](https://numpy.org/) for multi-dimensional arrays, and optionally [Xarray](https://docs.xarray.dev/) for labeled multi-dimensional arrays, [Zarr](https://zarr.readthedocs.io/) to store results in memory/disk/cloud or any key-value store, and [Adaptive](https://adaptive.readthedocs.io/) for parallel sweeps.
 1. 🤓 **Nerd stats**: >1000 tests with 100% test coverage, fully typed, only 3 required dependencies, _all_ Ruff Rules, _all_ public API documented.
 
-## :test_tube: How does it work?
+## How does it work?
 
 pipefunc provides a Pipeline class that you use to define your function pipeline.
 You add functions to the pipeline using the `pipefunc` decorator, which also lets you specify the function's output name.
@@ -128,7 +128,7 @@ print(result)  # prints 7.0
 
 Here the `mapspec` argument is used to specify the mapping between the inputs and outputs of the `f` function, it creates the product of the `a` and `b` input lists and computes the sum of each pair. The `g` function then computes the mean of the resulting 2D array. The `map` method executes the pipeline for the `inputs`, and the `load_outputs` function is used to load the results of the `g` function from the specified run folder.
 
-## :notebook: Jupyter Notebook Example
+## Jupyter Notebook Example
 
 See the detailed usage example and more in our [example.ipynb](https://github.com/pipefunc/pipefunc/blob/main/example.ipynb).
 
@@ -136,7 +136,7 @@ See the detailed usage example and more in our [example.ipynb](https://github.co
 > Have [`uv` installed](https://docs.astral.sh/uv/)?
 > Run `uvx --with "pipefunc[docs]" -p 3.13 opennb pipefunc/pipefunc/example.ipynb` to open the example notebook in your browser without the need to setup anything!
 
-## :computer: Installation
+## Installation
 
 Install the **latest stable** version from conda (recommended):
 
@@ -164,7 +164,7 @@ cd pipefunc
 pip install -e ".[dev]"
 ```
 
-## :hammer_and_wrench: Development
+## Development
 
 We use [`pre-commit`](https://pre-commit.com/) to manage pre-commit hooks, which helps us ensure that our code is always clean and compliant with our coding standards.
 To set it up, install pre-commit with pip and then run the install command:
