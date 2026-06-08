@@ -221,12 +221,23 @@ async def test_status_from_run_folder_incomplete(slow_pipeline: Pipeline, tmp_pa
 
 @pytest.mark.asyncio
 async def test_status_from_run_folder_uses_heartbeat_by_default(
-    slow_pipeline: Pipeline,
     tmp_path: Path,
 ) -> None:
+    release = threading.Event()
+
+    @pipefunc(output_name="values", mapspec="x[i] -> values[i]")
+    def slow_square(x: float) -> float:
+        release.wait()
+        return x**2
+
+    @pipefunc(output_name="total")
+    def aggregate(values: Array[float]) -> float:
+        return float(sum(values))
+
+    pipeline = Pipeline([slow_square, aggregate])
     run_folder = tmp_path / "heartbeat"
     executor = ThreadPoolExecutor(max_workers=1)
-    runner = slow_pipeline.map_async(
+    runner = pipeline.map_async(
         inputs={"x": list(range(8))},
         run_folder=run_folder,
         executor=executor,
@@ -245,10 +256,11 @@ async def test_status_from_run_folder_uses_heartbeat_by_default(
 
         running_status = await _wait_for_status(
             run_folder,
-            predicate=lambda s: s["status"] == "running" and bool(s["active_functions"]),
+            predicate=lambda s: "slow_square" in s["active_functions"],
         )
         assert "slow_square" in running_status["active_functions"]
 
+        release.set()
         await runner.task
         final_status = status_from_run_folder(run_folder)
 
@@ -257,6 +269,9 @@ async def test_status_from_run_folder_uses_heartbeat_by_default(
         assert final_status["active_functions"] == []
         assert final_status["stale"] is False
     finally:
+        release.set()
+        if not runner.task.done():
+            await runner.task
         executor.shutdown(wait=True)
 
 

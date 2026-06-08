@@ -4,6 +4,8 @@ import asyncio
 import functools
 import itertools
 import math
+import multiprocessing
+import threading
 import time
 import warnings
 from collections.abc import Callable, Iterable, Sequence
@@ -1261,10 +1263,22 @@ def _maybe_executor(
     parallel: bool,
 ) -> Generator[dict[OUTPUT_TYPE, Executor] | None, None, None]:
     if executor is None and parallel:
-        with ProcessPoolExecutor() as new_executor:  # shuts down the executor after use
+        with _default_process_pool_executor() as new_executor:
             yield {"": new_executor}
     else:
         yield executor
+
+
+def _default_process_pool_executor() -> ProcessPoolExecutor:
+    """Create the default process pool without forking multithreaded parents."""
+    if threading.active_count() <= 1:
+        return ProcessPoolExecutor()
+    start_methods = multiprocessing.get_all_start_methods()
+    if "forkserver" in start_methods:
+        return ProcessPoolExecutor(mp_context=multiprocessing.get_context("forkserver"))
+    if "spawn" in start_methods:
+        return ProcessPoolExecutor(mp_context=multiprocessing.get_context("spawn"))
+    return ProcessPoolExecutor()
 
 
 @dataclass
