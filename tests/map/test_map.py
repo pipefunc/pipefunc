@@ -1216,6 +1216,20 @@ def test_default_process_pool_executor_avoids_fork_when_threads_exist(monkeypatc
     finally:
         executor.shutdown(cancel_futures=True)
 
+    monkeypatch.setattr(_run.multiprocessing, "get_all_start_methods", lambda: ["spawn"])
+    executor = _run._default_process_pool_executor()
+    try:
+        assert executor._mp_context.get_start_method() == "spawn"
+    finally:
+        executor.shutdown(cancel_futures=True)
+
+    monkeypatch.setattr(_run.multiprocessing, "get_all_start_methods", list)
+    executor = _run._default_process_pool_executor()
+    try:
+        assert isinstance(executor, ProcessPoolExecutor)
+    finally:
+        executor.shutdown(cancel_futures=True)
+
 
 def test_fixed_indices(tmp_path: Path) -> None:
     @pipefunc(output_name="z", mapspec="x[i], y[i] -> z[i]")
