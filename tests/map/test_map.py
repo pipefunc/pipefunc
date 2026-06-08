@@ -1205,6 +1205,32 @@ def test_parallel():
     assert results["sum"].output == 14
 
 
+def test_default_process_pool_executor_avoids_fork_when_threads_exist(monkeypatch):
+    from pipefunc.map import _run
+
+    monkeypatch.setattr(_run.threading, "active_count", lambda: 2)
+
+    executor = _run._default_process_pool_executor()
+    try:
+        assert executor._mp_context.get_start_method() != "fork"
+    finally:
+        executor.shutdown(cancel_futures=True)
+
+    monkeypatch.setattr(_run.multiprocessing, "get_all_start_methods", lambda: ["spawn"])
+    executor = _run._default_process_pool_executor()
+    try:
+        assert executor._mp_context.get_start_method() == "spawn"
+    finally:
+        executor.shutdown(cancel_futures=True)
+
+    monkeypatch.setattr(_run.multiprocessing, "get_all_start_methods", list)
+    executor = _run._default_process_pool_executor()
+    try:
+        assert isinstance(executor, ProcessPoolExecutor)
+    finally:
+        executor.shutdown(cancel_futures=True)
+
+
 def test_fixed_indices(tmp_path: Path) -> None:
     @pipefunc(output_name="z", mapspec="x[i], y[i] -> z[i]")
     def f(x: int, y: int) -> int:
@@ -1568,6 +1594,8 @@ def test_internal_shape_in_pipefunc(dim: int | Literal["?"]):
 
 @pytest.mark.parametrize("storage", ["dict", "zarr_memory"])
 def test_parallel_memory_storage(storage: str):
+    from pipefunc.map import _run
+
     if storage == "zarr_memory" and not has_zarr:
         pytest.skip("zarr not installed")
     if storage == "zarr_memory" and sys.version_info >= (3, 13):
@@ -1591,7 +1619,8 @@ def test_parallel_memory_storage(storage: str):
 
     pipeline = Pipeline([f, g, h, i])
     inputs = {"x": [1, 2, 3]}
-    r1 = pipeline.map(inputs, storage=storage, parallel=True, executor=ProcessPoolExecutor())
+    with _run._default_process_pool_executor() as executor:
+        r1 = pipeline.map(inputs, storage=storage, parallel=True, executor=executor)
     r2 = pipeline.map(inputs, storage=storage, parallel=True)
     assert r1["r"].output == r2["r"].output == 12
 
