@@ -170,6 +170,10 @@ This section has been moved to [Function Inputs and Outputs](./concepts/function
 
 This section has been moved to [Type Checking](./concepts/type-checking.md).
 
+## Does `@pipefunc` preserve my function's signature and docstring (IDE support)?
+
+Yes, see [Static type checking and IDE support](./concepts/type-checking.md#static-type-checking-and-ide-support).
+
 ## What is the difference between `pipeline.run` and `pipeline.map`?
 
 This section has been moved to [Parallelism and Execution](./concepts/execution-and-parallelism.md#run-vs-map).
