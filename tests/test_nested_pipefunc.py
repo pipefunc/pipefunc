@@ -4,7 +4,7 @@ import re
 import networkx as nx
 import pytest
 
-from pipefunc import ErrorSnapshot, NestedPipeFunc, Pipeline, VariantPipeline, pipefunc
+from pipefunc import ErrorSnapshot, NestedPipeFunc, PipeFunc, Pipeline, VariantPipeline, pipefunc
 from pipefunc.map._mapspec import ArraySpec
 from pipefunc.resources import Resources
 from pipefunc.typing import NoAnnotation
@@ -401,7 +401,7 @@ def test_nested_pipefunc_output_annotation() -> None:
     def f2(c) -> float:
         return c / 2
 
-    funcs = [f1, f2]
+    funcs: list[PipeFunc] = [f1, f2]
     nf1 = NestedPipeFunc(funcs, output_name="d")
     assert nf1.output_annotation == {"d": float}
     nf1 = NestedPipeFunc(funcs, output_name="c")

@@ -17,8 +17,16 @@ import os
 import warnings
 import weakref
 from collections import defaultdict
-from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, get_args, get_origin
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    Literal,
+    ParamSpec,
+    TypeVar,
+    get_args,
+    get_origin,
+)
 
 import cloudpickle
 
@@ -40,18 +48,21 @@ from pipefunc.resources import Resources
 from pipefunc.typing import NoAnnotation, safe_get_type_hints
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
+
     import pydantic
 
     from pipefunc import Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
     from pipefunc.map._types import ShapeTuple
 
-T = TypeVar("T", bound=Callable[..., Any])
+P = ParamSpec("P")
+R = TypeVar("R")
 
 MAX_PARAMS_LEN = 15
 
 
-class PipeFunc(Generic[T]):
+class PipeFunc(Generic[P, R]):
     """Function wrapper class for pipeline functions with additional attributes.
 
     Parameters
@@ -195,9 +206,13 @@ class PipeFunc(Generic[T]):
 
     """
 
+    # Prevent pytest from collecting `PipeFunc` instances whose wrapped function
+    # is named ``test*`` (pytest follows ``__wrapped__`` during collection).
+    __test__ = False
+
     def __init__(
         self,
-        func: T,
+        func: Callable[P, R],
         output_name: OUTPUT_TYPE,
         *,
         output_picker: Callable[[Any, str], Any] | None = None,
@@ -223,8 +238,14 @@ class PipeFunc(Generic[T]):
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
         self._pipelines: weakref.WeakSet[Pipeline] = weakref.WeakSet()
-        self.func: Callable[..., Any] = func
+        self.func: Callable[P, R] = func
         self.__name__ = _get_name(func)
+        doc = getattr(func, "__doc__", None)
+        if doc and doc != getattr(type(func), "__doc__", None):
+            # Expose the wrapped function's docstring on the instance for
+            # `help()` and Jupyter's `?` introspection. The second check avoids
+            # picking up the *class* docstring of callable instances.
+            self.__doc__ = doc
         self._output_name: OUTPUT_TYPE = output_name
         self.debug = debug
         self.print_error = print_error
@@ -652,7 +673,12 @@ class PipeFunc(Generic[T]):
         for name in at_least_tuple(self.output_name):
             _validate_identifier("output_name", name)
 
-    def copy(self, **update: Any) -> PipeFunc:
+    @property
+    def __wrapped__(self) -> Callable[P, R]:
+        """Return the wrapped function, following the convention of `functools.wraps`."""
+        return self.func
+
+    def copy(self, **update: Any) -> PipeFunc[P, R]:
         """Create a copy of the `PipeFunc` instance, optionally updating the attributes."""
         kwargs = {
             "func": self.func,
@@ -688,14 +714,21 @@ class PipeFunc(Generic[T]):
     def _rename_to_native(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         return {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
         """Call the wrapped function with the given arguments.
+
+        Note that ``renames``, ``defaults``, ``bound``, and scopes are applied,
+        so the parameter names may differ from the original function signature
+        (which is what type checkers see).
 
         Returns
         -------
             The return value of the wrapped function.
 
         """
+        return self._call(*args, **kwargs)
+
+    def _call(self, *args: Any, **kwargs: Any) -> R:
         evaluated_resources = kwargs.pop(_EVALUATED_RESOURCES, None)
         kwargs = self._flatten_scopes(kwargs)
         if extra := set(kwargs) - set(self.parameters):
@@ -726,8 +759,9 @@ class PipeFunc(Generic[T]):
                 evaluated_resources,
                 self.resources,
             )
+            func: Callable[..., R] = self.func  # widen ParamSpec for the transformed kwargs
             try:
-                result = self.func(*args, **kwargs)
+                result = func(*args, **kwargs)
             except Exception as e:
                 if self.print_error:
                     print(
@@ -1022,7 +1056,7 @@ def pipefunc(
     scope: str | None = None,
     variant: str | dict[str | None, str] | None = None,
     variant_group: str | None = None,  # deprecated
-) -> Callable[[Callable[..., Any]], PipeFunc]:
+) -> Callable[[Callable[P, R]], PipeFunc[P, R]]:
     """A decorator that wraps a function in a PipeFunc instance.
 
     Parameters
@@ -1160,7 +1194,7 @@ def pipefunc(
 
     """
 
-    def decorator(f: Callable[..., Any]) -> PipeFunc:
+    def decorator(f: Callable[P, R]) -> PipeFunc[P, R]:
         """Wraps the original function in a PipeFunc instance.
 
         Parameters
