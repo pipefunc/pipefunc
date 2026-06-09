@@ -1149,6 +1149,57 @@ def test_run_multiple_outputs_list() -> None:
     )
 
 
+def test_run_default_output_name_unique_leaf() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(c):
+        return 2 * c
+
+    pipeline = Pipeline([f, g])
+    assert pipeline.run(kwargs={"a": 1, "b": 2}) == 6
+    assert pipeline.run(kwargs={"a": 1, "b": 2}, full_output=True) == {
+        "a": 1,
+        "b": 2,
+        "c": 3,
+        "d": 6,
+    }
+
+
+def test_run_default_output_name_multiple_leaves() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(c):
+        return 2 * c
+
+    @pipefunc(output_name="e")
+    def h(c):
+        return 3 * c
+
+    pipeline = Pipeline([f, g, h])
+    assert len(pipeline.leaf_nodes) == 2
+    assert pipeline.run(kwargs={"a": 1, "b": 2}) == (6, 9)
+    assert pipeline(a=1, b=2) == (6, 9)
+
+
+def test_run_default_output_name_multiple_outputs_leaf() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name=("d", "e"))
+    def g(c):
+        return 2 * c, 3 * c
+
+    pipeline = Pipeline([f, g])
+    assert pipeline.run(kwargs={"a": 1, "b": 2}) == (6, 9)
+
+
 def test_disjoint_pipefuncs() -> None:
     @pipefunc(output_name="c")
     def f(a, b):

@@ -553,7 +553,9 @@ class Pipeline:
         ----------
         __output_name__
             The identifier for the return value of the pipeline.
-            Is None by default, in which case the unique leaf node is used.
+            Is None by default, in which case the unique leaf node is used,
+            or all leaf nodes if there are multiple (returning a tuple of
+            their outputs).
             This parameter is positional-only and the strange name is used
             to avoid conflicts with the ``output_name`` argument that might be
             passed via ``kwargs``.
@@ -565,8 +567,6 @@ class Pipeline:
             The return value of the pipeline.
 
         """
-        if __output_name__ is None:
-            __output_name__ = self.unique_leaf_node.output_name
         return self.run(__output_name__, kwargs=kwargs)
 
     def _get_func_args(
@@ -665,6 +665,11 @@ class Pipeline:
         _update_all_results(func, r, output_name, all_results, self.lazy)
         return all_results[output_name]
 
+    def _default_output_name(self) -> OUTPUT_TYPE | list[OUTPUT_TYPE]:
+        """Return the output name(s) of the leaf node(s) of the pipeline graph."""
+        output_names = [f.output_name for f in self.leaf_nodes]
+        return output_names[0] if len(output_names) == 1 else output_names
+
     def _validate_run_output_name(
         self,
         kwargs: dict[str, Any],
@@ -694,7 +699,7 @@ class Pipeline:
 
     def run(
         self,
-        output_name: OUTPUT_TYPE | list[OUTPUT_TYPE],
+        output_name: OUTPUT_TYPE | list[OUTPUT_TYPE] | None = None,
         *,
         full_output: bool = False,
         kwargs: dict[str, Any],
@@ -706,7 +711,9 @@ class Pipeline:
         ----------
         output_name
             The identifier for the return value of the pipeline. Can be a single
-            output name or a list of output names.
+            output name or a list of output names. If ``None``, the output name
+            of the unique leaf node is used, or all leaf nodes if there are
+            multiple (returning a tuple of their outputs).
         full_output
             Whether to return the outputs of all function executions
             as a dictionary mapping function names to their return values.
@@ -726,6 +733,8 @@ class Pipeline:
             return values of the pipeline functions.
 
         """
+        if output_name is None:
+            output_name = self._default_output_name()
         self._validate_run_output_name(kwargs, output_name)
         self._validate_scoped_parameters(kwargs)
         flat_scope_kwargs = self._flatten_scopes(kwargs)
