@@ -25,6 +25,8 @@ dependencies:
   # optional-dependencies: pandas
   - pandas
   - xarray
+  # optional-dependencies: polars
+  - polars
   # optional-dependencies: plotting
   - bokeh
   - python-graphviz
