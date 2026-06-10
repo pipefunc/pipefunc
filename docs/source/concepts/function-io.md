@@ -530,3 +530,40 @@ print(result["result"].output)
 6. **`pipeline.map`:** We call `pipeline.map` as before, but now we only need to specify the `internal_shapes` of the lists, not the shape of the status. The `internal_shapes` argument is only needed when you return a list, and it cannot be inferred from the inputs.
 
 This pattern provides a clean and manageable way to work with functions that logically produce multiple outputs of varying shapes within the current capabilities of `pipefunc`.
+
+## Working with `polars` DataFrames (Parquet storage and `LazyFrame` inputs)
+
+`pipefunc` has first-class support for [polars](https://pola.rs/):
+
+1. **Parquet on disk**: when a function returns a `polars.DataFrame` and the results are stored on disk (e.g., `storage="file_array"` in `pipeline.map`), the output is serialized as a [Parquet](https://parquet.apache.org/) file instead of a pickle. Parquet files are compact, fast to read, and can be inspected with external tools like DuckDB. If Parquet serialization fails (e.g., for unsupported dtypes), `pipefunc` transparently falls back to `cloudpickle`.
+2. **Lazy inputs**: annotate a parameter as `polars.LazyFrame` to receive the upstream `polars.DataFrame` output lazily. When the upstream output is stored on disk as Parquet, the function receives `pl.scan_parquet(...)`, so the full DataFrame is never materialized in memory and polars can apply predicate and projection pushdown. Otherwise (e.g., in-memory storage or `pipeline.run`), the DataFrame is converted with `.lazy()`.
+
+Type validation understands this conversion: a function returning `pl.DataFrame` may feed into a parameter annotated as `pl.LazyFrame`.
+
+```{code-cell} ipython3
+import polars as pl
+
+from pipefunc import Pipeline, pipefunc
+
+
+@pipefunc(output_name="df")
+def make_df() -> pl.DataFrame:
+    return pl.DataFrame({"x": [1, 2, 3], "y": [10.0, 20.0, 30.0]})
+
+
+@pipefunc(output_name="mean_y")
+def mean_y(df: pl.LazyFrame) -> float:  # annotate as LazyFrame to load lazily
+    return df.select(pl.col("y").mean()).collect().item()
+
+
+pipeline = Pipeline([make_df, mean_y])
+result = pipeline.map({}, run_folder="my_run_folder", parallel=False, show_progress=False)
+print(result["mean_y"].output)
+```
+
+The `df` output above is stored as a Parquet file in the run folder, and `mean_y` receives a `pl.LazyFrame` that scans it.
+
+```{note}
+Only top-level `polars.DataFrame` return values are stored as Parquet; DataFrames nested inside other objects (lists, dicts, dataclasses) are pickled as usual.
+The `pl.LazyFrame` conversion applies to parameters annotated *exactly* as `pl.LazyFrame`.
+```

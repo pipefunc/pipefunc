@@ -20,6 +20,8 @@ from typing import (
 
 import numpy as np
 
+from pipefunc._utils import is_imported
+
 
 class NoAnnotation:
     """Marker class for missing type annotations."""
@@ -209,7 +211,7 @@ def _handle_generic_types(
     return None
 
 
-def is_type_compatible(
+def is_type_compatible(  # noqa: PLR0911
     incoming_type: Any,
     required_type: Any,
     memo: TypeCheckMemo | None = None,
@@ -228,6 +230,10 @@ def is_type_compatible(
 
     if _check_identical_or_any(incoming_type, required_type):
         return True
+    if _is_polars_dataframe_to_lazyframe(incoming_type, required_type):
+        # pipefunc converts `pl.DataFrame` values to `pl.LazyFrame` at execution
+        # time when the consuming parameter is annotated as `pl.LazyFrame`.
+        return True
     if (result := _is_typevar_compatible(incoming_type, required_type, memo)) is not None:
         return result
     if (result := _handle_union_types(incoming_type, required_type, memo)) is not None:
@@ -235,6 +241,15 @@ def is_type_compatible(
     if (result := _handle_generic_types(incoming_type, required_type, memo)) is not None:
         return result
     return False
+
+
+def _is_polars_dataframe_to_lazyframe(incoming_type: Any, required_type: Any) -> bool:
+    """Check for the special-cased `pl.DataFrame` output -> `pl.LazyFrame` input edge."""
+    if not is_imported("polars"):
+        return False
+    import polars as pl
+
+    return incoming_type is pl.DataFrame and required_type is pl.LazyFrame
 
 
 def _is_typevar_compatible(

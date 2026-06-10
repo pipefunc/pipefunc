@@ -43,7 +43,7 @@ from pipefunc.map._mapspec import (
     mapspec_dimensions,
     validate_consistent_axes,
 )
-from pipefunc.map._run import AsyncMap, run_map, run_map_async
+from pipefunc.map._run import AsyncMap, _convert_lazyframe_kwargs, run_map, run_map_async
 from pipefunc.map._run_eager import run_map_eager
 from pipefunc.map._run_eager_async import run_map_eager_async
 from pipefunc.map._run_info import _handle_cleanup_deprecation
@@ -615,6 +615,7 @@ class Pipeline:
                 raise ValueError(msg)
             func_args[arg] = value
             used_parameters.add(arg)
+        _convert_lazyframe_kwargs(func, func_args)
         return func_args
 
     def _current_cache(self) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:

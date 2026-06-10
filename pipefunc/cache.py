@@ -885,6 +885,10 @@ def to_hashable(  # noqa: C901, PLR0911, PLR0912
         if isinstance(obj, polars.DataFrame):
             hsh = to_hashable(obj.to_dict(as_series=False), fallback_to_pickle)
             return (m, tp, hsh)
+        if isinstance(obj, polars.LazyFrame):
+            # Hash the serialized query plan; collecting the data here would
+            # defeat the purpose of using a LazyFrame.
+            return (m, tp, obj.serialize())
 
     if fallback_to_pickle:
         try:

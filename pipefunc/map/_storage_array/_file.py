@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 import cloudpickle  # type: ignore[import-untyped]
 import numpy as np
 
-from pipefunc._utils import dump, load
+from pipefunc._utils import PARQUET_MAGIC, dump, load
 
 from ._base import (
     StorageBase,
@@ -326,8 +326,16 @@ def _load_all(filenames: Iterator[Path]) -> list[Any]:
     def maybe_read(f: Path) -> Any | None:
         return _read(f) if f.is_file() else None
 
-    def maybe_load(x: str | None) -> Any | None:
-        return cloudpickle.loads(x) if x is not None else None
+    def maybe_load(x: bytes | None) -> Any | None:
+        if x is None:
+            return None
+        if x[: len(PARQUET_MAGIC)] == PARQUET_MAGIC:
+            import io
+
+            import polars as pl
+
+            return pl.read_parquet(io.BytesIO(x))
+        return cloudpickle.loads(x)
 
     # Delegate file reading to the threadpool but deserialize sequentially,
     # as this is pure Python and CPU bound
