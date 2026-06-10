@@ -615,6 +615,7 @@ class Pipeline:
                 raise ValueError(msg)
             func_args[arg] = value
             used_parameters.add(arg)
+        func._convert_lazyframe_kwargs(func_args)
         return func_args
 
     def _current_cache(self) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:

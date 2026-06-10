@@ -234,6 +234,10 @@ This section has been moved to [Function Inputs and Outputs](./concepts/function
 
 This section has been moved to [Function Inputs and Outputs](./concepts/function-io.md#pipefuncs-with-multiple-outputs-of-different-shapes).
 
+## How does `pipefunc` work with `polars` DataFrames?
+
+See [Function Inputs and Outputs](./concepts/function-io.md#working-with-polars-dataframes-parquet-storage-and-lazyframe-inputs) for Parquet storage and lazy (`pl.LazyFrame`) inputs.
+
 ## Simplifying Pipelines
 
 This section has been moved to [Simplifying Pipelines](./concepts/simplifying-pipelines.md).

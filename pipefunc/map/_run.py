@@ -30,6 +30,7 @@ from pipefunc._utils import (
     dump,
     ensure_block_allowed,
     get_ncores,
+    is_parquet_file,
     is_running_in_ipynb,
     prod,
 )
@@ -716,7 +717,10 @@ def _func_kwargs(func: PipeFunc, run_info: RunInfo, store: dict[str, StoreType])
         elif p in run_info.inputs:
             kwargs[p] = run_info.inputs[p]
         elif p in run_info.all_output_names:
-            kwargs[p] = _load_from_store(p, store).value
+            if (lazy_frame := _maybe_scan_parquet(func, p, store)) is not None:
+                kwargs[p] = lazy_frame
+            else:
+                kwargs[p] = _load_from_store(p, store).value
         elif p in run_info.defaults and p not in run_info.all_output_names:
             kwargs[p] = run_info.defaults[p]
         else:  # pragma: no cover
@@ -725,6 +729,26 @@ def _func_kwargs(func: PipeFunc, run_info: RunInfo, store: dict[str, StoreType])
             msg = f"Parameter `{p}` not found in inputs, outputs, bound or defaults."
             raise ValueError(msg)
     return kwargs
+
+
+def _maybe_scan_parquet(func: PipeFunc, parameter: str, store: dict[str, StoreType]) -> Any:
+    """Return a `pl.LazyFrame` scanning the stored Parquet file, if applicable.
+
+    Only applies when the parameter is annotated as `pl.LazyFrame`, is not
+    indexed by the function's mapspec, and the upstream output is stored on
+    disk as a Parquet file (see `pipefunc._utils.dump`). This avoids
+    materializing the full `pl.DataFrame` in memory.
+    """
+    if parameter not in func._lazyframe_parameters:
+        return None
+    if func.mapspec is not None and parameter in func.mapspec.input_names:
+        return None
+    storage = store[parameter]
+    if not isinstance(storage, Path) or not storage.is_file() or not is_parquet_file(storage):
+        return None
+    import polars as pl
+
+    return pl.scan_parquet(storage)
 
 
 def _select_kwargs(
@@ -740,6 +764,7 @@ def _select_kwargs(
     normalized_keys = {k: v[0] if len(v) == 1 else v for k, v in input_keys.items()}
     selected = {k: v[normalized_keys[k]] if k in normalized_keys else v for k, v in kwargs.items()}
     _load_data(selected)
+    func._convert_lazyframe_kwargs(selected)
     return selected
 
 
@@ -1695,6 +1720,7 @@ def _execute_single(
 
     # Otherwise, run the function
     _load_data(kwargs)
+    func._convert_lazyframe_kwargs(kwargs)
     if error_handling == "raise":
         return _get_or_set_cache(func, kwargs, cache, _CTX_RAISE, "raise")
 

@@ -52,9 +52,23 @@ def at_least_tuple(x: Any) -> tuple[Any, ...]:
     return x if isinstance(x, tuple) else (x,)
 
 
-def load(path: Path, *, cache: bool = False) -> Any:
-    """Load a cloudpickled object from a path.
+PARQUET_MAGIC = b"PAR1"
 
+
+def is_parquet_file(path: Path) -> bool:
+    """Check whether the file at ``path`` is a Parquet file (by magic bytes)."""
+    try:
+        with path.open("rb") as f:
+            return f.read(len(PARQUET_MAGIC)) == PARQUET_MAGIC
+    except OSError:  # pragma: no cover
+        return False
+
+
+def load(path: Path, *, cache: bool = False) -> Any:
+    """Load an object from a path.
+
+    Reads Parquet files (written by `dump` for ``polars.DataFrame`` objects)
+    as ``polars.DataFrame``, everything else as cloudpickle.
     If ``cache`` is ``True``, the object will be cached in memory.
     """
     if cache:
@@ -62,12 +76,33 @@ def load(path: Path, *, cache: bool = False) -> Any:
         return _cached_load(cache_key)
 
     with path.open("rb") as f:
+        is_parquet = f.read(len(PARQUET_MAGIC)) == PARQUET_MAGIC
+        f.seek(0)
+        if is_parquet:
+            import polars as pl
+
+            return pl.read_parquet(f)
         return cloudpickle.load(f)
 
 
 def dump(obj: Any, path: Path) -> None:
-    """Dump an object to a path using cloudpickle."""
+    """Dump an object to a path.
+
+    ``polars.DataFrame`` objects are stored as Parquet (falling back to
+    cloudpickle if Parquet serialization fails, e.g., for ``pl.Object``
+    dtype columns); everything else is stored with cloudpickle.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
+    if is_imported("polars"):
+        import polars as pl
+
+        if isinstance(obj, pl.DataFrame):
+            try:
+                obj.write_parquet(path)
+            except Exception:  # noqa: BLE001, e.g., unsupported dtypes like pl.Object
+                path.unlink(missing_ok=True)
+            else:
+                return
     with path.open("wb") as f:
         cloudpickle.dump(obj, f)
 
@@ -629,3 +664,12 @@ def pandas_to_polars(df: Any) -> Any:
         # Fallback to manual conversion if pyarrow is not available
         # This happens when pandas has nullable types but pyarrow is not installed
         return pl.DataFrame({col: df[col].to_numpy() for col in df.columns})
+
+
+def is_lazyframe_annotation(annotation: Any) -> bool:
+    """Check whether ``annotation`` is ``polars.LazyFrame``."""
+    if not is_imported("polars"):
+        return False
+    import polars as pl
+
+    return annotation is pl.LazyFrame
