@@ -818,9 +818,9 @@ class Pipeline:
             If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
         output_names
             The output(s) to calculate. Can be a single output name (a ``tuple`` is the
-        output name of a function with multiple outputs, as in `Pipeline.run`) or a
-        collection of output names. If ``None``, the entire pipeline is run and all
-        outputs are computed.
+            output name of a function with multiple outputs, as in `Pipeline.run`) or a
+            collection of output names. If ``None``, the entire pipeline is run and all
+            outputs are computed.
         parallel
             Whether to run the functions in parallel. Is ignored if provided ``executor`` is not ``None``.
         executor
@@ -1027,9 +1027,9 @@ class Pipeline:
             If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
         output_names
             The output(s) to calculate. Can be a single output name (a ``tuple`` is the
-        output name of a function with multiple outputs, as in `Pipeline.run`) or a
-        collection of output names. If ``None``, the entire pipeline is run and all
-        outputs are computed.
+            output name of a function with multiple outputs, as in `Pipeline.run`) or a
+            collection of output names. If ``None``, the entire pipeline is run and all
+            outputs are computed.
         executor
             The executor to use for parallel execution. Can be specified as:
 
