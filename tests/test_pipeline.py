@@ -526,7 +526,7 @@ def test_setting_defaults() -> None:
     with pytest.raises(ValueError, match="Unexpected keyword arguments"):
         f(a=0)
 
-    assert f(a1=0) == 2
+    assert f(a1=0) == 2  # type: ignore[call-arg]
 
     pipeline = Pipeline([f])
     assert pipeline("c", a1=0) == 2
@@ -771,7 +771,7 @@ def test_unhashable_bound() -> None:
     def f(a, b):
         return a, b
 
-    assert f(a=1) == (1, [])
+    assert f(a=1) == (1, [])  # type: ignore[call-arg]
     pipeline = Pipeline([f])
     assert pipeline(a=1) == (1, [])
 

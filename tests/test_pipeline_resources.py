@@ -160,7 +160,7 @@ def test_resources_func_with_variable() -> None:
         assert resources.cpus == a + b
         return a * b
 
-    result = j(a=2, b=3)
+    result = j(a=2, b=3)  # type: ignore[call-arg]
     assert result == 6
 
     pipeline = Pipeline([j])

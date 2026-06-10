@@ -89,7 +89,7 @@ def test_pickle_pipefunc() -> None:
     func = PipeFunc(DataClass, output_name="c")  # type: ignore[arg-type]
     p = pickle.dumps(func)
     func2 = pickle.loads(p)  # noqa: S301
-    assert func(a=1) == func2(a=1)
+    assert func(a=1) == func2(a=1)  # type: ignore[call-arg]
 
 
 def test_update_defaults_and_renames_and_bound() -> None:
@@ -106,7 +106,7 @@ def test_update_defaults_and_renames_and_bound() -> None:
     assert f.defaults == {"a1": 42, "b": 2}
 
     # Call function with updated defaults
-    assert f(a1=3) == 5
+    assert f(a1=3) == 5  # type: ignore[call-arg]
 
     # Overwrite defaults
     f.update_defaults({"a1": 1, "b": 3}, overwrite=True)
@@ -114,9 +114,9 @@ def test_update_defaults_and_renames_and_bound() -> None:
     assert f.parameters == ("a1", "b")
 
     # Call function with new defaults
-    assert f(a1=2) == 5
+    assert f(a1=2) == 5  # type: ignore[call-arg]
     assert f() == 4
-    assert f(a1=2, b=3) == 5
+    assert f(a1=2, b=3) == 5  # type: ignore[call-arg]
 
     # Update renames
     assert f.renames == {"a": "a1"}
@@ -125,7 +125,7 @@ def test_update_defaults_and_renames_and_bound() -> None:
     assert f.parameters == ("a2", "b")
 
     # Call function with updated renames
-    assert f(a2=4) == 7
+    assert f(a2=4) == 7  # type: ignore[call-arg]
     assert f(b=0) == 1
 
     # Overwrite renames
@@ -133,20 +133,20 @@ def test_update_defaults_and_renames_and_bound() -> None:
     assert f.parameters == ("a3", "b")
 
     # Call function with new renames
-    assert f(a3=1) == 4
+    assert f(a3=1) == 4  # type: ignore[call-arg]
 
     assert f.defaults == {"a3": 1, "b": 3}  # need to reset defaults before updating bound
     f.update_defaults({}, overwrite=True)
     f.update_bound({"a3": "yolo", "b": "swag"})
-    assert f(a3=88, b=1) == "yoloswag"
+    assert f(a3=88, b=1) == "yoloswag"  # type: ignore[call-arg]
     assert f.bound == {"a3": "yolo", "b": "swag"}
     f.update_renames({"a": "a4"}, update_from="original")
     assert f.bound == {"a4": "yolo", "b": "swag"}
     f.update_bound({}, overwrite=True)
-    assert f(a4=88, b=1) == 89
+    assert f(a4=88, b=1) == 89  # type: ignore[call-arg]
 
     f.update_renames({"a4": "a5"}, update_from="current")
-    assert f(a5=88, b=1) == 89
+    assert f(a5=88, b=1) == 89  # type: ignore[call-arg]
     f.update_renames({"b": "b1"}, update_from="current")
     assert f.renames == {"a": "a5", "b": "b1"}
 
@@ -485,7 +485,7 @@ def test_pipefunc_scope() -> None:
 
     scope = "x"
     f.update_scope(scope, "*")
-    assert f(x={"a": 1, "b": 1}) == 2
+    assert f(x={"a": 1, "b": 1}) == 2  # type: ignore[call-arg]
     assert f(**{"x.a": 1, "x.b": 1}) == 2
     assert f(**{"x.b": 1, "x": {"a": 1}}) == 2
 
@@ -499,7 +499,7 @@ def test_set_pipefunc_scope_on_init() -> None:
     assert f.parameter_scopes == {"x"}
     assert f.renames == {"a": "x.a", "b": "x.b", "c": "x.c"}
     assert str(f.mapspec) == "x.a[i] -> x.c[i]"
-    assert f(x={"a": 1, "b": 1}) == 2
+    assert f(x={"a": 1, "b": 1}) == 2  # type: ignore[call-arg]
     f.update_scope(None, "*", "*")
     assert f.unscoped_parameters == ("a", "b")
     assert f.parameters == ("a", "b")
@@ -676,7 +676,7 @@ def test_default_with_positional_args() -> None:
 
     assert f(1, 2) == (1, 2)
     with pytest.raises(ValueError, match="Multiple values provided for parameter `a`"):
-        f(1, 2, a=2)
+        f(1, 2, a=2)  # type: ignore[misc]
 
     f.update_renames({"a": "x.a", "b": "x.b"}, update_from="original")
     assert f(1) == (1, 1)
@@ -761,14 +761,14 @@ def test_wrapping_pipefunc_in_pipefunc() -> None:
     def test(input: Any) -> Any:  # noqa: A002
         return input
 
-    assert test(input2=1) == 1
+    assert test(input2=1) == 1  # type: ignore[call-arg]
     test2 = PipeFunc(
         func=test,
         output_name="test2",
         renames={"input2": "input3"},
         mapspec="input3[i] -> test2[i]",
     )
-    assert test2(input3=1) == 1
+    assert test2(input3=1) == 1  # type: ignore[call-arg]
 
 
 def test_wrapping_pipefunc_with_scope_in_pipefunc() -> None:
@@ -787,13 +787,13 @@ def test_wrapping_pipefunc_with_scope_in_pipefunc() -> None:
     assert parameter.name == "input"
     assert parameter.annotation == "int"
 
-    assert test(x={"input2": 1}) == 1
+    assert test(x={"input2": 1}) == 1  # type: ignore[call-arg]
     test2 = PipeFunc(
         func=test,
         output_name="test2",
         renames={"x.input2": "x.input3"},
     )
-    assert test2(x={"input3": 1}) == 1
+    assert test2(x={"input3": 1}) == 1  # type: ignore[call-arg]
 
     parameter = test2.original_parameters["x.input2"]
     assert isinstance(parameter, inspect.Parameter)
@@ -814,3 +814,49 @@ def test_renamed_inputs_error_snapshot():
         f(b=-1)  # This will raise an error
     with pytest.raises(ValueError, match="a cannot be negative"):
         f.error_snapshot.reproduce()
+
+
+def test_pipefunc_docstring_and_wrapped() -> None:
+    @pipefunc(output_name="c")
+    def f(a: int, b: int) -> int:
+        """Add ``a`` and ``b``."""
+        return a + b
+
+    assert f.__doc__ == "Add ``a`` and ``b``."
+    assert f.__wrapped__ is f.func
+
+    # `__signature__` (which reflects renames) takes precedence over `__wrapped__`
+    f.update_renames({"a": "x"})
+    assert list(inspect.signature(f).parameters) == ["x", "b"]
+
+
+def test_pipefunc_no_docstring_falls_back_to_class() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    assert f.__doc__ is PipeFunc.__doc__
+
+
+def test_pipefunc_docstring_survives_pickle() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        """My docs."""
+        return a + b
+
+    f2 = pickle.loads(pickle.dumps(f))  # noqa: S301
+    assert f2.__doc__ == "My docs."
+    assert f2.__wrapped__ is f2.func
+    assert f2(a=1, b=2) == 3
+
+
+def test_pipefunc_callable_instance_keeps_class_docstring() -> None:
+    class Adder:
+        """Class docstring, not the function's."""
+
+        def __call__(self, a, b):
+            return a + b
+
+    pf = PipeFunc(Adder(), output_name="c")
+    # The class docstring of the callable instance is not copied to the PipeFunc
+    assert pf.__doc__ is PipeFunc.__doc__

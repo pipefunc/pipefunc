@@ -108,3 +108,48 @@ For completeness, this is the type hint for `Array[int]`:
 from pipefunc.typing import Array
 Array[int]
 ```
+
+## Static type checking and IDE support
+
+Everything above is about the *runtime* type validation that `pipefunc` performs when constructing a `Pipeline`.
+In addition, the `@pipefunc` decorator preserves the wrapped function's signature for *static* type checkers (`mypy`, `pyright`) and IDEs.
+
+A decorated function is a `PipeFunc[P, R]` instance, where `P` captures the original parameters and `R` the return type:
+
+```python
+@pipefunc(output_name="c")
+def add(a: int, b: float) -> float:
+    """Add two numbers together."""
+    return a + b
+
+reveal_type(add)           # PipeFunc[(a: int, b: float), float]
+reveal_type(add(1, 2.0))   # float
+add("wrong", "types")      # error: incompatible argument types
+add.update_renames({"a": "x"})  # PipeFunc methods remain fully typed
+```
+
+This means your IDE shows the original parameter names and types in autocompletion and signature help, type checkers validate calls to the decorated function, and the original docstring is available via `help(add)` and Jupyter's `add?`.
+
+Runtime introspection also works as expected — `inspect.signature` reflects any renames, defaults, and bound arguments:
+
+```{code-cell} ipython3
+import inspect
+
+from pipefunc import pipefunc
+
+@pipefunc(output_name="c", renames={"a": "x"})
+def add(a: int, b: float) -> float:
+    """Add two numbers together."""
+    return a + b
+
+inspect.signature(add)
+```
+
+```{note}
+**Limitation:** static type checkers always see the *original* function signature.
+Features that rewrite the signature at runtime — `renames`, `scope`, and parameters added or removed via `update_defaults`/`update_bound` — cannot be expressed statically ([`ParamSpec`](https://peps.python.org/pep-0612/) captures the signature at decoration time).
+In the example above, calling `add(x=1, b=2.0)` is correct at runtime but will be flagged by a type checker, which expects `a`.
+This applies to unannotated functions too: the parameter *names* are captured even without type hints.
+If this comes up in your code, add a targeted `# type: ignore[call-arg]` (mypy) or `# pyright: ignore[reportCallIssue]` comment to the affected calls.
+Calls through `pipeline(...)`, `pipeline.run(...)`, and `pipeline.map(...)` are unaffected.
+```
