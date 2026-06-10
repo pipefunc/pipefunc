@@ -181,6 +181,7 @@ pipeline.cache.clear()
 - When using `pipeline.map` with `parallel=True`, the cache itself will be serialized, so one must use a cache that supports shared memory, such as {class}`~pipefunc.cache.LRUCache` with `shared=True` or a disk cache like {class}`~pipefunc.cache.DiskCache`.
 - The {func}`pipefunc.cache.to_hashable` function is used to attempt to ensure that input values are hashable, which is a requirement for storing results in a cache.
 - This function works for many common types but is not guaranteed to work for all types.
+- Cached values are isolated from mutations: the in-memory caches store and return deep copies (shared caches achieve the same via (de)serialization), so mutating a returned result does not corrupt the cache entry. If your results are large and you never mutate them, you can opt out of the copy overhead with e.g. ``LRUCache(shared=False, copy=False)`` or ``SimpleCache(copy=False)``.
 
 By understanding and utilizing `pipefunc`'s caching mechanisms effectively, you can significantly improve the performance of your pipelines, especially when dealing with computationally expensive functions or large datasets.
 

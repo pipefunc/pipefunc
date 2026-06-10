@@ -547,3 +547,53 @@ def test_pickling_and_deepcopy_disk(shared: bool, with_lru: bool) -> None:
         cache.put("key3", "value3")
         assert "key3" in cache
         assert "key3" in copied_cache
+
+
+@pytest.mark.parametrize("cache_type", ["lru", "hybrid", "simple"])
+def test_cache_returns_independent_copies(cache_type: str) -> None:
+    cache: LRUCache | HybridCache | SimpleCache
+    if cache_type == "lru":
+        cache = LRUCache(shared=False)
+    elif cache_type == "hybrid":
+        cache = HybridCache(shared=False)
+    else:
+        cache = SimpleCache()
+
+    value = {"a": [1, 2, 3]}
+    args = ("k", value, 1.0) if cache_type == "hybrid" else ("k", value)
+    cache.put(*args)
+
+    # Mutating the original object after `put` does not affect the cache
+    value["a"].append(4)
+    assert cache.get("k") == {"a": [1, 2, 3]}
+
+    # Mutating a returned value does not affect later hits
+    first = cache.get("k")
+    assert first is not None
+    first["a"][0] = 999
+    assert cache.get("k") == {"a": [1, 2, 3]}
+
+
+@pytest.mark.parametrize("cache_type", ["lru", "hybrid", "simple"])
+def test_cache_copy_false_aliases(cache_type: str) -> None:
+    cache: LRUCache | HybridCache | SimpleCache
+    if cache_type == "lru":
+        cache = LRUCache(shared=False, copy=False)
+    elif cache_type == "hybrid":
+        cache = HybridCache(shared=False, copy=False)
+    else:
+        cache = SimpleCache(copy=False)
+
+    value = {"a": [1, 2, 3]}
+    args = ("k", value, 1.0) if cache_type == "hybrid" else ("k", value)
+    cache.put(*args)
+    assert cache.get("k") is value
+
+
+def test_disk_cache_lru_returns_independent_copies(tmp_path: Path) -> None:
+    cache = DiskCache(cache_dir=str(tmp_path), with_lru_cache=True, lru_shared=False)
+    cache.put("k", {"a": [1, 2, 3]})
+    first = cache.get("k")
+    assert first is not None
+    first["a"][0] = 999
+    assert cache.get("k") == {"a": [1, 2, 3]}
