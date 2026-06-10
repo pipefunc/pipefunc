@@ -20,6 +20,8 @@ from typing import (
 
 import numpy as np
 
+from pipefunc._utils import is_imported
+
 
 class NoAnnotation:
     """Marker class for missing type annotations."""
@@ -243,10 +245,7 @@ def is_type_compatible(  # noqa: PLR0911
 
 def _is_polars_dataframe_to_lazyframe(incoming_type: Any, required_type: Any) -> bool:
     """Check for the special-cased `pl.DataFrame` output -> `pl.LazyFrame` input edge."""
-    # NOTE: Don't use `pipefunc._utils.is_imported` here; importing from `_utils`
-    # (which imports the stdlib `typing`) makes CodeQL flag a spurious import
-    # cycle with this `pipefunc.typing` module.
-    if "polars" not in sys.modules:
+    if not is_imported("polars"):
         return False
     import polars as pl
 
