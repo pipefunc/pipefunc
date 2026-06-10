@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from typing import TYPE_CHECKING, Any
 
 import numpy as np  # noqa: TC002, needed at runtime to resolve `np.ndarray` annotations
@@ -223,3 +224,11 @@ def test_to_hashable_lazyframe() -> None:
     lf = pl.DataFrame({"a": [1, 2]}).lazy()
     key = to_hashable(lf)
     assert hash(key) == hash(to_hashable(pl.DataFrame({"a": [1, 2]}).lazy()))
+
+
+def test_helpers_when_polars_not_imported(monkeypatch: pytest.MonkeyPatch) -> None:
+    from pipefunc._utils import is_lazyframe_annotation
+
+    monkeypatch.delitem(sys.modules, "polars")
+    assert not is_lazyframe_annotation(pl.LazyFrame)
+    assert not is_type_compatible(pl.DataFrame, pl.LazyFrame)
