@@ -12,6 +12,7 @@ import sys
 import time
 import warnings
 from contextlib import nullcontext, suppress
+from copy import deepcopy
 from multiprocessing import Manager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -21,6 +22,25 @@ import cloudpickle
 if TYPE_CHECKING:
     from collections.abc import Callable, Hashable, Iterable
     from multiprocessing.managers import DictProxy, ListProxy, SyncManager
+
+
+def _try_deepcopy(value: Any) -> Any:
+    """Deep copy ``value``, falling back to the original object if copying fails.
+
+    Caches that keep values in regular (non-shared) memory return the *same*
+    object on every hit. Without a copy, mutating a returned value (or the
+    value after it was stored) silently corrupts the cache entry.
+    """
+    try:
+        return deepcopy(value)
+    except Exception as e:  # noqa: BLE001  # pragma: no cover
+        warnings.warn(
+            f"Cannot deepcopy cached value of type `{type(value).__name__}` ({e!r});"
+            " using the original object instead. Mutating it will affect the cache.",
+            UserWarning,
+            stacklevel=3,
+        )
+        return value
 
 
 class _CacheBase(abc.ABC):
@@ -67,6 +87,12 @@ class HybridCache(_CacheBase):
         Use cloudpickle for storing the data in memory if using shared memory.
     shared
         Whether the cache should be shared between multiple processes.
+    copy
+        Whether to store and return deep copies of the values when the cache is
+        not shared (a shared cache already (de)serializes the values, which has
+        the same effect). This prevents mutations of returned values (or of the
+        original object after storing) from leaking into the cache. Set to
+        ``False`` to avoid the copy overhead for large values that are never mutated.
 
     """
 
@@ -78,6 +104,7 @@ class HybridCache(_CacheBase):
         *,
         allow_cloudpickle: bool = True,
         shared: bool = True,
+        copy: bool = True,
     ) -> None:
         """Initialize the HybridCache instance."""
         if shared:
@@ -96,6 +123,7 @@ class HybridCache(_CacheBase):
         self.duration_weight: float = duration_weight
         self.shared: bool = shared
         self._allow_cloudpickle: bool = allow_cloudpickle
+        self._copy: bool = copy
 
     @property
     def cache(self) -> dict[Hashable, Any]:
@@ -147,6 +175,9 @@ class HybridCache(_CacheBase):
         value = self._cache_dict[key]
         if self._allow_cloudpickle and self.shared:
             value = cloudpickle.loads(value)
+        elif not self.shared and self._copy:
+            # A shared cache returns a fresh copy via the manager proxy already.
+            value = _try_deepcopy(value)
         return value
 
     def put(self, key: Hashable, value: Any, duration: float) -> None:  # type: ignore[override]
@@ -167,6 +198,8 @@ class HybridCache(_CacheBase):
         """
         if self._allow_cloudpickle and self.shared:
             value = cloudpickle.dumps(value)
+        elif not self.shared and self._copy:
+            value = _try_deepcopy(value)
         with self._cache_lock:
             if len(self._cache_dict) >= self.max_size:
                 self._expire()
@@ -282,6 +315,12 @@ class LRUCache(_CacheBase):
         Use cloudpickle for storing the data in memory if using shared memory.
     shared
         Whether the cache should be shared between multiple processes.
+    copy
+        Whether to store and return deep copies of the values when the cache is
+        not shared (a shared cache already (de)serializes the values, which has
+        the same effect). This prevents mutations of returned values (or of the
+        original object after storing) from leaking into the cache. Set to
+        ``False`` to avoid the copy overhead for large values that are never mutated.
 
     """
 
@@ -291,11 +330,13 @@ class LRUCache(_CacheBase):
         max_size: int = 128,
         allow_cloudpickle: bool = True,
         shared: bool = True,
+        copy: bool = True,
     ) -> None:
         """Initialize the cache."""
         self.max_size = max_size
         self.shared = shared
         self._allow_cloudpickle = allow_cloudpickle
+        self._copy = copy
         if max_size == 0:  # pragma: no cover
             msg = "max_size must be greater than 0"
             raise ValueError(msg)
@@ -320,12 +361,17 @@ class LRUCache(_CacheBase):
             self._cache_queue.append(key)
         if self._allow_cloudpickle and self.shared:
             return cloudpickle.loads(value)
+        if not self.shared and self._copy:
+            # A shared cache returns a fresh copy via the manager proxy already.
+            return _try_deepcopy(value)
         return value
 
     def put(self, key: Hashable, value: Any) -> None:
         """Insert a key value pair into the cache."""
         if self._allow_cloudpickle and self.shared:
             value = cloudpickle.dumps(value)
+        elif not self.shared and self._copy:
+            value = _try_deepcopy(value)
         with self._cache_lock:
             self._cache_dict[key] = value
             cache_size = len(self._cache_queue)
@@ -386,19 +432,31 @@ class LRUCache(_CacheBase):
 
 
 class SimpleCache(_CacheBase):
-    """A simple cache without any eviction strategy."""
+    """A simple cache without any eviction strategy.
 
-    def __init__(self) -> None:
+    Parameters
+    ----------
+    copy
+        Whether to store and return deep copies of the values. This prevents
+        mutations of returned values (or of the original object after storing)
+        from leaking into the cache. Set to ``False`` to avoid the copy overhead
+        for large values that are never mutated.
+
+    """
+
+    def __init__(self, *, copy: bool = True) -> None:
         """Initialize the cache."""
         self._cache_dict: dict[Hashable, Any] = {}
+        self._copy = copy
 
     def get(self, key: Hashable) -> Any:
         """Get a value from the cache by key."""
-        return self._cache_dict.get(key)
+        value = self._cache_dict.get(key)
+        return _try_deepcopy(value) if self._copy else value
 
     def put(self, key: Hashable, value: Any) -> None:
         """Insert a key value pair into the cache."""
-        self._cache_dict[key] = value
+        self._cache_dict[key] = _try_deepcopy(value) if self._copy else value
 
     def __contains__(self, key: Hashable) -> bool:
         """Check if a key is present in the cache."""
