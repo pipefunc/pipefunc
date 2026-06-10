@@ -75,12 +75,13 @@ def load(path: Path, *, cache: bool = False) -> Any:
         cache_key = _get_cache_key(path)
         return _cached_load(cache_key)
 
-    if is_parquet_file(path):
-        import polars as pl
-
-        return pl.read_parquet(path)
-
     with path.open("rb") as f:
+        is_parquet = f.read(len(PARQUET_MAGIC)) == PARQUET_MAGIC
+        f.seek(0)
+        if is_parquet:
+            import polars as pl
+
+            return pl.read_parquet(f)
         return cloudpickle.load(f)
 
 

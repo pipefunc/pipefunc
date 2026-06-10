@@ -329,7 +329,7 @@ def _load_all(filenames: Iterator[Path]) -> list[Any]:
     def maybe_load(x: bytes | None) -> Any | None:
         if x is None:
             return None
-        if x[: len(PARQUET_MAGIC)] == PARQUET_MAGIC:
+        if x.startswith(PARQUET_MAGIC):
             import io
 
             import polars as pl

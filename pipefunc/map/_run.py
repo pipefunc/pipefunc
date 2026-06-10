@@ -751,18 +751,6 @@ def _maybe_scan_parquet(func: PipeFunc, parameter: str, store: dict[str, StoreTy
     return pl.scan_parquet(storage)
 
 
-def _convert_lazyframe_kwargs(func: PipeFunc, kwargs: dict[str, Any]) -> None:
-    """Convert `pl.DataFrame` values to `pl.LazyFrame` where the annotation asks for it."""
-    if not func._lazyframe_parameters:  # fast path, avoids per-element overhead
-        return
-    import polars as pl
-
-    for p in func._lazyframe_parameters:
-        value = kwargs.get(p)
-        if isinstance(value, pl.DataFrame):
-            kwargs[p] = value.lazy()
-
-
 def _select_kwargs(
     func: PipeFunc,
     kwargs: dict[str, Any],
@@ -776,7 +764,7 @@ def _select_kwargs(
     normalized_keys = {k: v[0] if len(v) == 1 else v for k, v in input_keys.items()}
     selected = {k: v[normalized_keys[k]] if k in normalized_keys else v for k, v in kwargs.items()}
     _load_data(selected)
-    _convert_lazyframe_kwargs(func, selected)
+    func._convert_lazyframe_kwargs(selected)
     return selected
 
 
@@ -1732,7 +1720,7 @@ def _execute_single(
 
     # Otherwise, run the function
     _load_data(kwargs)
-    _convert_lazyframe_kwargs(func, kwargs)
+    func._convert_lazyframe_kwargs(kwargs)
     if error_handling == "raise":
         return _get_or_set_cache(func, kwargs, cache, _CTX_RAISE, "raise")
 

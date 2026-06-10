@@ -882,6 +882,17 @@ class PipeFunc(Generic[P, R]):
         """Names of parameters annotated as `polars.LazyFrame`."""
         return tuple(p for p, a in self.parameter_annotations.items() if is_lazyframe_annotation(a))
 
+    def _convert_lazyframe_kwargs(self, kwargs: dict[str, Any]) -> None:
+        """Convert `pl.DataFrame` values to `pl.LazyFrame` where the annotation asks for it."""
+        if not self._lazyframe_parameters:  # fast path, avoids per-element overhead
+            return
+        import polars as pl
+
+        for p in self._lazyframe_parameters:
+            value = kwargs.get(p)
+            if isinstance(value, pl.DataFrame):
+                kwargs[p] = value.lazy()
+
     @functools.cached_property
     def output_annotation(self) -> dict[str, Any]:
         """Return the type annotation of the wrapped function's output."""
