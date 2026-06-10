@@ -672,14 +672,3 @@ def is_lazyframe_annotation(annotation: Any) -> bool:
     import polars as pl
 
     return annotation is pl.LazyFrame
-
-
-def maybe_lazyframe(value: Any, annotation: Any) -> Any:
-    """Convert a ``polars.DataFrame`` to a ``polars.LazyFrame`` if the annotation asks for it."""
-    if not is_lazyframe_annotation(annotation):
-        return value
-    import polars as pl
-
-    if isinstance(value, pl.DataFrame):
-        return value.lazy()
-    return value

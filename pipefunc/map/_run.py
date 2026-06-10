@@ -30,11 +30,8 @@ from pipefunc._utils import (
     dump,
     ensure_block_allowed,
     get_ncores,
-    is_imported,
-    is_lazyframe_annotation,
     is_parquet_file,
     is_running_in_ipynb,
-    maybe_lazyframe,
     prod,
 )
 from pipefunc._widgets.helpers import maybe_async_task_status_widget
@@ -742,7 +739,7 @@ def _maybe_scan_parquet(func: PipeFunc, parameter: str, store: dict[str, StoreTy
     disk as a Parquet file (see `pipefunc._utils.dump`). This avoids
     materializing the full `pl.DataFrame` in memory.
     """
-    if not is_lazyframe_annotation(func.parameter_annotations.get(parameter)):
+    if parameter not in func._lazyframe_parameters:
         return None
     if func.mapspec is not None and parameter in func.mapspec.input_names:
         return None
@@ -756,11 +753,14 @@ def _maybe_scan_parquet(func: PipeFunc, parameter: str, store: dict[str, StoreTy
 
 def _convert_lazyframe_kwargs(func: PipeFunc, kwargs: dict[str, Any]) -> None:
     """Convert `pl.DataFrame` values to `pl.LazyFrame` where the annotation asks for it."""
-    if not is_imported("polars"):
+    if not func._lazyframe_parameters:  # fast path, avoids per-element overhead
         return
-    for p, annotation in func.parameter_annotations.items():
-        if p in kwargs:
-            kwargs[p] = maybe_lazyframe(kwargs[p], annotation)
+    import polars as pl
+
+    for p in func._lazyframe_parameters:
+        value = kwargs.get(p)
+        if isinstance(value, pl.DataFrame):
+            kwargs[p] = value.lazy()
 
 
 def _select_kwargs(

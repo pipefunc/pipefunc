@@ -37,6 +37,7 @@ from pipefunc._utils import (
     clear_cached_properties,
     format_function_call,
     is_classmethod,
+    is_lazyframe_annotation,
     is_pydantic_base_model,
     requires,
 )
@@ -875,6 +876,11 @@ class PipeFunc(Generic[P, R]):
                 func = func.__call__  # type: ignore[operator]
         type_hints = safe_get_type_hints(func, include_extras=True)
         return {self.renames.get(k, k): v for k, v in type_hints.items() if k != "return"}
+
+    @functools.cached_property
+    def _lazyframe_parameters(self) -> tuple[str, ...]:
+        """Names of parameters annotated as `polars.LazyFrame`."""
+        return tuple(p for p, a in self.parameter_annotations.items() if is_lazyframe_annotation(a))
 
     @functools.cached_property
     def output_annotation(self) -> dict[str, Any]:
