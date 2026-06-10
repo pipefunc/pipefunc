@@ -774,8 +774,8 @@ def test_nested_pipefunc_preserve_cache_on_join() -> None:
     assert pipeline(a=1, b=2) == 18
     assert pipeline.cache is not None
     assert pipeline.cache.cache == {
-        ("c", (("a", 1), ("b", 2))): 3,
-        ("e", (("a", 1), ("b", 2))): 18,
+        (pipeline["c"]._cache_id, (("a", 1), ("b", 2))): 3,
+        (pipeline["e"]._cache_id, (("a", 1), ("b", 2))): 18,
     }
 
     # Check that the cache is preserved when combining pipelines and f+g is NestedPipeFunc
@@ -789,8 +789,8 @@ def test_nested_pipefunc_preserve_cache_on_join() -> None:
     assert pipeline["e"].cache
     assert pipeline(a=1, b=2) == 18
     assert pipeline.cache.cache == {
-        ("c-d", (("a", 1), ("b", 2))): (3, 6),
-        ("e", (("a", 1), ("b", 2))): 18,
+        (pipeline[("c", "d")]._cache_id, (("a", 1), ("b", 2))): (3, 6),
+        (pipeline["e"]._cache_id, (("a", 1), ("b", 2))): 18,
     }
 
 

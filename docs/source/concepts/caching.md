@@ -85,7 +85,15 @@ You can specify the cache type using the `cache_type` parameter when creating a 
 
 ## Cache Keys
 
-The cache key is computed based on the input values of each {class}`~pipefunc.PipeFunc`.
+The cache key is computed based on the input values of each {class}`~pipefunc.PipeFunc` *and* a fingerprint of the function's implementation (a hash of its source code).
+This means that editing a function invalidates its cached results: redefining a function in a Jupyter notebook, or restarting a script after changing the code, will not return stale results from a persistent {class}`~pipefunc.cache.DiskCache`.
+
+```{note}
+The fingerprint covers the function's own source only.
+Editing a *helper function* that the cached function calls does not invalidate the cache; define a custom [`__pipefunc_hash__`](#the-__pipefunc_hash__-method) method if you need to include more context.
+For callables whose implementation cannot be fingerprinted (e.g., builtins), a warning is emitted and the cache key falls back to the output name only.
+```
+
 When using `pipeline.run` or calling the pipeline as a function, the cache key is computed based solely on the root arguments provided to the pipeline. This means that _*only*_ the root arguments need to be "hashable" (see [section](#handling-unhashable-objects) below) for caching to work.
 When using `pipeline.map`, the cache key is computed based on the input values of each {class}`~pipefunc.PipeFunc`. That means that _*all*_ arguments to each cached function must be "hashable" (see [section](#handling-unhashable-objects) below) for caching to work.
 
@@ -188,8 +196,8 @@ By understanding and utilizing `pipefunc`'s caching mechanisms effectively, you 
 ## Advanced: Caching Stateful Functions
 
 When caching stateful functions, you need to be careful about the cache key because the function's internal state can affect the result, even if the input arguments are the same.
-By default, `pipefunc` computes the [cache key](#cache-keys) based on the function's input arguments.
-However, this is insufficient for stateful functions where the internal state can change the output.
+By default, `pipefunc` computes the [cache key](#cache-keys) based on the function's input arguments and a fingerprint of its implementation.
+However, this is insufficient for stateful functions where the internal state can change the output (instance state is not part of the fingerprint).
 
 To address this, `pipefunc` provides a mechanism to customize how the cache key is generated for stateful functions using the special `__pipefunc_hash__` method.
 
