@@ -2273,3 +2273,41 @@ def test_pipeline_call_with_list_output_name() -> None:
 
     pipeline = Pipeline([f, g])
     assert pipeline(["c", "d"], a=1, b=2) == (3, 6)
+
+
+def test_nest_funcs_flexible_output_names() -> None:
+    def make_pipeline() -> Pipeline:
+        @pipefunc(output_name="c")
+        def f(a, b):
+            return a + b
+
+        @pipefunc(output_name="d")
+        def g(c):
+            return 2 * c
+
+        return Pipeline([f, g])
+
+    # list instead of set
+    pipeline = make_pipeline()
+    nf = pipeline.nest_funcs(["c", "d"], new_output_name="d")
+    assert nf.output_name == "d"
+    assert pipeline(a=1, b=2) == 6
+
+    # a single output name normalizes but still requires >= 2 functions to nest
+    pipeline = make_pipeline()
+    with pytest.raises(ValueError, match="at least two"):
+        pipeline.nest_funcs("c")
+
+
+def test_pipeline_func_default_output_name() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(c):
+        return 2 * c
+
+    pipeline = Pipeline([f, g])
+    assert pipeline.func()(a=1, b=2) == 6
+    assert pipeline.func("c")(a=1, b=2) == 3

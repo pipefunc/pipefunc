@@ -77,7 +77,7 @@ def load_all_outputs(run_folder: str | Path) -> dict[str, Any]:
 
 
 def load_xarray_dataset(
-    *output_name: str,
+    *output_names: str,
     run_folder: str | Path,
     load_intermediate: bool = True,
 ) -> xr.Dataset:
@@ -85,7 +85,7 @@ def load_xarray_dataset(
 
     Parameters
     ----------
-    output_name
+    output_names
         The names of the outputs to load. If empty, all outputs are loaded.
     run_folder
         The folder where the pipeline run was stored.
@@ -105,13 +105,13 @@ def load_xarray_dataset(
         run_info.mapspecs,
         run_info.inputs,
         run_folder=run_folder,
-        output_names=output_name or None,  # type: ignore[arg-type]
+        output_names=output_names or None,  # type: ignore[arg-type]
         load_intermediate=load_intermediate,
     )
 
 
 def load_dataframe(
-    *output_name: str,
+    *output_names: str,
     run_folder: str | Path,
     load_intermediate: bool = True,
     backend: Literal["pandas", "polars"] = "pandas",
@@ -120,7 +120,7 @@ def load_dataframe(
 
     Parameters
     ----------
-    output_name
+    output_names
         The names of the outputs to load. If empty, all outputs are loaded.
     run_folder
         The folder where the pipeline run was stored.
@@ -137,7 +137,7 @@ def load_dataframe(
     from .xarray import xarray_dataset_to_dataframe
 
     ds = load_xarray_dataset(
-        *output_name,
+        *output_names,
         run_folder=run_folder,
         load_intermediate=load_intermediate,
     )

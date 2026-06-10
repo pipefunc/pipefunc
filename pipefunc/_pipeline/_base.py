@@ -515,19 +515,27 @@ class Pipeline:
                 g.add_edge(_Resources(f.resources_variable, f.output_name), f)
         return g
 
-    def func(self, output_name: OUTPUT_TYPE | list[OUTPUT_TYPE]) -> _PipelineAsFunc:
+    def func(
+        self,
+        output_name: OUTPUT_TYPE | list[OUTPUT_TYPE] | None = None,
+    ) -> _PipelineAsFunc:
         """Create a composed function that can be called with keyword arguments.
 
         Parameters
         ----------
         output_name
-            The identifier for the return value of the composed function.
+            The identifier for the return value of the composed function. Can be a
+            single output name or a list of output names. If ``None``, the output
+            name of the unique leaf node is used, or all leaf nodes if there are
+            multiple (returning a tuple of their outputs).
 
         Returns
         -------
             The composed function that can be called with keyword arguments.
 
         """
+        if output_name is None:
+            output_name = self._default_output_name()
         key = tuple(output_name) if isinstance(output_name, list) else output_name
         if f := self._internal_cache.func.get(key):
             return f
@@ -2098,7 +2106,7 @@ class Pipeline:
 
     def nest_funcs(
         self,
-        output_names: set[OUTPUT_TYPE] | Literal["*"],
+        output_names: OUTPUT_TYPE | Iterable[OUTPUT_TYPE] | Literal["*"],
         new_output_name: OUTPUT_TYPE | None = None,
         function_name: str | None = None,
     ) -> NestedPipeFunc:
@@ -2107,8 +2115,10 @@ class Pipeline:
         Parameters
         ----------
         output_names
-            The output names to nest in a `NestedPipeFunc`. Can also be ``"*"`` to nest all functions
-            in the pipeline into a single `NestedPipeFunc`.
+            The output names to nest in a `NestedPipeFunc`. Can be a single output name
+            (a ``tuple`` is the output name of a function with multiple outputs, as in
+            `Pipeline.run`) or a collection of output names. Can also be ``"*"`` to nest
+            all functions in the pipeline into a single `NestedPipeFunc`.
         new_output_name
             The identifier for the output of the wrapped function. If ``None``, it is automatically
             constructed from all the output names of the `PipeFunc` instances. Must be a subset of
@@ -2125,7 +2135,9 @@ class Pipeline:
         if output_names == "*":
             funcs = self.functions.copy()
         else:
-            funcs = [self.output_to_func[output_name] for output_name in output_names]
+            names = ensure_output_names_set(output_names)
+            assert names is not None
+            funcs = [self.output_to_func[output_name] for output_name in names]
 
         for f in funcs:
             self.drop(f=f)
