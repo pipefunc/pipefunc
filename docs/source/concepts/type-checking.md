@@ -149,6 +149,7 @@ inspect.signature(add)
 **Limitation:** static type checkers always see the *original* function signature.
 Features that rewrite the signature at runtime — `renames`, `scope`, and parameters added or removed via `update_defaults`/`update_bound` — cannot be expressed statically ([`ParamSpec`](https://peps.python.org/pep-0612/) captures the signature at decoration time).
 In the example above, calling `add(x=1, b=2.0)` is correct at runtime but will be flagged by a type checker, which expects `a`.
-If this comes up in your code, add a targeted `# type: ignore[call-arg]` (mypy) or `# pyright: ignore[reportCallIssue]` comment, or leave the function unannotated (calls to unannotated functions are not checked).
+This applies to unannotated functions too: the parameter *names* are captured even without type hints.
+If this comes up in your code, add a targeted `# type: ignore[call-arg]` (mypy) or `# pyright: ignore[reportCallIssue]` comment to the affected calls.
 Calls through `pipeline(...)`, `pipeline.run(...)`, and `pipeline.map(...)` are unaffected.
 ```
