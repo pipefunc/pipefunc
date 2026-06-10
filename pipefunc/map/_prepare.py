@@ -5,7 +5,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeVar
 
 from pipefunc._pipeline._pydantic import maybe_pydantic_model_to_dict
-from pipefunc._utils import at_least_tuple, is_running_in_ipynb
+from pipefunc._utils import at_least_tuple, ensure_output_names_set, is_running_in_ipynb
 
 from ._adaptive_scheduler_slurm_executor import validate_slurm_executor
 from ._mapspec import validate_consistent_axes
@@ -14,7 +14,7 @@ from ._result import ResultDict
 from ._run_info import RunInfo
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterable
     from concurrent.futures import Executor
     from pathlib import Path
 
@@ -47,7 +47,7 @@ def prepare_run(
     inputs: dict[str, Any] | pydantic.BaseModel,
     run_folder: str | Path | None,
     internal_shapes: UserShapeDict | None,
-    output_names: set[OUTPUT_TYPE] | None,
+    output_names: OUTPUT_TYPE | Iterable[OUTPUT_TYPE] | None,
     parallel: bool,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
@@ -67,6 +67,7 @@ def prepare_run(
     inputs = maybe_pydantic_model_to_dict(inputs)
     pipeline._validate_scoped_parameters(inputs)
     inputs = pipeline._flatten_scopes(inputs)
+    output_names = ensure_output_names_set(output_names)
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
     executor = _expand_output_name_in_executor(pipeline, executor)

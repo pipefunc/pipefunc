@@ -2226,3 +2226,88 @@ def test_legacy_fix(tmp_path: Path) -> None:
     assert legacy_data_2["run_folder"] == str(run_folder_2.resolve())
     assert legacy_data_2["defaults_path"] == "defaults/defaults.cloudpickle"
     assert legacy_data_2["input_paths"]["a"] == "inputs/a.cloudpickle"
+
+
+def test_map_output_names_flexible_types(tmp_path: Path) -> None:
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def f(x: int) -> int:
+        return x
+
+    @pipefunc(output_name=("z1", "z2"))
+    def g(y: Array[int]) -> tuple[int, int]:
+        return sum(y), len(y)
+
+    pipeline = Pipeline([f, g])
+    inputs = {"x": [1, 2, 3]}
+
+    # single output name as a bare string
+    r = pipeline.map(inputs, tmp_path, output_names="y", parallel=False, storage="dict")
+    assert len(r) == 1
+    assert r["y"].output.tolist() == [1, 2, 3]
+
+    # list of output names
+    r = pipeline.map(inputs, tmp_path, output_names=["y"], parallel=False, storage="dict")
+    assert len(r) == 1
+    assert r["y"].output.tolist() == [1, 2, 3]
+
+    # a tuple is a single (multiple-output) output name, like in `pipeline.run`
+    r = pipeline.map(inputs, output_names=("z1", "z2"), parallel=False, storage="dict")
+    assert r["z1"].output == 6
+    assert r["z2"].output == 3
+
+    # subpipeline accepts the same flexible types
+    partial = pipeline.subpipeline(output_names=["y"])
+    r = partial.map(inputs, tmp_path, parallel=False, storage="dict")
+    assert len(r) == 1
+    assert r["y"].output.tolist() == [1, 2, 3]
+
+
+def test_pipeline_call_with_list_output_name() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(c):
+        return 2 * c
+
+    pipeline = Pipeline([f, g])
+    assert pipeline(["c", "d"], a=1, b=2) == (3, 6)
+
+
+def test_nest_funcs_flexible_output_names() -> None:
+    def make_pipeline() -> Pipeline:
+        @pipefunc(output_name="c")
+        def f(a, b):
+            return a + b
+
+        @pipefunc(output_name="d")
+        def g(c):
+            return 2 * c
+
+        return Pipeline([f, g])
+
+    # list instead of set
+    pipeline = make_pipeline()
+    nf = pipeline.nest_funcs(["c", "d"], new_output_name="d")
+    assert nf.output_name == "d"
+    assert pipeline(a=1, b=2) == 6
+
+    # a single output name normalizes but still requires >= 2 functions to nest
+    pipeline = make_pipeline()
+    with pytest.raises(ValueError, match="at least two"):
+        pipeline.nest_funcs("c")
+
+
+def test_pipeline_func_default_output_name() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(c):
+        return 2 * c
+
+    pipeline = Pipeline([f, g])
+    assert pipeline.func()(a=1, b=2) == 6
+    assert pipeline.func("c")(a=1, b=2) == 3

@@ -28,6 +28,24 @@ if TYPE_CHECKING:
     import pydantic
     from griffe import DocstringSection
 
+    from pipefunc._pipeline._types import OUTPUT_TYPE
+
+
+def ensure_output_names_set(
+    output_names: OUTPUT_TYPE | Iterable[OUTPUT_TYPE] | None,
+) -> set[OUTPUT_TYPE] | None:
+    """Normalize ``output_names`` to a set of output names.
+
+    A single ``str`` or ``tuple`` is treated as one output name (a ``tuple`` is
+    the output name of a function with multiple outputs, matching `Pipeline.run`);
+    any other iterable is treated as a collection of output names.
+    """
+    if output_names is None or isinstance(output_names, set):
+        return output_names
+    if isinstance(output_names, (str, tuple)):
+        return {output_names}
+    return set(output_names)
+
 
 def at_least_tuple(x: Any) -> tuple[Any, ...]:
     """Convert x to a tuple if it is not already a tuple."""

@@ -25,7 +25,7 @@ kernelspec:
 
 These methods are used to execute the pipeline but have different use cases:
 
-- `pipeline.run(output_name, kwargs)` is used to execute the pipeline as a function and is fully sequential. It allows going from any input arguments to any output arguments. It does **not** support map-reduce operations. Internally, it keeps all intermediate results in memory in a dictionary.
+- `pipeline.run(output_name, kwargs)` is used to execute the pipeline as a function and is fully sequential. The `output_name` is optional; if omitted, the unique leaf node is used, or all leaf nodes if there are multiple (returning a tuple). It allows going from any input arguments to any output arguments. It does **not** support map-reduce operations. Internally, it keeps all intermediate results in memory in a dictionary.
 - `pipeline.map(inputs, ...)` is used to execute the pipeline in parallel. It supports map-reduce operations and is optimized for parallel execution. Internally, it puts all intermediate results in a {class}`~pipefunc.map.StorageBase` (there are implementations for storing on disk or in memory).
 
 ```{note}
@@ -34,6 +34,8 @@ Internally, the `pipeline.run` method is called when using the pipeline as a fun
 - `pipeline.run(output_name, kwargs)`
 - `pipeline(output_name, **kwargs)`
 - `f = pipeline.func(output_name)` and then `f(**kwargs)`
+
+In all three, `output_name` may be omitted to use the leaf node(s) of the pipeline.
 
 ```
 
@@ -44,7 +46,7 @@ Here is a table summarizing the differences between `pipeline.run` and `pipeline
 | Execution mode                                         | Sequential                                                                       | Parallel (any {class}`~concurrent.futures.Executor` class) or sequential                                               |
 | Map-reduce support (via {class}`pipefunc.map.MapSpec`) | No                                                                               | Yes                                                                                                                    |
 | Input arguments                                        | Can provide _any_ input arguments for any function in the pipeline               | Requires the root arguments (use {class}`~pipefunc.Pipeline.subpipeline` to get a subgraph)                            |
-| Output arguments                                       | Can request the output of any function in the pipeline                           | Calculates _all_ function nodes in the entire pipeline (use {class}`~pipefunc.Pipeline.subpipeline` to get a subgraph) |
+| Output arguments                                       | Can request the output of any function in the pipeline                           | Calculates _all_ outputs by default; select specific ones with ``output_names=...``                                    |
 | Intermediate results storage                           | In-memory dictionary                                                             | Configurable storage ({class}`~pipefunc.map.StorageBase`), e.g., on disk, cloud, or in (shared-)memory                 |
 | Use case                                               | Executing the pipeline as a regular function, going from any input to any output | Optimized for parallel execution and map-reduce operations                                                             |
 | Calling syntax                                         | `pipeline.run(output_name, kwargs)` or `pipeline(output_name, **kwargs)`         | `pipeline.map(inputs, ...)`                                                                                            |
