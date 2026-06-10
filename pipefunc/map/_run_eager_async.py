@@ -21,7 +21,7 @@ from pipefunc.map._run_eager import (
 from ._run_info import _handle_cleanup_deprecation
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterable
     from concurrent.futures import Executor
     from pathlib import Path
 
@@ -46,7 +46,7 @@ def run_map_eager_async(
     run_folder: str | Path | None = None,
     internal_shapes: UserShapeDict | None = None,
     *,
-    output_names: set[OUTPUT_TYPE] | None = None,
+    output_names: OUTPUT_TYPE | Iterable[OUTPUT_TYPE] | None = None,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
     storage: StorageType | None = None,
@@ -91,7 +91,10 @@ def run_map_eager_async(
         The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
         If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
     output_names
-        The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
+        The output(s) to calculate. Can be a single output name (a ``tuple`` is the
+        output name of a function with multiple outputs, as in `Pipeline.run`) or a
+        collection of output names. If ``None``, the entire pipeline is run and all
+        outputs are computed.
     executor
         The executor to use for parallel execution. Can be specified as:
 
