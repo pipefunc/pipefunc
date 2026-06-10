@@ -597,3 +597,53 @@ def test_disk_cache_lru_returns_independent_copies(tmp_path: Path) -> None:
     assert first is not None
     first["a"][0] = 999
     assert cache.get("k") == {"a": [1, 2, 3]}
+
+
+def test_compute_function_hash() -> None:
+    from pipefunc.cache import compute_function_hash
+
+    def make(version: int):
+        if version == 1:
+
+            def f(a):
+                return a + 1
+
+        else:
+
+            def f(a):
+                return a + 2
+
+        return f
+
+    # identical source -> identical hash; different body -> different hash
+    assert compute_function_hash(make(1)) == compute_function_hash(make(1))
+    assert compute_function_hash(make(1)) != compute_function_hash(make(2))
+
+    # partial: bound arguments are folded into the hash
+    import functools
+
+    def g(a, b):
+        return a + b
+
+    assert compute_function_hash(functools.partial(g, b=1)) != compute_function_hash(
+        functools.partial(g, b=2),
+    )
+
+    # exec-defined function: no source available, falls back to the code object
+    ns1: dict = {}
+    ns2: dict = {}
+    exec("def h(x): return x + 1", ns1)  # noqa: S102
+    exec("def h(x): return x + 2", ns2)  # noqa: S102
+    h1, h2 = compute_function_hash(ns1["h"]), compute_function_hash(ns2["h"])
+    assert h1 is not None
+    assert h1 != h2
+
+    # builtins cannot be fingerprinted
+    assert compute_function_hash(len) is None
+
+    # callable class instances are fingerprinted via their class
+    class Adder:
+        def __call__(self, a):
+            return a + 1
+
+    assert compute_function_hash(Adder()) == compute_function_hash(Adder())

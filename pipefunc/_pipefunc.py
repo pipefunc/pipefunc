@@ -12,6 +12,7 @@ import contextlib
 import dataclasses
 import datetime
 import functools
+import hashlib
 import inspect
 import os
 import warnings
@@ -41,6 +42,7 @@ from pipefunc._utils import (
     is_pydantic_base_model,
     requires,
 )
+from pipefunc.cache import compute_function_hash
 from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
@@ -1042,11 +1044,26 @@ class PipeFunc(Generic[P, R]):
 
     @functools.cached_property
     def _cache_id(self) -> str:
-        """Return a unique identifier for the function used in cache keys."""
+        """Return a unique identifier for the function used in cache keys.
+
+        Includes a fingerprint of the function's implementation, so that
+        editing a function invalidates its cached results (e.g., when
+        redefining a function in a Jupyter notebook or when using a
+        persistent `~pipefunc.cache.DiskCache` across sessions).
+        """
         name = "-".join(at_least_tuple(self.output_name))
         if hasattr(self.func, "__pipefunc_hash__"):
             pipefunc_hash = self.func.__pipefunc_hash__()
             return f"{name}-{pipefunc_hash}"
+        if (function_hash := compute_function_hash(self.func)) is not None:
+            return f"{name}-{function_hash}"
+        warnings.warn(
+            f"Cannot fingerprint the implementation of `{self.__name__}` for the cache key;"
+            " cached results will not be invalidated when the function changes."
+            " Define a `__pipefunc_hash__` method on the callable to control this.",
+            UserWarning,
+            stacklevel=2,
+        )
         return name
 
 
@@ -1398,6 +1415,14 @@ class NestedPipeFunc(PipeFunc):
         f._bound = self._bound.copy()
         f.debug = self.debug
         return f
+
+    @functools.cached_property
+    def _cache_id(self) -> str:
+        """Return a unique identifier combining the nested functions' identifiers."""
+        name = "-".join(at_least_tuple(self.output_name))
+        combined = "|".join(f._cache_id for f in self.pipeline.sorted_functions)
+        digest = hashlib.sha256(combined.encode()).hexdigest()[:16]
+        return f"{name}-{digest}"
 
     def _combine_mapspecs(self) -> MapSpec | None:
         mapspecs = [f.mapspec for f in self.pipeline.functions]
