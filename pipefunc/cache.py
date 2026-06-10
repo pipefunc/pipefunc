@@ -7,9 +7,11 @@ import array
 import collections
 import functools
 import hashlib
+import inspect
 import pickle
 import sys
 import time
+import types
 import warnings
 from contextlib import nullcontext, suppress
 from copy import deepcopy
@@ -22,6 +24,65 @@ import cloudpickle
 if TYPE_CHECKING:
     from collections.abc import Callable, Hashable, Iterable
     from multiprocessing.managers import DictProxy, ListProxy, SyncManager
+
+
+def compute_function_hash(func: Callable[..., Any]) -> str | None:
+    """Compute a short hash that fingerprints a callable's implementation.
+
+    Used in cache keys so that editing a function invalidates its cached
+    results (e.g., when redefining a function in a Jupyter notebook or when
+    using a persistent `DiskCache` across sessions).
+
+    The fingerprint is derived from, in order of preference:
+
+    1. The source code (``inspect.getsource``) of the callable.
+    2. The code object's bytecode, constants, and names (when no source is
+       available, e.g., for ``exec``-defined functions).
+    3. For callable class instances, the class is fingerprinted instead. Note
+       that instance *state* is not included; use ``__pipefunc_hash__`` for
+       stateful callables.
+
+    `functools.partial` objects are unwrapped and their bound arguments are
+    folded into the hash.
+
+    Returns ``None`` if no fingerprint can be computed (e.g., for builtins).
+    """
+    parts: list[str] = []
+    while isinstance(func, functools.partial):
+        parts.append(repr((func.args, sorted(func.keywords.items()))))
+        func = func.func
+    fingerprint = _fingerprint_callable(func)
+    if fingerprint is None:
+        return None
+    parts.append(fingerprint)
+    return hashlib.sha256("\n".join(parts).encode()).hexdigest()[:16]
+
+
+def _fingerprint_callable(obj: Any) -> str | None:
+    with suppress(Exception):
+        return inspect.getsource(obj)
+    code = getattr(obj, "__code__", None)
+    if code is not None:
+        return repr(
+            (
+                _code_repr(code),
+                getattr(obj, "__defaults__", None),
+                getattr(obj, "__kwdefaults__", None),
+            ),
+        )
+    if callable(obj) and not inspect.isroutine(obj) and not inspect.isclass(obj):
+        # A callable class instance: fingerprint its class.
+        return _fingerprint_callable(type(obj))
+    return None
+
+
+def _code_repr(code: types.CodeType) -> str:
+    # `repr` of a code object contains its memory address, so expand nested
+    # code objects (e.g., of inner functions and comprehensions) recursively.
+    consts = tuple(
+        _code_repr(c) if isinstance(c, types.CodeType) else repr(c) for c in code.co_consts
+    )
+    return repr((code.co_code, consts, code.co_names))
 
 
 def _try_deepcopy(value: Any) -> Any:

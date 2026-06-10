@@ -130,9 +130,9 @@ def test_running_dag_pipeline():
 
     assert dag.mapping
     expected = [
-        ("c", (("a", 1), ("b", 2))),
-        ("d", (("a", 1), ("b", 2), ("x", 1))),
-        ("e", (("a", 1), ("b", 2), ("x", 1))),
+        (pipeline["c"]._cache_id, (("a", 1), ("b", 2))),
+        (pipeline["d"]._cache_id, (("a", 1), ("b", 2), ("x", 1))),
+        (pipeline["e"]._cache_id, (("a", 1), ("b", 2), ("x", 1))),
     ]
     assert list(dag.cache.cache) == expected
 
