@@ -4,13 +4,14 @@ from __future__ import annotations
 import asyncio
 import time
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
-from pipefunc._utils import clip
+from pipefunc._utils import at_least_tuple, clip
+from pipefunc.map._progress import Status
 
 if TYPE_CHECKING:
     from pipefunc._pipeline._types import OUTPUT_TYPE
-    from pipefunc.map._progress import Status
 
 
 class ProgressTrackerBase(ABC):
@@ -136,3 +137,40 @@ class ProgressTrackerBase(ABC):
     def _update_sync_interval(self, update_duration: float) -> None:
         """Update the sync interval based on how long the update took."""
         self._sync_update_interval = clip(50 * update_duration, 0.01, 1.0)
+
+    def combined_progress(self) -> dict[OUTPUT_TYPE, Status]:
+        """Calculate combined progress for each scope."""
+        grouped: dict[str, list[Status]] = defaultdict(list)
+        for output_name, status in self.progress_dict.items():
+            scope, name = _split_scope_and_name(at_least_tuple(output_name)[0])
+            key = scope or name
+            grouped[key].append(status)
+
+        combined_progress: dict[OUTPUT_TYPE, Status] = {}
+        for key, statuses in grouped.items():
+            if len(statuses) == 1:
+                combined_progress[key] = statuses[0]
+                continue
+            n_totals = [s.n_total for s in statuses]
+            n_total = None if None in n_totals else sum(n_totals)  # type: ignore[arg-type]
+            start_times = [s.start_time for s in statuses]
+            start_time = None if None in start_times else min(start_times)  # type: ignore[type-var]
+            end_times = [s.end_time for s in statuses]
+            end_time = None if None in end_times else max(end_times)  # type: ignore[type-var]
+            scope_status = Status(
+                n_total=n_total,
+                n_in_progress=sum(s.n_in_progress for s in statuses),
+                n_completed=sum(s.n_completed for s in statuses),
+                n_failed=sum(s.n_failed for s in statuses),
+                start_time=start_time,
+                end_time=end_time,
+            )
+            combined_progress[key] = scope_status
+        return combined_progress
+
+
+def _split_scope_and_name(name: str) -> tuple[None | str, str]:
+    if "." not in name:
+        return None, name
+    scope, name = name.split(".", 1)
+    return scope, name
