@@ -91,15 +91,23 @@ def make_mesh(geo: Geometry, mesh_size: float, coarse_mesh_size: float = 0.1):
 def make_materials(geo: Geometry) -> Materials:
     return Materials(geo, ["i", "j", "c"])
 
-@pipefunc(output_name="electrostatics", mapspec="V_left[i], V_right[j] -> electrostatics[i, j]")
-def run_electrostatics(mesh, materials, V_left: float, V_right: float) -> Electrostatics:
+@pipefunc(
+    output_name="electrostatics",
+    mapspec="V_left[i], V_right[j] -> electrostatics[i, j]",
+)
+def run_electrostatics(
+    mesh, materials, V_left: float, V_right: float
+) -> Electrostatics:
     return Electrostatics(mesh, materials, [V_left, V_right])
 
-@pipefunc(output_name="charge", mapspec="electrostatics[i, j] -> charge[i, j]")
+@pipefunc(
+    output_name="charge",
+    mapspec="electrostatics[i, j] -> charge[i, j]",
+)
 def get_charge(electrostatics: Electrostatics) -> float:
     return sum(electrostatics.voltages)
 
-@pipefunc(output_name="average_charge")  # no mapspec: receives the full 2D array
+@pipefunc(output_name="average_charge")  # no mapspec: gets the full 2D array
 def average_charge(charge: np.ndarray) -> float:
     return np.mean(charge)
 
@@ -115,7 +123,7 @@ Extending the study requires no changes to the functions: `Pipeline.add_mapspec_
 pipeline.add_mapspec_axis("x", axis="a")
 pipeline.add_mapspec_axis("y", axis="b")
 results = pipeline.map(new_inputs, run_folder="run", parallel=True)
-ds = results.to_xarray()  # labeled 4D Dataset with coordinates V_left, V_right, x, y
+ds = results.to_xarray()  # labeled 4D Dataset (V_left, V_right, x, y)
 ```
 
 \autoref{fig:pipeline} shows the resulting pipeline as rendered by `pipeline.visualize()`.
