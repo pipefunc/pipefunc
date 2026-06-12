@@ -16,7 +16,7 @@ jobs:
     env:
       python-version: "3.13"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.3
         with:
           fetch-depth: 0
 
@@ -27,7 +27,7 @@ jobs:
           cat environment.yml
 
       - name: Install Conda environment with micromamba
-        uses: mamba-org/setup-micromamba@v3
+        uses: mamba-org/setup-micromamba@v3.0.0
         with:
           environment-file: environment.yml
           cache-environment: true
@@ -38,7 +38,7 @@ jobs:
           pip install -e ".[test,all]"
 
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@v4
+        uses: CodSpeedHQ/action@v4.17.5
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           mode: instrumentation
