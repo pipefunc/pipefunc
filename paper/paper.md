@@ -13,9 +13,11 @@ authors:
     orcid: 0000-0003-0383-4986
     affiliation: "1, 2"
 affiliations:
-  - name: IonQ Inc., College Park, Maryland, USA
+  - name: Delft University of Technology, Delft, The Netherlands
     index: 1
-date: 10 June 2026
+  - name: Current address — IonQ Inc., College Park, Maryland, USA
+    index: 2
+date: 12 June 2026
 bibliography: paper.bib
 ---
 
@@ -67,7 +69,7 @@ Because mapspecs are data rather than code, `pipefunc` can validate shapes befor
 The trade-off is a learning curve for the index notation, which is kept minimal by mirroring NumPy's einsum syntax.
 
 Third, execution, storage, and resource management are orthogonal plug-ins.
-A pipeline runs on any `concurrent.futures.Executor`; results go to any of several storage backends; per-function resource requirements (CPUs, memory, GPUs, wall time) can be declared—optionally as functions of the input arguments—and are translated into SLURM job submissions automatically.
+A pipeline runs on any `concurrent.futures.Executor`; results go to any of several storage backends; per-function resource requirements (CPUs, memory, GPUs, wall time) can be declared—optionally as functions of the input arguments—and are translated into SLURM job submissions automatically through the Adaptive Scheduler backend.
 Different functions in one pipeline can use different executors and stores.
 The per-function scheduling overhead is roughly 10 µs on a recent laptop (Apple M4), measured over a 125,000-iteration sweep, so the framework remains usable even for pipelines of many fast functions.
 
