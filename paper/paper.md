@@ -107,16 +107,25 @@ def run_electrostatics(
 def get_charge(electrostatics: Electrostatics) -> float:
     return sum(electrostatics.voltages)
 
+@pipefunc(
+    output_name="avg_over_V_left",
+    mapspec="charge[:, j] -> avg_over_V_left[j]",  # reduce axis i, keep j
+)
+def avg_over_V_left(charge: np.ndarray) -> float:
+    return np.mean(charge)  # 1D result: one value per V_right
+
 @pipefunc(output_name="average_charge")  # no mapspec: gets the full 2D array
 def average_charge(charge: np.ndarray) -> float:
-    return np.mean(charge)
+    return np.mean(charge)  # scalar: reduces the entire array
 
 pipeline = Pipeline([make_geometry, make_mesh, make_materials,
-                     run_electrostatics, get_charge, average_charge])
+                     run_electrostatics, get_charge,
+                     avg_over_V_left, average_charge])
 results = pipeline.map(inputs, run_folder="run", parallel=True)
 ```
 
-The mapspec on `run_electrostatics` declares an outer product over the voltage arrays, `get_charge` maps element-wise over the resulting 2D array, and `average_charge`—having no mapspec—receives the fully assembled array and reduces it.
+The mapspec on `run_electrostatics` declares an outer product over the voltage arrays, and `get_charge` maps element-wise over the resulting 2D array.
+Reductions are equally expressible through the same index algebra: `avg_over_V_left` uses `charge[:, j] -> avg_over_V_left[j]` to average over the `V_left` axis while keeping `V_right`, turning the 2D array into a 1D one, whereas `average_charge`—having no mapspec—receives the fully assembled array and reduces it to a scalar.
 Extending the study requires no changes to the functions: `Pipeline.add_mapspec_axis` rewrites the mapspecs of all downstream functions, so a two-parameter study becomes a four-dimensional one in two lines:
 
 ```python
