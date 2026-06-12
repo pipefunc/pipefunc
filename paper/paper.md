@@ -72,6 +72,9 @@ A pipeline runs on any `concurrent.futures.Executor`; results go to any of sever
 Different functions in one pipeline can use different executors and stores.
 The per-function scheduling overhead is roughly 15 µs, so the framework remains usable even for pipelines of many fast functions.
 
+The pipeline supports two complementary execution modes.
+Beyond the parallel map-reduce of `pipeline.map`, a pipeline can be called directly for any single output (`pipeline("e", a=1, b=2)`), computing only the required upstream functions sequentially on demand; intermediate results can also be supplied to bypass upstream functions (`pipeline("e", c=3, d=6)`), which is convenient for interactive exploration and debugging.
+
 The following condensed example, modeled on a typical device-simulation workflow, shows the pieces working together (imports and dataclass definitions are omitted; the full runnable version is the physics-based example in the documentation).
 The objects passed between functions are plain frozen dataclasses; the functions contain no `pipefunc`-specific code beyond the decorator.
 
