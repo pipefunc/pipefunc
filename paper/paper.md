@@ -118,7 +118,7 @@ ds = results.to_xarray()  # labeled 4D Dataset with coordinates V_left, V_right,
 \autoref{fig:pipeline} shows the resulting pipeline as rendered by `pipeline.visualize()`.
 Because the DAG is known before execution, the same pipeline can be inspected (`pipeline.print_documentation()` renders the functions' docstrings as pipeline documentation), validated (type annotations are checked between connected functions), restructured (`pipeline.nest_funcs` merges nodes so that large intermediate objects are never serialized), profiled, cached, and resumed after partial failure—all without touching the underlying functions.
 
-![The example pipeline after adding the `x` and `y` sweep axes, as rendered by `pipeline.visualize()`. Green dashed nodes are inputs, blue nodes are functions; each function node lists its outputs with mapspec indices and type annotations.\label{fig:pipeline}](pipeline.svg)
+![The example pipeline after adding the `x` and `y` sweep axes, as rendered by `pipeline.visualize()`. Green dashed nodes are inputs, blue nodes are functions; each function node lists its outputs with mapspec indices and type annotations.\label{fig:pipeline}](pipeline.pdf)
 
 The implementation is fully typed, has over 99.9% line coverage from more than 1100 tests (enforced in continuous integration and tracked on Codecov), and has only three required dependencies.
 
