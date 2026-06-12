@@ -37,9 +37,8 @@ Such scripts are difficult to test, to resume after partial failure, and to migr
 Existing workflow tools solve parts of this problem but typically demand that the user restructure their code or operate substantial infrastructure (see *State of the field*).
 
 `pipefunc` addresses this with a deliberately small conceptual surface: ordinary Python functions plus output names plus mapspecs.
-Crucially, the function bodies and signatures remain framework-agnostic—they accept and return plain Python objects and carry no framework-specific types.
-All orchestration metadata lives in a thin wrapper, applied either as the `@pipefunc` decorator or at pipeline-assembly time (`PipeFunc(func, ...)`), so existing functions can be used entirely untouched.
-Code that already follows good engineering practice—small, pure functions with explicit inputs and outputs—can therefore be adopted into a pipeline without modification, remains unit-testable in isolation, and stays reusable outside the framework.
+Crucially, the function bodies and signatures remain framework-agnostic—they accept and return plain Python objects and carry no framework-specific types—because all orchestration metadata lives in a thin wrapper, applied either as the `@pipefunc` decorator or at pipeline-assembly time (`PipeFunc(func, ...)`).
+Code that already follows good engineering practice—small, pure functions with explicit inputs and outputs—can therefore be adopted without modification, remains unit-testable in isolation, and stays reusable outside the framework.
 The same pipeline definition runs sequentially in a notebook, in parallel on a workstation, or on a SLURM [@yoo2003slurm] cluster, with results stored in pluggable backends (in-memory, file-based, or—via the optional Zarr [@zarr] integration—cloud-capable stores) and automatically reassembled into an `xarray.Dataset`.
 
 `pipefunc` is aimed at researchers who think in functions rather than in workflow-engine concepts: the cost of adopting it is a decorator per function, and the cost of leaving is deleting them.
@@ -70,7 +69,7 @@ The trade-off is a learning curve for the index notation, which is kept minimal 
 Third, execution, storage, and resource management are orthogonal plug-ins.
 A pipeline runs on any `concurrent.futures.Executor`; results go to any of several storage backends; per-function resource requirements (CPUs, memory, GPUs, wall time) can be declared—optionally as functions of the input arguments—and are translated into SLURM job submissions automatically.
 Different functions in one pipeline can use different executors and stores.
-The per-function scheduling overhead is roughly 15 µs, so the framework remains usable even for pipelines of many fast functions.
+The per-function scheduling overhead is roughly 10 µs on a recent laptop (Apple M4), measured over a 125,000-iteration sweep, so the framework remains usable even for pipelines of many fast functions.
 
 The pipeline supports two complementary execution modes.
 Beyond the parallel map-reduce of `pipeline.map`, a pipeline can be called directly for any single output (`pipeline("e", a=1, b=2)`), computing only the required upstream functions sequentially on demand; intermediate results can also be supplied to bypass upstream functions (`pipeline("e", c=3, d=6)`), which is convenient for interactive exploration and debugging.
@@ -146,10 +145,10 @@ The implementation is fully typed, has over 99.9% line coverage from more than 1
 
 # Research impact statement
 
-`pipefunc` has been distributed on PyPI since 2023 and on conda-forge, and was developed to support large-scale physics simulations, in particular multidimensional parameter sweeps in quantum-device modeling.
-As of June 2026, it has been downloaded over 185,000 times from conda-forge with PyPI adding roughly 34,000 downloads per month (per anaconda.org and pypistats.org), and an active user community exists around the project's GitHub repository (over 450 stars, eight code contributors) and Discord server.
-Open-source adoption, independent of the author, spans several domains: `rbyte` [@rbyte], an open-source multimodal dataset library for spatial intelligence developed by Yaak, uses `pipefunc` in its core; the computational-methodology repository of the Soundscape Attributes Translation Project in acoustics research builds its analysis on `pipefunc` pipelines [@satp]; and the pyiron developers prototype an integration [@pipefunc-executorlib] of `pipefunc` with `executorlib` [@executorlib] for materials-science workflows on HPC systems.
+`pipefunc` was developed to support large-scale physics simulations, in particular multidimensional parameter sweeps in quantum-device modeling, and has since been adopted independently of the author across several domains.
+`rbyte` [@rbyte], an open-source multimodal dataset library for spatial intelligence developed by Yaak, uses `pipefunc` in its core; the computational-methodology repository of the Soundscape Attributes Translation Project in acoustics research builds its analysis on `pipefunc` pipelines [@satp]; and the pyiron developers prototype an integration [@pipefunc-executorlib] of `pipefunc` with `executorlib` [@executorlib] for materials-science workflows on HPC systems.
 Downstream tools are also being built on top of it, such as `flowfunc` [@flowfunc], a workflow runner that uses `pipefunc` as its execution engine.
+This adoption is reflected in its distribution: available on PyPI since 2023 and on conda-forge, `pipefunc` had been downloaded over 185,000 times from conda-forge as of June 2026, with PyPI adding roughly 34,000 downloads per month (per anaconda.org and pypistats.org), and an active user community has formed around the project's GitHub repository (over 450 stars, eight code contributors) and Discord server.
 The design lineage traces to `aiida-dynamic-workflows` [@aiida-dynamic-workflows], developed at Microsoft Quantum for simulating topological qubit devices; `pipefunc` generalizes that approach without the AiiDA infrastructure requirement.
 
 # AI usage disclosure
