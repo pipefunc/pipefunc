@@ -79,6 +79,8 @@ The following condensed example, modeled on a typical device-simulation workflow
 The objects passed between functions are plain frozen dataclasses; the functions contain no `pipefunc`-specific code beyond the decorator.
 
 ```python
+EPS0, GAP = 8.854e-12, 1e-3  # permittivity (F/m), electrode gap (m)
+
 @pipefunc(output_name="geo")
 def make_geometry(x: float, y: float) -> Geometry:
     return Geometry(x, y)
@@ -88,8 +90,8 @@ def make_mesh(geo: Geometry, mesh_size: float, coarse_mesh_size: float = 0.1):
     return Mesh(geo, mesh_size), Mesh(geo, coarse_mesh_size)
 
 @pipefunc(output_name="materials")
-def make_materials(geo: Geometry) -> Materials:
-    return Materials(geo, ["i", "j", "c"])
+def make_materials(geo: Geometry, eps_r: float = 3.9) -> Materials:
+    return Materials(geo, eps_r)
 
 @pipefunc(
     output_name="electrostatics",
@@ -98,34 +100,40 @@ def make_materials(geo: Geometry) -> Materials:
 def run_electrostatics(
     mesh, materials, V_left: float, V_right: float
 ) -> Electrostatics:
-    return Electrostatics(mesh, materials, [V_left, V_right])
+    area = mesh.geometry.x * mesh.geometry.y
+    eps = EPS0 * materials.eps_r
+    C_left = eps * area / GAP        # left electrode fully overlaps
+    C_right = eps * area / 2 / GAP   # right electrode overlaps half
+    return Electrostatics(V_left, V_right, C_left, C_right)
 
 @pipefunc(
     output_name="charge",
     mapspec="electrostatics[i, j] -> charge[i, j]",
 )
 def get_charge(electrostatics: Electrostatics) -> float:
-    return sum(electrostatics.voltages)
+    es = electrostatics  # solved fields + capacitances
+    return es.C_left * es.V_left + es.C_right * es.V_right
 
 @pipefunc(
-    output_name="avg_over_V_left",
-    mapspec="charge[:, j] -> avg_over_V_left[j]",  # reduce axis i, keep j
+    output_name="capacitance",
+    mapspec="V_left[:], charge[:, j] -> capacitance[j]",  # reduce i, keep j
 )
-def avg_over_V_left(charge: np.ndarray) -> float:
-    return np.mean(charge)  # 1D result: one value per V_right
+def capacitance(V_left: np.ndarray, charge: np.ndarray) -> float:
+    charge = np.asarray(charge, dtype=float)
+    return np.polyfit(V_left, charge, 1)[0]  # slope dQ/dV_left = C_left
 
-@pipefunc(output_name="average_charge")  # no mapspec: gets the full 2D array
-def average_charge(charge: np.ndarray) -> float:
-    return np.mean(charge)  # scalar: reduces the entire array
+@pipefunc(output_name="max_charge")  # no mapspec: gets the full 2D array
+def max_charge(charge: np.ndarray) -> float:
+    return float(np.max(np.abs(charge)))  # peak |Q| over the bias range
 
 pipeline = Pipeline([make_geometry, make_mesh, make_materials,
                      run_electrostatics, get_charge,
-                     avg_over_V_left, average_charge])
+                     capacitance, max_charge])
 results = pipeline.map(inputs, run_folder="run", parallel=True)
 ```
 
-The mapspec on `run_electrostatics` declares an outer product over the voltage arrays, and `get_charge` maps element-wise over the resulting 2D array.
-Reductions are equally expressible through the same index algebra: `avg_over_V_left` uses `charge[:, j] -> avg_over_V_left[j]` to average over the `V_left` axis while keeping `V_right`, turning the 2D array into a 1D one, whereas `average_charge`—having no mapspec—receives the fully assembled array and reduces it to a scalar.
+The mapspec on `run_electrostatics` declares an outer product over the two electrode-voltage arrays, and `get_charge` maps element-wise over the resulting 2D array to give the induced charge `Q = C_left V_left + C_right V_right` at each bias point.
+Reductions are expressed through the same index algebra: `capacitance` uses `charge[:, j] -> capacitance[j]` to fit the slope `dQ/dV_left` for each `V_right`, recovering the mutual capacitance and collapsing the 2D array to 1D, whereas `max_charge`—having no mapspec—receives the fully assembled array and reduces it to a single peak value.
 Extending the study requires no changes to the functions: `Pipeline.add_mapspec_axis` rewrites the mapspecs of all downstream functions, so a two-parameter study becomes a four-dimensional one in two lines:
 
 ```python
