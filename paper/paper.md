@@ -13,10 +13,8 @@ authors:
     orcid: 0000-0003-0383-4986
     affiliation: "1, 2"
 affiliations:
-  - name: Delft University of Technology, Delft, The Netherlands
+  - name: IonQ Inc., College Park, Maryland, USA
     index: 1
-  - name: Current address — IonQ Inc., College Park, Maryland, USA
-    index: 2
 date: 10 June 2026
 bibliography: paper.bib
 ---
