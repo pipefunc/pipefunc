@@ -97,34 +97,28 @@ def make_materials(geo: Geometry, eps_r: float = 3.9) -> Materials:
     output_name="electrostatics",
     mapspec="V_left[i], V_right[j] -> electrostatics[i, j]",
 )
-def run_electrostatics(
-    mesh, materials, V_left: float, V_right: float
-) -> Electrostatics:
-    area = mesh.geometry.x * mesh.geometry.y
-    eps = EPS0 * materials.eps_r
-    C_left = eps * area / GAP        # left electrode fully overlaps
-    C_right = eps * area / 2 / GAP   # right electrode overlaps half
-    return Electrostatics(V_left, V_right, C_left, C_right)
+def run_electrostatics(mesh, materials, V_left, V_right) -> Electrostatics:
+    C = EPS0 * materials.eps_r * mesh.geometry.x * mesh.geometry.y / GAP
+    return Electrostatics(V_left, V_right, C_left=C, C_right=C / 2)
 
 @pipefunc(
     output_name="charge",
     mapspec="electrostatics[i, j] -> charge[i, j]",
 )
 def get_charge(electrostatics: Electrostatics) -> float:
-    es = electrostatics  # solved fields + capacitances
+    es = electrostatics
     return es.C_left * es.V_left + es.C_right * es.V_right
 
 @pipefunc(
     output_name="capacitance",
     mapspec="V_left[:], charge[:, j] -> capacitance[j]",  # reduce i, keep j
 )
-def capacitance(V_left: np.ndarray, charge: np.ndarray) -> float:
-    charge = np.asarray(charge, dtype=float)
-    return np.polyfit(V_left, charge, 1)[0]  # slope dQ/dV_left = C_left
+def capacitance(V_left, charge) -> float:
+    return np.polyfit(V_left, np.asarray(charge, float), 1)[0]
 
-@pipefunc(output_name="max_charge")  # no mapspec: gets the full 2D array
-def max_charge(charge: np.ndarray) -> float:
-    return float(np.max(np.abs(charge)))  # peak |Q| over the bias range
+@pipefunc(output_name="max_charge")  # no mapspec: gets the whole 2D array
+def max_charge(charge) -> float:
+    return float(np.max(np.abs(charge)))
 
 pipeline = Pipeline([make_geometry, make_mesh, make_materials,
                      run_electrostatics, get_charge,
