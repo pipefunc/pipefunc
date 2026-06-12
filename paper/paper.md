@@ -122,6 +122,8 @@ def max_charge(charge) -> float:
 pipeline = Pipeline([make_geometry, make_mesh, make_materials,
                      run_electrostatics, get_charge,
                      capacitance, max_charge])
+inputs = {"x": 0.1, "y": 0.2, "mesh_size": 0.01,
+          "V_left": np.linspace(0, 2, 3), "V_right": np.linspace(-0.5, 0.5, 2)}
 results = pipeline.map(inputs, run_folder="run", parallel=True)
 ```
 
@@ -139,14 +141,14 @@ ds = results.to_xarray()  # labeled 4D Dataset (V_left, V_right, x, y)
 \autoref{fig:pipeline} shows the resulting pipeline as rendered by `pipeline.visualize()`.
 Because the DAG is known before execution, the same pipeline can be inspected (`pipeline.print_documentation()` renders the functions' docstrings as pipeline documentation), validated (type annotations are checked between connected functions), restructured (`pipeline.nest_funcs` merges nodes so that large intermediate objects are never serialized), profiled, cached, and resumed after partial failure—all without touching the underlying functions.
 
-![The example pipeline after adding the `x` and `y` sweep axes, as rendered by `pipeline.visualize()`. Green dashed nodes are inputs, blue nodes are functions; each function node lists its outputs with mapspec indices and type annotations.\label{fig:pipeline}](pipeline.pdf)
+![The example pipeline after adding the `x` and `y` sweep axes, as rendered by `pipeline.visualize()`. Green dashed nodes are inputs, blue nodes are functions; each function node lists its outputs with mapspec indices.\label{fig:pipeline}](pipeline.pdf)
 
 The implementation is fully typed, has over 99.9% line coverage from more than 1100 tests (enforced in continuous integration and tracked on Codecov), and has only three required dependencies.
 
 # Research impact statement
 
 `pipefunc` was developed to support large-scale physics simulations, in particular multidimensional parameter sweeps in quantum-device modeling, and has since been adopted independently of the author across several domains.
-`rbyte` [@rbyte], an open-source multimodal dataset library for spatial intelligence developed by Yaak, uses `pipefunc` in its core; a soundscape-psychometrics study from the Soundscape Attributes Translation Project [@satp] has its reproducible data analysis implemented with `pipefunc` pipelines [@satp-repo]; and the pyiron developers prototype an integration [@pipefunc-executorlib] of `pipefunc` with `executorlib` [@executorlib] for materials-science workflows on HPC systems.
+`rbyte` [@rbyte], an open-source multimodal dataset library for spatial intelligence developed by Yaak, uses `pipefunc` in its core; a soundscape-psychometrics study from the Soundscape Attributes Translation Project [@satp] has its reproducible data analysis implemented with `pipefunc` pipelines [@satp-repo]; and the pyiron developers have prototyped an integration [@pipefunc-executorlib] of `pipefunc` with `executorlib` [@executorlib] for materials-science workflows on HPC systems.
 Downstream tools are also being built on top of it, such as `flowfunc` [@flowfunc], a workflow runner that uses `pipefunc` as its execution engine.
 This adoption is reflected in its distribution: available on PyPI since 2023 and on conda-forge, `pipefunc` had been downloaded over 185,000 times from conda-forge as of June 2026, with PyPI adding roughly 34,000 downloads per month (per anaconda.org and pypistats.org); the project is openly developed on GitHub (over 450 stars, eight code contributors) and provides a public Discord channel for user questions.
 The design lineage traces to `aiida-dynamic-workflows` [@aiida-dynamic-workflows], developed at Microsoft Quantum for simulating topological qubit devices; `pipefunc` generalizes that approach without the AiiDA infrastructure requirement.
