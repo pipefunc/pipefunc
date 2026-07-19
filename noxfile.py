@@ -40,7 +40,12 @@ def pytest_all_deps(session: nox.Session) -> None:
             # "mcp",  # because 'fastmcp' -> 'cryptography'
             # "zarr",  # because 'numcodecs' -> 'cryptography'
         ]
-        session.install(f".[test,{','.join(extras)}]")
+        requirements = [f".[test,{','.join(extras)}]"]
+        if session.python == "3.13t":
+            # These releases stopped publishing wheels for the experimental
+            # Python 3.13 free-threaded ABI. Avoid slow, fragile source builds.
+            requirements.extend(("nh3<0.3.2", "pillow<12.3", "scipy<1.18"))
+        session.install(*requirements)
     else:
         session.install(".[all,test]")
     session.run("pytest", *xdist)
