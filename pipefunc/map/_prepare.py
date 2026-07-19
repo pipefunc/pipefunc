@@ -69,7 +69,9 @@ def prepare_run(
     inputs = pipeline._flatten_scopes(inputs)
     output_names = ensure_output_names_set(output_names)
     if auto_subpipeline or output_names is not None:
-        pipeline = pipeline.subpipeline(set(inputs), output_names)
+        subpipeline = pipeline.subpipeline(set(inputs), output_names)
+        subpipeline.cache = pipeline.cache
+        pipeline = subpipeline
     executor = _expand_output_name_in_executor(pipeline, executor)
     validate_slurm_executor(executor, in_async)
     _validate_complete_inputs(pipeline, inputs)

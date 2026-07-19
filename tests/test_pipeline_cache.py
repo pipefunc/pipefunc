@@ -205,6 +205,48 @@ def test_sharing_defaults() -> None:
         assert calls == {"f": 2, "g": 2}
 
 
+@pytest.mark.parametrize(
+    ("output_names", "auto_subpipeline"),
+    [
+        pytest.param(["metric"], False, id="output_names"),
+        pytest.param(None, True, id="auto_subpipeline"),
+    ],
+)
+def test_map_subpipeline_shares_cache(
+    output_names: list[str] | None,
+    auto_subpipeline: bool,
+) -> None:
+    calls = {"simulate": 0, "metric": 0}
+
+    @pipefunc(output_name="sim", mapspec="x[i] -> sim[i]", cache=True)
+    def simulate(x):
+        calls["simulate"] += 1
+        return x * 10
+
+    @pipefunc(output_name="metric", mapspec="sim[i] -> metric[i]", cache=True)
+    def metric(sim):
+        calls["metric"] += 1
+        return sim + 1
+
+    pipeline = Pipeline(
+        [simulate, metric],
+        cache_type="hybrid",
+        cache_kwargs={"shared": False},
+    )
+    for _ in range(2):
+        pipeline.map(
+            {"x": [1, 2, 3]},
+            output_names=output_names,
+            auto_subpipeline=auto_subpipeline,
+            parallel=False,
+            storage="dict",
+        )
+
+    assert calls == {"simulate": 3, "metric": 3}
+    assert pipeline.cache is not None
+    assert len(pipeline.cache) == 6
+
+
 def test_autoset_cache() -> None:
     @pipefunc(output_name="y", cache=True)
     def f(a):
