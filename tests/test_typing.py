@@ -14,6 +14,7 @@ from typing import (
     TypeAlias,
     TypeVar,
     Union,
+    get_args,
     get_type_hints,
 )
 
@@ -68,8 +69,12 @@ def test_are_types_compatible_numpy():
     assert is_type_compatible(npt.NDArray, npt.NDArray[Any])
     assert is_type_compatible(npt.NDArray[Any], npt.NDArray[Any])
     assert is_type_compatible(npt.NDArray[np.int32], npt.NDArray[Any])
-    # npt.NDArray without arguments turns into numpy.ndarray[typing.Any, numpy.dtype[+_ScalarType_co]]
-    assert not is_type_compatible(npt.NDArray[Any], npt.NDArray)
+    if get_args(npt.NDArray):
+        # Before NumPy 2.5, bare NDArray retains an unresolved scalar type parameter.
+        assert not is_type_compatible(npt.NDArray[Any], npt.NDArray)
+    else:
+        # NumPy 2.5 defines NDArray with Any as the default scalar type.
+        assert is_type_compatible(npt.NDArray[Any], npt.NDArray)
 
 
 def test_are_types_compatible_standard_edge_cases():
