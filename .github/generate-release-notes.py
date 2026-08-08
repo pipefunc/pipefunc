@@ -148,7 +148,6 @@ def _categorize_pr_title(pr_title: str) -> tuple[int, str]:
         "BUG:": "🐛 Bug Fixes",
         "FIX:": "🐛 Bug Fixes",  # Used this a couple of times, but now stick to "BUG:"
         "⬆️": "📦 Dependencies",
-        "[pre-commit.ci]": "🔄 Pre-commit",
     }
     for prefix, category in mapping.items():
         if pr_title.startswith(prefix):
