@@ -7,10 +7,12 @@ from ._mapspec import MapSpec
 from ._run import run_map, run_map_async
 from ._run_info import RunInfo
 from ._storage_array._base import StorageBase, register_storage, storage_registry
+from ._storage_array._chunked_file import ChunkedFileArray
 from ._storage_array._dict import DictArray, SharedMemoryDictArray
 from ._storage_array._file import FileArray
 
 __all__ = [
+    "ChunkedFileArray",
     "DictArray",
     "FileArray",
     "MapSpec",
