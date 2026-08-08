@@ -430,3 +430,27 @@ async def test_widget_error_display_without_rich():
         widget._refresh_display("failed", error)
         widget._toggle_traceback(None)
         mock_print.assert_called_with(error)
+
+
+@pytest.mark.asyncio
+async def test_multiple_tasks():
+    """Test that multiple tasks can be attached to the widget."""
+    widget = AsyncTaskStatusWidget(display=False, initial_update_interval=0.01)
+
+    async def test_task():
+        await asyncio.sleep(0.001)
+        return "done"
+
+    t1 = asyncio.create_task(test_task())
+    t2 = asyncio.create_task(test_task())
+    widget.attach_task(t1, t2)
+    await asyncio.sleep(0.05)
+    assert "completed successfully" in widget._status_html_widget.value
+
+
+@pytest.mark.asyncio
+async def test_multiple_tasks_no_tasks():
+    """Test that an error is raised if no tasks are provided."""
+    widget = AsyncTaskStatusWidget(display=False)
+    with pytest.raises(ValueError, match="No tasks to monitor, provide at least one"):
+        widget.attach_task()
