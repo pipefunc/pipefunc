@@ -624,7 +624,7 @@ def visualize_graphviz_widget(
         "graphviz_anywidget",
         "graphviz",
         reason="visualize_graphviz_widget",
-        extras="plotting",
+        extras="widgets",
     )
     from graphviz_anywidget import graphviz_widget
 
