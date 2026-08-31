@@ -74,18 +74,22 @@ Here is a simple example usage of pipefunc to illustrate its primary features:
 ```python
 from pipefunc import pipefunc, Pipeline
 
+
 # Define three functions that will be a part of the pipeline
 @pipefunc(output_name="c")
 def f_c(a, b):
     return a + b
 
+
 @pipefunc(output_name="d")
 def f_d(b, c):
     return b * c
 
+
 @pipefunc(output_name="e")
 def f_e(c, d, x=1):
     return c * d * x
+
 
 # Create a pipeline with these functions
 pipeline = Pipeline([f_c, f_d, f_e], profile=True)  # `profile=True` enables resource profiling
@@ -111,13 +115,18 @@ from pipefunc import pipefunc, Pipeline
 from pipefunc.map import load_outputs
 import numpy as np
 
-@pipefunc(output_name="c", mapspec="a[i], b[j] -> c[i, j]")  # the mapspec is used to specify the mapping
+
+@pipefunc(
+    output_name="c", mapspec="a[i], b[j] -> c[i, j]"
+)  # the mapspec is used to specify the mapping
 def f(a: int, b: int):
     return a + b
+
 
 @pipefunc(output_name="mean")  # there is no mapspec, so this function takes the full 2D array
 def g(c: np.ndarray):
     return np.mean(c)
+
 
 pipeline = Pipeline([f, g])
 inputs = {"a": [1, 2, 3], "b": [4, 5, 6]}
