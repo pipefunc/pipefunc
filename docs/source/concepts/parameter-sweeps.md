@@ -49,7 +49,5 @@ set_cache_for_sweep(output_name, pipeline, sweep, min_executions=2, verbose=True
 We can now run the sweep using e.g.,
 
 ```python
-results = [
-    pipeline.run(output_name, kwargs=combo, full_output=True) for combo in sweep.list()
-]
+results = [pipeline.run(output_name, kwargs=combo, full_output=True) for combo in sweep.list()]
 ```

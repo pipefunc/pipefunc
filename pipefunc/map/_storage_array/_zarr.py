@@ -111,7 +111,7 @@ def _decode_with_mask(
         mask_array = np.broadcast_to(mask_array, data_array.shape)
 
     decoded = np.empty(data_array.shape, dtype=object)
-    for idx in np.ndindex(data_array.shape if data_array.shape else (1,)):
+    for idx in np.ndindex(data_array.shape or (1,)):
         index = idx if data_array.shape else ()
         if mask_array[index]:
             decoded[index] = None
