@@ -12,10 +12,24 @@ min_cpus = 2  # if ≤2 parallelization is not worth it
 xdist = ("-n", "auto") if num_cpus > min_cpus else ()
 
 
+def _install(session: nox.Session, *requirements: str) -> None:
+    """Install dependencies without expensive source builds on Python 3.13t."""
+    if session.python == "3.13t":
+        # Many packages no longer publish wheels for this experimental ABI.
+        # Keep small source builds for dependencies that have no 3.13t wheels.
+        session.install(
+            "--only-binary=:all:",
+            "--no-binary=pipefunc,cffi,pyyaml,tornado",
+            *requirements,
+        )
+    else:
+        session.install(*requirements)
+
+
 @nox.session(python=python)
 def pytest_min_deps(session: nox.Session) -> None:
     """Run pytest with no optional dependencies."""
-    session.install(".[test]")
+    _install(session, ".[test]")
     session.run("pytest", *xdist)
 
 
@@ -40,12 +54,7 @@ def pytest_all_deps(session: nox.Session) -> None:
             # "mcp",  # because 'fastmcp' -> 'cryptography'
             # "zarr",  # because 'numcodecs' -> 'cryptography'
         ]
-        requirements = [f".[test,{','.join(extras)}]"]
-        if session.python == "3.13t":
-            # These releases stopped publishing wheels for the experimental
-            # Python 3.13 free-threaded ABI. Avoid slow, fragile source builds.
-            requirements.extend(("nh3<0.3.2", "pillow<12.3", "scipy<1.18"))
-        session.install(*requirements)
+        _install(session, f".[test,{','.join(extras)}]")
     else:
-        session.install(".[all,test]")
+        _install(session, ".[all,test]")
     session.run("pytest", *xdist)
