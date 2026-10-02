@@ -122,9 +122,10 @@ def add(a: int, b: float) -> float:
     """Add two numbers together."""
     return a + b
 
-reveal_type(add)           # PipeFunc[(a: int, b: float), float]
-reveal_type(add(1, 2.0))   # float
-add("wrong", "types")      # error: incompatible argument types
+
+reveal_type(add)  # PipeFunc[(a: int, b: float), float]
+reveal_type(add(1, 2.0))  # float
+add("wrong", "types")  # error: incompatible argument types
 add.update_renames({"a": "x"})  # PipeFunc methods remain fully typed
 ```
 

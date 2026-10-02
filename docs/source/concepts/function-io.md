@@ -47,8 +47,10 @@ This function `f` has a default value for `x` set to 2.
 ```python
 from pipefunc import PipeFunc
 
+
 def f(a, x):
     return a * x
+
 
 f_func = PipeFunc(f, output_name="y", defaults={"x": 2})
 ```
@@ -269,8 +271,10 @@ f(a=1, x=999)  # x is ignored and replaced by the bound value
 ```python
 from pipefunc import PipeFunc
 
+
 def f(a, x):
-   return a + x
+    return a + x
+
 
 f_func = PipeFunc(f, output_name="y", bound={"x": 2})
 ```
@@ -380,14 +384,17 @@ from pipefunc import PipeFunc, Pipeline
 from dataclasses import dataclass
 from pydantic import BaseModel
 
+
 @dataclass
 class InputDataClass:
     a: int
     b: int
 
+
 class PydanticModel(BaseModel):
     x: int
     y: int
+
 
 # We can use these classes as PipeFuncs
 
@@ -470,36 +477,44 @@ import numpy as np
 from pipefunc import Pipeline, pipefunc
 from pipefunc.typing import Array
 
+
 @dataclass
 class Status:
     complete: list[int]
     incomplete: list[int]
 
+
 @pipefunc("status")
 def get_status(mock_complete: list[int], mock_incomplete: list[int]) -> Status:
     return Status(mock_complete, mock_incomplete)
+
 
 @pipefunc("incomplete")
 def get_incomplete(status: Status) -> list[int]:
     return status.incomplete
 
+
 @pipefunc("complete")
 def get_complete(status: Status) -> list[int]:
     return status.complete
+
 
 @pipefunc("loaded", mapspec="complete[i] -> loaded[i]")
 def load_complete(complete: int) -> int:
     # Pretend we loaded something
     return complete
 
+
 @pipefunc("executed", mapspec="incomplete[j] -> executed[j]")
 def run_incomplete(incomplete: int) -> int:
     # Pretend we executed something
     return incomplete
 
+
 @pipefunc("result")
 def combine(loaded: Array[int], executed: Array[int]) -> list[int]:
     return list(loaded) + list(executed)
+
 
 pipeline = Pipeline(
     [
