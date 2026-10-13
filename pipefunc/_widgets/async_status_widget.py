@@ -116,7 +116,7 @@ class AsyncTaskStatusWidget:
         self._start_time = time.monotonic()
         self._start_datetime = datetime.now().strftime("%H:%M:%S")  # noqa: DTZ005
         self._update_interval = initial_update_interval
-        self._task: asyncio.Task | None = None
+        self._task: asyncio.Future | None = None
         self._update_timer: asyncio.Task | None = None
         self._exception: Exception | None = None
 
@@ -301,15 +301,26 @@ class AsyncTaskStatusWidget:
         """Display the widget in the current cell."""
         IPython.display.display(self.widget)
 
-    def attach_task(self, task: asyncio.Task) -> None:
+    def attach_task(self, *tasks: asyncio.Future) -> None:
         """Attach the widget to a task for monitoring.
 
         Parameters
         ----------
-        task
-            The asyncio.Task to monitor
+        tasks
+            The asyncio.Task(s) or asyncio.Future(s) to monitor.
+            If multiple are provided, they will be gathered.
 
         """
+        assert all(isinstance(task, asyncio.Future) for task in tasks)
+
+        if len(tasks) > 1:
+            task = asyncio.gather(*tasks)
+        elif len(tasks) == 1:
+            task = tasks[0]
+        else:
+            msg = "No tasks to monitor, provide at least one"
+            raise ValueError(msg)
+
         self._task = task
         task.add_done_callback(self.update_status)
         self._refresh_display("running")
