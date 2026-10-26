@@ -33,10 +33,10 @@ class AdaptiveSchedulerDetails(NamedTuple):
     learners: list[SequenceLearner]
     fnames: list[Path]
     dependencies: dict[int, list[int]]
-    nodes: tuple[int | None | Callable[[], int | None], ...] | None
-    cores_per_node: tuple[int | None | Callable[[], int | None], ...] | None
+    nodes: tuple[int | Callable[[], int | None] | None, ...] | None
+    cores_per_node: tuple[int | Callable[[], int | None] | None, ...] | None
     extra_scheduler: tuple[list[str] | Callable[[], list[str]], ...] | None
-    partition: tuple[str | None | Callable[[], str | None], ...] | None
+    partition: tuple[str | Callable[[], str | None] | None, ...] | None
     executor_type: tuple[EXECUTOR_TYPES | Callable[[], EXECUTOR_TYPES], ...] | None = None
 
     def kwargs(self) -> dict[str, Any]:
