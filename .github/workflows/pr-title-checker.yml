@@ -13,7 +13,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: thehanimo/pr-title-checker@v1.4.3
+      - uses: thehanimo/pr-title-checker@v2.0.0
         id: check
         continue-on-error: true
         with:
