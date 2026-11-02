@@ -296,7 +296,7 @@ class Resources:
 
     @staticmethod
     def maybe_with_defaults(
-        resources: Resources | None | Callable[[dict[str, Any]], Resources],
+        resources: Resources | Callable[[dict[str, Any]], Resources] | None,
         default_resources: Resources | None,
     ) -> Resources | Callable[[dict[str, Any]], Resources] | None:
         """Combine the Resources instance with default resources, if provided."""

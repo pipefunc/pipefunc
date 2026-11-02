@@ -31,9 +31,11 @@ This tutorial explains how to:
 from pipefunc import Pipeline, pipefunc
 from adaptive_scheduler import SlurmExecutor
 
+
 @pipefunc(output_name="y", resources={"cpus": 2})  # SLURM job with 2 CPUs.
 def double_it(x: int) -> int:
     return 2 * x
+
 
 pipeline = Pipeline([double_it])
 runner = pipeline.map_async(
@@ -88,9 +90,11 @@ To run your pipeline on a SLURM cluster, instantiate a `SlurmExecutor` and pass 
 from pipefunc import Pipeline, pipefunc
 from adaptive_scheduler import SlurmExecutor
 
+
 @pipefunc(output_name="y", mapspec="x[i] -> y[i]", resources={"cpus": 2})
 def double_it(x: int) -> int:
     return 2 * x
+
 
 @pipefunc(
     output_name="z",
@@ -104,9 +108,11 @@ def double_it(x: int) -> int:
 def add_one(y: int) -> int:
     return y + 1
 
+
 @pipefunc(output_name="z_sum")
 def sum_it(z):
     return sum(z)
+
 
 pipeline = Pipeline([double_it, add_one, sum_it])
 inputs = {"x": range(10)}
@@ -189,6 +195,7 @@ Suppose you want to process 100 items, but you want to split them into two SLURM
 from pipefunc import Pipeline, pipefunc
 from adaptive_scheduler import SlurmExecutor
 
+
 @pipefunc(
     output_name="y",
     mapspec="x[i] -> y[i]",
@@ -197,6 +204,7 @@ from adaptive_scheduler import SlurmExecutor
 )
 def process_item(x):
     return x + 1
+
 
 pipeline = Pipeline([process_item])
 
@@ -234,6 +242,7 @@ from adaptive_scheduler import SlurmExecutor
 
 executor = SlurmExecutor()
 
+
 @pipefunc(
     output_name="data_processed",
     resources={"cpus": 2, "memory": "4GB"},
@@ -246,10 +255,12 @@ def process_data(data, resources):
     print(f"Allocated Resources: {resources}")
     # The function can now manage its own parallelism (e.g. via a process pool).
     from concurrent.futures import ProcessPoolExecutor
+
     with ProcessPoolExecutor(resources.cpus) as ex:
         # Do some printing in parallel (not smart, but just to show the parallelization)
         list(ex.map(print, data))
     return sum(data)
+
 
 pipeline = Pipeline([process_data])
 result = pipeline(data=[1, 2, 3])
@@ -269,17 +280,21 @@ For example:
 from concurrent.futures import ThreadPoolExecutor
 from adaptive_scheduler import SlurmExecutor
 
+
 @pipefunc(output_name="a", mapspec="x[i] -> a[i]", resources={"cpus": 2})
 def slow_function(x: int) -> int:
     # Simulate a slow, resource-intensive computation.
     import time
+
     time.sleep(1)
     return x * 10
+
 
 @pipefunc(output_name="b", mapspec="a[i] -> b[i]")
 def fast_function(a: int) -> int:
     # Simulate a fast computation that does not require heavy resources.
     return a + 5
+
 
 pipeline = Pipeline([slow_function, fast_function])
 inputs = {"x": range(5)}
@@ -338,20 +353,22 @@ For large array-like inputs (e.g., lists of objects, large NumPy arrays) that ar
 from pathlib import Path
 import numpy as np
 from pipefunc import Pipeline, pipefunc
-from pipefunc.helpers import FileArray # Import FileArray
-from adaptive_scheduler import SlurmExecutor # Assuming SlurmExecutor is used
+from pipefunc.helpers import FileArray  # Import FileArray
+from adaptive_scheduler import SlurmExecutor  # Assuming SlurmExecutor is used
 
 large_array_data = np.arange(1_000_000)
-shared_input_folder = Path("/mnt/shared/my_large_array_data") # Accessible by Slurm nodes
+shared_input_folder = Path("/mnt/shared/my_large_array_data")  # Accessible by Slurm nodes
 shared_input_folder.mkdir(parents=True, exist_ok=True)
 file_array_input = FileArray.from_data(large_array_data, shared_input_folder)
+
 
 @pipefunc(output_name="y", mapspec="x[i] -> y[i]", resources={"cpus": 1}, resources_scope="element")
 def process_element(x: int) -> int:
     return x * 2
 
+
 pipeline = Pipeline([process_element])
-run_folder = Path("/mnt/shared/my_run_output_slurm") # Also shared
+run_folder = Path("/mnt/shared/my_run_output_slurm")  # Also shared
 
 runner = pipeline.map_async(
     inputs={"x": file_array_input},
@@ -376,24 +393,26 @@ For single, potentially large, non-iterable inputs (e.g., a large configuration 
 ```python
 from pathlib import Path
 from pipefunc import Pipeline, pipefunc, resources
-from pipefunc.helpers import FileValue # Import FileValue
+from pipefunc.helpers import FileValue  # Import FileValue
 from adaptive_scheduler import SlurmExecutor
 
 large_config_object = {"param_a": "value_a", "data": list(range(100_000))}
-shared_file_path = Path("/mnt/shared/my_large_config.pkl") # Accessible by Slurm nodes
+shared_file_path = Path("/mnt/shared/my_large_config.pkl")  # Accessible by Slurm nodes
 file_ref_input = FileValue.from_data(large_config_object, shared_file_path)
+
 
 @pipefunc(output_name="y", resources={"cpus": 1})
 def use_config(config: dict, task_id: int) -> str:
     # config will be the loaded large_config_object
     return f"Task {task_id} processed config with {len(config.get('data', []))} items."
 
+
 pipeline = Pipeline([use_config])
 run_folder = Path("/mnt/shared/my_single_obj_run")
 
 # Example: Pass the same large config to multiple "tasks" simulated by a mapspec on task_id
 # In a real scenario, 'config' might be a non-mapspec'd input to several parallel mapspec functions.
-pipeline.add_mapspec_axis("task_id", axis="i") # Make task_id a mapspec input
+pipeline.add_mapspec_axis("task_id", axis="i")  # Make task_id a mapspec input
 
 runner = pipeline.map_async(
     inputs={"config": file_ref_input, "task_id": range(5)},
