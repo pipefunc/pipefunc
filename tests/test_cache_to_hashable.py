@@ -47,6 +47,30 @@ def test_to_hashable_numpy_array() -> None:
     assert result[2][2] == (1, 2, 3, 4)  # type: ignore[index]
 
 
+def test_to_hashable_numpy_object_array_with_unhashable_elements() -> None:
+    arr = np.empty(2, dtype=object)
+    arr[0] = [1, 2]
+    arr[1] = np.array([3, 4])
+    result = to_hashable(arr)
+    hash(result)
+    assert result[2][0] == (2,)  # type: ignore[index]
+    assert result[2][1] == "|O"  # type: ignore[index]
+    assert result[2][2] == (to_hashable([1, 2]), to_hashable(np.array([3, 4])))  # type: ignore[index]
+
+    other = np.empty(2, dtype=object)
+    other[0] = [1, 2]
+    other[1] = np.array([3, 5])
+    assert to_hashable(other) != result
+
+    class Unhashable:
+        __hash__ = None  # type: ignore[assignment]
+
+    unhashable = np.empty(1, dtype=object)
+    unhashable[0] = Unhashable()
+    with pytest.raises(UnhashableError):
+        to_hashable(unhashable, fallback_to_pickle=False)
+
+
 @pytest.mark.skipif(not has_pandas, reason="pandas not installed")
 def test_to_hashable_pandas_series() -> None:
     import pandas as pd
