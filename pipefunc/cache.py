@@ -923,7 +923,10 @@ def to_hashable(  # noqa: C901, PLR0911, PLR0912
 
     # Handle numpy arrays
     if "numpy" in sys.modules and isinstance(obj, sys.modules["numpy"].ndarray):
-        return (m, tp, (obj.shape, obj.dtype.str, tuple(obj.flatten())))
+        flat = obj.flatten()
+        # Object arrays can hold unhashable elements (e.g., lists or arrays)
+        items = _hashable_iterable(flat, fallback_to_pickle) if obj.dtype.hasobject else tuple(flat)
+        return (m, tp, (obj.shape, obj.dtype.str, items))
 
     # Handle pandas Series and DataFrames
     if "pandas" in sys.modules:
