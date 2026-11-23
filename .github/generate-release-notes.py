@@ -241,7 +241,7 @@ def _get_pr_nr(line: str) -> str | None:
 
 def _get_first_line(message: str) -> str:
     """Get the first line of a multi-line message."""
-    return message.split("\n")[0].strip()
+    return message.split("\n", maxsplit=1)[0].strip()
 
 
 def _get_file_stats(
